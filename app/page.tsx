@@ -322,6 +322,19 @@ export default function Home() {
           </div>
           <p className="text-xs" style={{ color: "#5a4a40" }}>© 2025 Moncie Estética. Todos os direitos reservados.</p>
         </div>
+        <div className="max-w-6xl mx-auto mt-6 pt-6 text-center w-full" style={{ borderTop: "1px solid rgba(200,160,120,0.08)" }}>
+          <p className="text-xs w-full" style={{ color: "#5a4a40" }}>
+            Desenvolvido por{" "}
+            <a
+              href="https://riandrodev.netlify.app/"
+              target="_blank"
+              className="transition hover:text-white"
+              style={{ color: "#c8a078" }}
+            >
+              Riandro Deian
+            </a>
+          </p>
+        </div>
       </footer>
 
       {/* WHATSAPP FIXO */}
