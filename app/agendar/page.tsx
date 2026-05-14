@@ -1,155 +1,365 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 
+const procedimentos = [
+  "Botox",
+  "Harmonização Facial",
+  "Limpeza de Pele",
+  "Peeling",
+  "Massagem Relaxante",
+  "Drenagem Linfática",
+  "Harmonização de Glúteo",
+];
+
+const horarios = [
+  "08:00", "09:00", "10:00", "11:00",
+  "13:00", "14:00", "15:00", "16:00", "17:00",
+];
+
+type Etapa = "form" | "sucesso";
+
 export default function Agendar() {
-  const [nome, setNome] = useState("");
-  const [data, setData] = useState("");
-  const [procedimento, setProcedimento] = useState("");
+  const [etapa, setEtapa] = useState<Etapa>("form");
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
-  const [agendamentos, setAgendamentos] = useState<any[]>([]);
+  const [erro, setErro] = useState("");
 
-  const procedimentos = [
-    "Botox",
-    "Harmonização Facial",
-    "Limpeza de Pele",
-    "Peeling",
-    "Massagem Relaxante",
-    "Drenagem Linfática",
-  ];
+  const [nome, setNome] = useState("");
+  const [telefone, setTelefone] = useState("");
+  const [procedimento, setProcedimento] = useState("");
+  const [data, setData] = useState("");
+  const [horario, setHorario] = useState("");
 
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (!data.user) window.location.href = "/login";
-    });
-    fetchAgendamentos();
-  }, []);
-
-  async function fetchAgendamentos() {
-    const { data } = await supabase
-      .from("agendamentos")
-      .select("*")
-      .order("data", { ascending: true });
-    if (data) setAgendamentos(data);
+  function formatarTelefone(valor: string) {
+    const nums = valor.replace(/\D/g, "").slice(0, 11);
+    if (nums.length <= 2) return nums;
+    if (nums.length <= 7) return `(${nums.slice(0, 2)}) ${nums.slice(2)}`;
+    return `(${nums.slice(0, 2)}) ${nums.slice(2, 7)}-${nums.slice(7)}`;
   }
 
-  async function handleSalvar() {
-    if (!nome || !data || !procedimento) {
-      setMessage("Preencha todos os campos!");
+  const hoje = new Date().toISOString().split("T")[0];
+
+  async function handleSubmit() {
+    setErro("");
+
+    if (!nome || !telefone || !procedimento || !data || !horario) {
+      setErro("Por favor, preencha todos os campos.");
       return;
     }
+
     setLoading(true);
-    const { error } = await supabase
+
+    // Verifica se horário já está ocupado
+    const { data: existente } = await supabase
       .from("agendamentos")
-      .insert([{ nome, data, procedimento }]);
-    if (error) setMessage(error.message);
-    else {
-      setMessage("Agendamento salvo com sucesso!");
-      setNome("");
-      setData("");
-      setProcedimento("");
-      fetchAgendamentos();
+      .select("id")
+      .eq("data", data)
+      .eq("horario", horario)
+      .neq("status", "cancelado")
+      .single();
+
+    if (existente) {
+      setErro("Este horário já está reservado. Por favor, escolha outro.");
+      setLoading(false);
+      return;
     }
+
+    const { error } = await supabase.from("agendamentos").insert([
+      {
+        nome,
+        telefone,
+        procedimento,
+        data,
+        horario,
+        status: "pendente",
+      },
+    ]);
+
     setLoading(false);
+
+    if (error) {
+      setErro("Erro ao realizar agendamento. Tente novamente.");
+      return;
+    }
+
+    setEtapa("sucesso");
   }
 
-  async function handleDeletar(id: string) {
-    await supabase.from("agendamentos").delete().eq("id", id);
-    fetchAgendamentos();
+  if (etapa === "sucesso") {
+    return (
+      <main
+        className="min-h-svh bg-[#0a0707] text-white flex items-center justify-center px-6"
+        style={{ fontFamily: "Georgia, serif" }}
+      >
+        <div className="text-center max-w-lg">
+          {/* Ícone */}
+          <div
+            className="w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-8 text-4xl"
+            style={{ background: "rgba(200,160,120,0.12)", border: "1px solid rgba(200,160,120,0.3)" }}
+          >
+            ✓
+          </div>
+
+          <p
+            className="uppercase tracking-[0.4em] text-xs mb-4"
+            style={{ color: "#c8a078" }}
+          >
+            Agendamento Realizado
+          </p>
+
+          <h1 className="text-4xl md:text-5xl font-bold mb-6">
+            Tudo certo, {nome.split(" ")[0]}!
+          </h1>
+
+          <p className="text-lg leading-8 mb-4" style={{ color: "#a89080" }}>
+            Seu agendamento de{" "}
+            <span style={{ color: "#c8a078" }}>{procedimento}</span> foi registrado para{" "}
+            <span style={{ color: "#c8a078" }}>
+              {new Date(data + "T12:00:00").toLocaleDateString("pt-BR", {
+                day: "2-digit",
+                month: "long",
+              })}
+            </span>{" "}
+            às <span style={{ color: "#c8a078" }}>{horario}</span>.
+          </p>
+
+          <p className="text-sm mb-10" style={{ color: "#a89080" }}>
+            Em breve nossa equipe entrará em contato para confirmar.
+          </p>
+
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <a
+              href="https://wa.me/556193578458"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-8 py-4 rounded-full text-sm uppercase tracking-widest font-semibold transition hover:scale-105"
+              style={{ background: "#c8a078", color: "#0a0707" }}
+            >
+              Confirmar pelo WhatsApp
+            </a>
+
+            <a
+              href="/"
+              className="px-8 py-4 rounded-full text-sm uppercase tracking-widest font-semibold transition hover:scale-105"
+              style={{
+                border: "1px solid rgba(200,160,120,0.3)",
+                color: "#c8a078",
+              }}
+            >
+              Voltar ao Início
+            </a>
+          </div>
+        </div>
+      </main>
+    );
   }
 
   return (
-    <main className="min-h-screen bg-[#0a0707] px-6 py-20">
-      <div className="max-w-2xl mx-auto">
+    <main
+      className="min-h-svh bg-[#0a0707] text-white px-6 py-16"
+      style={{ fontFamily: "Georgia, serif" }}
+    >
+      {/* Fundo decorativo */}
+      <div
+        className="fixed w-[400px] h-[400px] rounded-full blur-3xl pointer-events-none"
+        style={{
+          background: "rgba(200,160,120,0.05)",
+          top: "10%",
+          right: "-10%",
+        }}
+      />
 
-        <h1 className="text-4xl font-bold mb-2 text-white">Agendamentos</h1>
-        <p className="mb-10 text-sm" style={{ color: "#a89080" }}>
-          Moncie Clínica de Estética
-        </p>
+      <div className="max-w-2xl mx-auto relative">
 
-        {/* FORMULÁRIO */}
-        <div
-          className="rounded-3xl p-8 mb-10"
-          style={{ background: "#120d0d", border: "1px solid rgba(200,160,120,0.15)" }}
+        {/* Voltar */}
+        <a
+          href="/"
+          className="inline-flex items-center gap-2 text-sm mb-12 transition hover:opacity-70"
+          style={{ color: "#a89080" }}
         >
-          <div className="flex flex-col gap-4">
+          ← Voltar
+        </a>
+
+        {/* Header */}
+        <div className="mb-12">
+          <p
+            className="uppercase tracking-[0.4em] text-xs mb-4"
+            style={{ color: "#c8a078" }}
+          >
+            Clínica Moncie
+          </p>
+
+          <h1 className="text-4xl md:text-5xl font-bold mb-4">
+            Agendar Procedimento
+          </h1>
+
+          <p style={{ color: "#a89080" }}>
+            Preencha os dados abaixo e nossa equipe confirmará em breve.
+          </p>
+        </div>
+
+        {/* Formulário */}
+        <div className="flex flex-col gap-5">
+
+          {/* Nome */}
+          <div>
+            <label
+              className="block text-xs uppercase tracking-widest mb-2"
+              style={{ color: "#c8a078" }}
+            >
+              Nome completo
+            </label>
             <input
               type="text"
-              placeholder="Nome do cliente"
+              placeholder="Seu nome"
               value={nome}
               onChange={(e) => setNome(e.target.value)}
-              className="w-full px-5 py-4 rounded-xl bg-[#1a1212] text-white outline-none"
-              style={{ border: "1px solid rgba(200,160,120,0.2)" }}
+              className="w-full px-5 py-4 rounded-2xl outline-none text-white placeholder:text-neutral-600 transition focus:border-[#c8a078]"
+              style={{
+                background: "#120d0d",
+                border: "1px solid rgba(200,160,120,0.15)",
+              }}
             />
+          </div>
 
+          {/* Telefone */}
+          <div>
+            <label
+              className="block text-xs uppercase tracking-widest mb-2"
+              style={{ color: "#c8a078" }}
+            >
+              WhatsApp
+            </label>
             <input
-              type="date"
-              value={data}
-              onChange={(e) => setData(e.target.value)}
-              className="w-full px-5 py-4 rounded-xl bg-[#1a1212] text-white outline-none"
-              style={{ border: "1px solid rgba(200,160,120,0.2)" }}
+              type="tel"
+              placeholder="(61) 99999-9999"
+              value={telefone}
+              onChange={(e) =>
+                setTelefone(formatarTelefone(e.target.value))
+              }
+              className="w-full px-5 py-4 rounded-2xl outline-none text-white placeholder:text-neutral-600 transition focus:border-[#c8a078]"
+              style={{
+                background: "#120d0d",
+                border: "1px solid rgba(200,160,120,0.15)",
+              }}
             />
+          </div>
 
+          {/* Procedimento */}
+          <div>
+            <label
+              className="block text-xs uppercase tracking-widest mb-2"
+              style={{ color: "#c8a078" }}
+            >
+              Procedimento
+            </label>
             <select
               value={procedimento}
               onChange={(e) => setProcedimento(e.target.value)}
-              className="w-full px-5 py-4 rounded-xl bg-[#1a1212] text-white outline-none"
-              style={{ border: "1px solid rgba(200,160,120,0.2)" }}
+              className="w-full px-5 py-4 rounded-2xl outline-none text-white transition focus:border-[#c8a078]"
+              style={{
+                background: "#120d0d",
+                border: "1px solid rgba(200,160,120,0.15)",
+                color: procedimento ? "white" : "#52525b",
+              }}
             >
-              <option value="">Selecione o procedimento</option>
+              <option value="" disabled>
+                Selecione um procedimento
+              </option>
               {procedimentos.map((p) => (
-                <option key={p} value={p}>{p}</option>
+                <option key={p} value={p}>
+                  {p}
+                </option>
               ))}
             </select>
-
-            <button
-              onClick={handleSalvar}
-              disabled={loading}
-              className="w-full py-4 rounded-xl font-semibold uppercase tracking-widest text-sm transition hover:scale-105"
-              style={{ background: "#c8a078", color: "#0a0707" }}
-            >
-              {loading ? "Salvando..." : "Agendar"}
-            </button>
-
-            {message && (
-              <p className="text-center text-sm" style={{ color: "#c8a078" }}>
-                {message}
-              </p>
-            )}
           </div>
-        </div>
 
-        {/* LISTA */}
-        <div className="flex flex-col gap-4">
-          {agendamentos.length === 0 && (
-            <p className="text-center" style={{ color: "#a89080" }}>
-              Nenhum agendamento ainda.
-            </p>
-          )}
-          {agendamentos.map((a) => (
-            <div
-              key={a.id}
-              className="rounded-2xl p-6 flex justify-between items-center"
-              style={{ background: "#120d0d", border: "1px solid rgba(200,160,120,0.1)" }}
+          {/* Data */}
+          <div>
+            <label
+              className="block text-xs uppercase tracking-widest mb-2"
+              style={{ color: "#c8a078" }}
             >
-              <div>
-                <p className="text-white font-semibold">{a.nome}</p>
-                <p className="text-sm" style={{ color: "#a89080" }}>{a.procedimento}</p>
-                <p className="text-sm" style={{ color: "#a89080" }}>{a.data}</p>
-              </div>
-              <button
-                onClick={() => handleDeletar(a.id)}
-                className="text-sm px-4 py-2 rounded-full transition hover:scale-105"
-                style={{ border: "1px solid rgba(200,160,120,0.3)", color: "#c8a078" }}
-              >
-                Cancelar
-              </button>
-            </div>
-          ))}
-        </div>
+              Data
+            </label>
+            <input
+              type="date"
+              value={data}
+              min={hoje}
+              onChange={(e) => setData(e.target.value)}
+              className="w-full px-5 py-4 rounded-2xl outline-none text-white transition focus:border-[#c8a078]"
+              style={{
+                background: "#120d0d",
+                border: "1px solid rgba(200,160,120,0.15)",
+                colorScheme: "dark",
+              }}
+            />
+          </div>
 
+          {/* Horário */}
+          <div>
+            <label
+              className="block text-xs uppercase tracking-widest mb-3"
+              style={{ color: "#c8a078" }}
+            >
+              Horário
+            </label>
+            <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
+              {horarios.map((h) => (
+                <button
+                  key={h}
+                  type="button"
+                  onClick={() => setHorario(h)}
+                  className="py-3 rounded-2xl text-sm transition hover:scale-105"
+                  style={{
+                    background:
+                      horario === h
+                        ? "#c8a078"
+                        : "#120d0d",
+                    color:
+                      horario === h ? "#0a0707" : "#a89080",
+                    border:
+                      horario === h
+                        ? "1px solid #c8a078"
+                        : "1px solid rgba(200,160,120,0.15)",
+                    fontWeight: horario === h ? "700" : "400",
+                  }}
+                >
+                  {h}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Erro */}
+          {erro && (
+            <div
+              className="px-5 py-4 rounded-2xl text-sm"
+              style={{
+                background: "rgba(239,68,68,0.1)",
+                border: "1px solid rgba(239,68,68,0.3)",
+                color: "#ef4444",
+              }}
+            >
+              {erro}
+            </div>
+          )}
+
+          {/* Botão */}
+          <button
+            onClick={handleSubmit}
+            disabled={loading}
+            className="w-full py-5 rounded-full uppercase tracking-widest text-sm font-semibold transition hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed mt-2"
+            style={{ background: "#c8a078", color: "#0a0707" }}
+          >
+            {loading ? "Agendando..." : "Confirmar Agendamento"}
+          </button>
+
+          <p className="text-center text-xs" style={{ color: "#a89080" }}>
+            Após o agendamento, nossa equipe confirmará pelo WhatsApp.
+          </p>
+        </div>
       </div>
     </main>
   );
