@@ -7,7 +7,7 @@ export default function Home() {
 
   return (
     <main
-      className="min-h-screen bg-[#0a0707] text-white overflow-x-hidden"
+      className="min-h-svh bg-[#0a0707] text-white overflow-x-hidden"
       style={{ fontFamily: "Georgia, serif" }}
     >
       {/* NAVBAR */}
