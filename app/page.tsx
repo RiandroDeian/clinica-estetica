@@ -1,6 +1,3 @@
-# app/page.tsx COMPLETO (Versão Otimizada Mobile + Premium)
-
-```tsx
 "use client";
 
 import { useState } from "react";
@@ -527,14 +524,3 @@ export default function Home() {
     </main>
   );
 }
-```
-
----
-
-# DEPLOY
-
-```bash
-git add .
-git commit -m "layout premium finalizado"
-git push
-```
