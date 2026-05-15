@@ -55,37 +55,42 @@ const procedimentos = [
     nome: "Botox",
     descricao:
       "Suaviza linhas de expressão com resultado natural e sofisticado.",
-    img: "https://images.unsplash.com/photo-1616394584738-fc6e612e71b9?w=900&q=80",
+    img: "https://images.unsplash.com/photo-1629909613654-28e377c37b09?w=900&q=80",
   },
+
   {
     nome: "Harmonização Facial",
     descricao:
       "Equilíbrio facial com técnicas modernas e resultados naturais.",
-    img: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=900&q=80",
+    img: "https://images.unsplash.com/photo-1515377905703-c4788e51af15?w=900&q=80",
   },
+
   {
     nome: "Limpeza de Pele",
     descricao:
-      "Renovação profunda para uma pele mais saudável e iluminada.",
-    img: "https://images.unsplash.com/photo-1512290923902-8a9f81dc236c?w=900&q=80",
+      "Renovação profunda para uma pele saudável e iluminada.",
+    img: "https://images.unsplash.com/photo-1487412947147-5cebf100ffc2?w=900&q=80",
   },
+
   {
     nome: "Peeling",
     descricao:
       "Tratamento avançado para rejuvenescimento facial.",
-    img: "https://images.unsplash.com/photo-1598440947619-2c35fc9aa908?w=900&q=80",
+    img: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=900&q=80",
   },
+
   {
     nome: "Drenagem Linfática",
     descricao:
       "Redução de inchaço e melhora da circulação corporal.",
-    img: "https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=900&q=80",
+    img: "https://images.unsplash.com/photo-1519823551278-64ac92734fb1?w=900&q=80",
   },
+
   {
     nome: "Preenchimento Labial",
     descricao:
-      "Volume e definição com resultado sofisticado.",
-    img: "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=900&q=80",
+      "Volume e definição com resultado elegante e natural.",
+    img: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=900&q=80",
   },
 ];
 
@@ -435,14 +440,6 @@ export default function Home() {
             <h2 className="text-3xl md:text-5xl font-bold mb-6">
               Antes e Depois
             </h2>
-
-            <p
-              className="max-w-2xl mx-auto"
-              style={{ color: "#a89080" }}
-            >
-              Resultados naturais e sofisticados realizados
-              na Moncié.
-            </p>
           </FadeSection>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -456,7 +453,7 @@ export default function Home() {
                 }}
               >
                 <img
-                  src="https://images.unsplash.com/photo-1515377905703-c4788e51af15?w=900&q=80"
+                  src="https://images.unsplash.com/photo-1621784564114-6eea05b89863?w=900&q=80"
                   alt="Antes e depois"
                   className="w-full h-[420px] object-cover"
                 />
@@ -468,10 +465,6 @@ export default function Home() {
                   >
                     Harmonização Facial
                   </h3>
-
-                  <p style={{ color: "#a89080" }}>
-                    Resultados naturais com técnicas modernas.
-                  </p>
                 </div>
               </div>
             </FadeSection>
@@ -486,7 +479,7 @@ export default function Home() {
                 }}
               >
                 <img
-                  src="https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=900&q=80"
+                  src="https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=900&q=80"
                   alt="Resultado paciente"
                   className="w-full h-[420px] object-cover"
                 />
@@ -498,120 +491,10 @@ export default function Home() {
                   >
                     Botox Premium
                   </h3>
-
-                  <p style={{ color: "#a89080" }}>
-                    Rejuvenescimento elegante e sofisticado.
-                  </p>
                 </div>
               </div>
             </FadeSection>
           </div>
-        </div>
-      </section>
-
-      {/* SOBRE */}
-      <section
-        id="sobre"
-        className="py-24 md:py-28 px-5 bg-[#0a0707]"
-      >
-        <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-14 items-center">
-          <FadeSection>
-            <img
-              src="/imagem-clinica (4).jpeg"
-              alt="Moncié"
-              className="rounded-3xl h-[350px] md:h-[600px] object-cover w-full"
-            />
-          </FadeSection>
-
-          <FadeSection delay={150}>
-            <p
-              className="uppercase tracking-[0.3em] text-xs mb-4"
-              style={{ color: "#c8a078" }}
-            >
-              Sobre a Moncié
-            </p>
-
-            <h2 className="text-3xl md:text-5xl font-bold mb-8">
-              Tecnologia, estética e excelência
-            </h2>
-
-            <p
-              className="leading-8 text-base md:text-lg mb-6"
-              style={{ color: "#a89080" }}
-            >
-              A Moncié nasceu para oferecer tratamentos
-              sofisticados, modernos e personalizados.
-            </p>
-
-            <p
-              className="leading-8 text-base md:text-lg mb-10"
-              style={{ color: "#a89080" }}
-            >
-              Nossa equipe oferece atendimento humanizado,
-              suporte personalizado e experiências premium.
-            </p>
-
-            <a
-              href="https://wa.me/556193578458"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-block px-10 py-5 rounded-full uppercase tracking-widest text-sm font-semibold transition hover:scale-105"
-              style={{
-                background: "#c8a078",
-                color: "#0a0707",
-              }}
-            >
-              Entrar em Contato
-            </a>
-          </FadeSection>
-        </div>
-      </section>
-
-      {/* CONTATO */}
-      <section
-        id="contato"
-        className="py-24 md:py-28 px-5 bg-black text-center"
-      >
-        <div className="max-w-4xl mx-auto">
-          <FadeSection>
-            <p
-              className="uppercase tracking-[0.3em] text-xs mb-4"
-              style={{ color: "#c8a078" }}
-            >
-              Localização
-            </p>
-
-            <h2 className="text-3xl md:text-5xl font-bold mb-10">
-              Visite a Moncié
-            </h2>
-
-            <div
-              className="rounded-3xl overflow-hidden border border-[#c8a07820]"
-            >
-              <iframe
-                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3836.1!2d-47.65!3d-15.6!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zMTXCsDM2JzAwLjAiUyA0N8KwMzknMDAuMCJX!5e0!3m2!1spt-BR!2sbr!4v1"
-                width="100%"
-                height="350"
-                style={{ border: 0 }}
-                loading="lazy"
-              />
-            </div>
-
-            <div className="mt-10">
-              <a
-                href="https://wa.me/556193578458"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-block px-10 py-5 rounded-full uppercase tracking-widest text-sm font-semibold transition hover:scale-105"
-                style={{
-                  background: "#c8a078",
-                  color: "#0a0707",
-                }}
-              >
-                Falar no WhatsApp
-              </a>
-            </div>
-          </FadeSection>
         </div>
       </section>
     </main>
