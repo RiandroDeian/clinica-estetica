@@ -127,7 +127,6 @@ export default function Home() {
         }}
       >
         <div className="flex items-center justify-between">
-          {/* LOGO */}
           <div className="flex items-center gap-3">
             <img
               src="/logo-moncie-print.jpg"
@@ -149,7 +148,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* MENU DESKTOP */}
+          {/* DESKTOP */}
           <div
             className="hidden lg:flex items-center gap-8 uppercase text-xs tracking-[0.2em]"
             style={{ color: "#c8a078" }}
@@ -192,23 +191,14 @@ export default function Home() {
             </a>
           </div>
 
-          {/* MENU MOBILE */}
+          {/* MOBILE */}
           <button
             className="lg:hidden flex flex-col gap-1.5"
             onClick={() => setMenuAberto(!menuAberto)}
           >
-            <span
-              className="w-6 h-0.5"
-              style={{ background: "#c8a078" }}
-            />
-            <span
-              className="w-6 h-0.5"
-              style={{ background: "#c8a078" }}
-            />
-            <span
-              className="w-6 h-0.5"
-              style={{ background: "#c8a078" }}
-            />
+            <span className="w-6 h-0.5 bg-[#c8a078]" />
+            <span className="w-6 h-0.5 bg-[#c8a078]" />
+            <span className="w-6 h-0.5 bg-[#c8a078]" />
           </button>
         </div>
 
@@ -419,81 +409,6 @@ export default function Home() {
                 </div>
               </FadeSection>
             ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ANTES E DEPOIS */}
-      <section
-        id="antesedepois"
-        className="py-24 md:py-28 px-5 bg-[#0d0909]"
-      >
-        <div className="max-w-6xl mx-auto">
-          <FadeSection className="text-center mb-16">
-            <p
-              className="uppercase tracking-[0.3em] text-xs mb-4"
-              style={{ color: "#c8a078" }}
-            >
-              Resultados Reais
-            </p>
-
-            <h2 className="text-3xl md:text-5xl font-bold mb-6">
-              Antes e Depois
-            </h2>
-          </FadeSection>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <FadeSection>
-              <div
-                className="rounded-3xl overflow-hidden"
-                style={{
-                  background: "#120d0d",
-                  border:
-                    "1px solid rgba(200,160,120,0.1)",
-                }}
-              >
-                <img
-                  src="https://images.unsplash.com/photo-1621784564114-6eea05b89863?w=900&q=80"
-                  alt="Antes e depois"
-                  className="w-full h-[420px] object-cover"
-                />
-
-                <div className="p-6">
-                  <h3
-                    className="text-2xl mb-3"
-                    style={{ color: "#c8a078" }}
-                  >
-                    Harmonização Facial
-                  </h3>
-                </div>
-              </div>
-            </FadeSection>
-
-            <FadeSection delay={120}>
-              <div
-                className="rounded-3xl overflow-hidden"
-                style={{
-                  background: "#120d0d",
-                  border:
-                    "1px solid rgba(200,160,120,0.1)",
-                }}
-              >
-                <img
-                  src="https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=900&q=80"
-                  alt="Resultado paciente"
-                  className="w-full h-[420px] object-cover"
-                />
-
-                <div className="p-6">
-                  <h3
-                    className="text-2xl mb-3"
-                    style={{ color: "#c8a078" }}
-                  >
-                    Botox Premium
-                  </h3>
-                </div>
-              </div>
-            </FadeSection>
           </div>
         </div>
       </section>
