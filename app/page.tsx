@@ -16,9 +16,7 @@ function useInView(threshold = 0.15) {
       { threshold }
     );
 
-    if (ref.current) {
-      observer.observe(ref.current);
-    }
+    if (ref.current) observer.observe(ref.current);
 
     return () => observer.disconnect();
   }, [threshold]);
@@ -43,9 +41,7 @@ function FadeSection({
       className={className}
       style={{
         opacity: inView ? 1 : 0,
-        transform: inView
-          ? "translateY(0)"
-          : "translateY(30px)",
+        transform: inView ? "translateY(0)" : "translateY(30px)",
         transition: `opacity 0.8s ease ${delay}ms, transform 0.8s ease ${delay}ms`,
       }}
     >
@@ -59,31 +55,31 @@ const procedimentos = [
     nome: "Botox",
     descricao:
       "Suaviza linhas de expressão com resultado natural e sofisticado.",
-    img: "/imagem-clinica (1).jpeg",
+    img: "https://images.unsplash.com/photo-1616394584738-fc6e612e71b9?w=800&q=80",
   },
   {
     nome: "Harmonização Facial",
     descricao:
       "Equilíbrio facial com técnicas modernas e resultados naturais.",
-    img: "/imagem-clinica (2).jpeg",
+    img: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=800&q=80",
   },
   {
     nome: "Limpeza de Pele",
     descricao:
       "Renovação profunda para uma pele mais saudável e iluminada.",
-    img: "/imagem-clinica (3).jpeg",
+    img: "https://images.unsplash.com/photo-1512290923902-8a9f81dc236c?w=800&q=80",
   },
   {
     nome: "Peeling",
     descricao:
       "Tratamento avançado para renovação celular e rejuvenescimento.",
-    img: "/imagem-clinica (4).jpeg",
+    img: "https://images.unsplash.com/photo-1598440947619-2c35fc9aa908?w=800&q=80",
   },
   {
     nome: "Drenagem Linfática",
     descricao:
       "Redução de inchaço e melhora da circulação corporal.",
-    img: "/imagem-clinica (5).jpeg",
+    img: "https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=800&q=80",
   },
 ];
 
@@ -141,7 +137,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* DESKTOP */}
           <div
             className="hidden md:flex items-center gap-8 uppercase text-xs tracking-[0.2em]"
             style={{ color: "#c8a078" }}
@@ -150,10 +145,7 @@ export default function Home() {
               Início
             </a>
 
-            <a
-              href="#procedimentos"
-              className="hover:text-white transition"
-            >
+            <a href="#procedimentos" className="hover:text-white transition">
               Procedimentos
             </a>
 
@@ -177,7 +169,6 @@ export default function Home() {
             </a>
           </div>
 
-          {/* MOBILE BUTTON */}
           <button
             className="md:hidden flex flex-col gap-1.5"
             onClick={() => setMenuAberto(!menuAberto)}
@@ -197,7 +188,6 @@ export default function Home() {
           </button>
         </div>
 
-        {/* MOBILE MENU */}
         {menuAberto && (
           <div
             className="md:hidden flex flex-col gap-5 pt-6 pb-4 uppercase text-xs tracking-[0.2em]"
@@ -283,12 +273,22 @@ export default function Home() {
               href="#antesedepois"
               className="px-10 py-5 rounded-full font-semibold uppercase tracking-widest text-sm transition hover:scale-105"
               style={{
-                border:
-                  "1px solid rgba(200,160,120,0.3)",
+                border: "1px solid rgba(200,160,120,0.3)",
                 color: "#c8a078",
               }}
             >
               Antes e Depois
+            </a>
+
+            <a
+              href="#contato"
+              className="px-10 py-5 rounded-full font-semibold uppercase tracking-widest text-sm transition hover:scale-105"
+              style={{
+                border: "1px solid rgba(200,160,120,0.3)",
+                color: "#c8a078",
+              }}
+            >
+              Localização
             </a>
           </div>
         </div>
@@ -408,21 +408,60 @@ export default function Home() {
               Resultados Reais
             </p>
 
-            <h2 className="text-4xl md:text-5xl font-bold">
+            <h2 className="text-4xl md:text-5xl font-bold mb-6">
               Antes e Depois
             </h2>
+
+            <p
+              className="max-w-2xl mx-auto"
+              style={{ color: "#a89080" }}
+            >
+              Resultados reais realizados na Moncié Estética.
+            </p>
           </FadeSection>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <img
-              src="/imagem-clinica (2).jpeg"
-              className="rounded-3xl h-[420px] object-cover w-full"
-            />
+            <div
+              className="rounded-3xl h-[420px] flex items-center justify-center text-center p-10"
+              style={{
+                background: "#120d0d",
+                border: "1px solid rgba(200,160,120,0.1)",
+              }}
+            >
+              <div>
+                <p
+                  className="text-2xl mb-4"
+                  style={{ color: "#c8a078" }}
+                >
+                  Antes & Depois
+                </p>
 
-            <img
-              src="/imagem-clinica (3).jpeg"
-              className="rounded-3xl h-[420px] object-cover w-full"
-            />
+                <p style={{ color: "#a89080" }}>
+                  Adicione aqui as fotos reais dos pacientes.
+                </p>
+              </div>
+            </div>
+
+            <div
+              className="rounded-3xl h-[420px] flex items-center justify-center text-center p-10"
+              style={{
+                background: "#120d0d",
+                border: "1px solid rgba(200,160,120,0.1)",
+              }}
+            >
+              <div>
+                <p
+                  className="text-2xl mb-4"
+                  style={{ color: "#c8a078" }}
+                >
+                  Resultados Naturais
+                </p>
+
+                <p style={{ color: "#a89080" }}>
+                  Espaço reservado para resultados reais da clínica.
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -483,105 +522,6 @@ export default function Home() {
           </FadeSection>
         </div>
       </section>
-
-      {/* CONTATO */}
-      <section
-        id="contato"
-        className="py-28 px-5 text-center bg-black"
-      >
-        <div className="max-w-4xl mx-auto">
-          <FadeSection>
-            <p
-              className="uppercase tracking-[0.3em] text-xs mb-4"
-              style={{ color: "#c8a078" }}
-            >
-              Atendimento
-            </p>
-
-            <h2 className="text-4xl md:text-5xl font-bold mb-8">
-              Agende pelo WhatsApp
-            </h2>
-
-            <p
-              className="text-lg leading-8 mb-10"
-              style={{ color: "#a89080" }}
-            >
-              Nossa equipe responde dúvidas, realiza
-              atendimentos personalizados e auxilia no seu
-              agendamento.
-            </p>
-
-            <a
-              href="https://wa.me/556193578458"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-block px-10 py-5 rounded-full uppercase tracking-widest text-sm font-semibold transition hover:scale-105"
-              style={{
-                background: "#c8a078",
-                color: "#0a0707",
-              }}
-            >
-              Falar no WhatsApp
-            </a>
-          </FadeSection>
-        </div>
-      </section>
-
-      {/* FOOTER */}
-      <footer
-        className="px-5 py-10"
-        style={{
-          background: "#080505",
-          borderTop:
-            "1px solid rgba(200,160,120,0.1)",
-        }}
-      >
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between gap-6">
-          <div>
-            <h3
-              className="text-2xl font-bold mb-3"
-              style={{ color: "#c8a078" }}
-            >
-              Moncié Estética
-            </h3>
-
-            <p style={{ color: "#a89080" }}>
-              Beleza, autoestima e tecnologia.
-            </p>
-          </div>
-
-          <div className="flex gap-6">
-            <a
-              href="https://www.instagram.com/moncieclinica/"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ color: "#a89080" }}
-            >
-              Instagram
-            </a>
-
-            <a
-              href="https://wa.me/556193578458"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ color: "#a89080" }}
-            >
-              WhatsApp
-            </a>
-          </div>
-        </div>
-      </footer>
-
-      {/* WHATSAPP FIXO */}
-      <a
-        href="https://wa.me/556193578458"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="fixed bottom-6 right-6 w-16 h-16 rounded-full flex items-center justify-center text-2xl shadow-2xl transition hover:scale-110 z-50"
-        style={{ background: "#25D366" }}
-      >
-        💬
-      </a>
     </main>
   );
 }
