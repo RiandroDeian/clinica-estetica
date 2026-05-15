@@ -148,7 +148,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* DESKTOP */}
           <div
             className="hidden lg:flex items-center gap-8 uppercase text-xs tracking-[0.2em]"
             style={{ color: "#c8a078" }}
@@ -191,7 +190,6 @@ export default function Home() {
             </a>
           </div>
 
-          {/* MOBILE */}
           <button
             className="lg:hidden flex flex-col gap-1.5"
             onClick={() => setMenuAberto(!menuAberto)}
@@ -406,6 +404,51 @@ export default function Home() {
                       Agendar
                     </a>
                   </div>
+                </div>
+              </FadeSection>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ANTES E DEPOIS */}
+      <section
+        id="antesedepois"
+        className="py-24 md:py-28 px-5 bg-[#0d0909]"
+      >
+        <div className="max-w-7xl mx-auto">
+          <FadeSection className="text-center mb-16">
+            <p
+              className="uppercase tracking-[0.3em] text-xs mb-4"
+              style={{ color: "#c8a078" }}
+            >
+              Resultados
+            </p>
+
+            <h2 className="text-3xl md:text-5xl font-bold mb-6">
+              Antes e Depois
+            </h2>
+          </FadeSection>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {[
+              "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=900&q=80",
+              "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=900&q=80",
+              "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=900&q=80",
+            ].map((img, i) => (
+              <FadeSection key={i} delay={i * 80}>
+                <div
+                  className="rounded-3xl overflow-hidden"
+                  style={{
+                    border:
+                      "1px solid rgba(200,160,120,0.1)",
+                  }}
+                >
+                  <img
+                    src={img}
+                    alt="Antes e Depois"
+                    className="w-full h-[420px] object-cover"
+                  />
                 </div>
               </FadeSection>
             ))}
