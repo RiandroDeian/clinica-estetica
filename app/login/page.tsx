@@ -35,9 +35,10 @@ export default function Login() {
 
       setMensagem("Login realizado!");
 
-      setTimeout(() => {
-        router.push("/admin");
-      }, 1000);
+
+      router.push("/admin");
+      router.refresh();
+
 
     } catch (err) {
       console.log(err);
