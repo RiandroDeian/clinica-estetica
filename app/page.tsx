@@ -59,158 +59,6 @@ function BeforeAfterSlider({ before, after, label }: { before: string; after: st
   );
 }
 
-function ChatWidget() {
-  const [open, setOpen] = useState(false);
-  const [etapa, setEtapa] = useState<"inicio" | "equipe" | "chat">("inicio");
-  const [msgs, setMsgs] = useState<{ de: "user" | "bot"; texto: string }[]>([]);
-  const [input, setInput] = useState("");
-  const [carregando, setCarregando] = useState(false);
-  const fimRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (open && etapa === "inicio" && msgs.length === 0) {
-      setMsgs([{ de: "bot", texto: "Olá! Seja muito bem-vinda à Moncié Esthetique 🌸\n\nFicamos felizes em ter você aqui. Como posso te ajudar hoje?" }]);
-    }
-  }, [open]);
-
-  useEffect(() => {
-    fimRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [msgs, carregando]);
-
-  const escolherEquipe = () => {
-    setEtapa("equipe");
-    setMsgs(m => [...m,
-      { de: "user", texto: "Quero falar com a equipe" },
-      { de: "bot", texto: "Perfeito! Logo alguém da nossa equipe irá te atender com toda a atenção que você merece 💛\n\nClique abaixo para continuar pelo WhatsApp:" }
-    ]);
-  };
-
-  const escolherChat = () => {
-    setEtapa("chat");
-    setMsgs(m => [...m,
-      { de: "user", texto: "Continuar por aqui" },
-      { de: "bot", texto: "Ótimo! Estou aqui para te ajudar com informações sobre nossos tratamentos, localização e agendamentos. O que você gostaria de saber? 😊" }
-    ]);
-  };
-
-  const enviarMensagem = async () => {
-    if (!input.trim() || carregando) return;
-    const pergunta = input.trim();
-    setInput("");
-    setMsgs(m => [...m, { de: "user", texto: pergunta }]);
-    setCarregando(true);
-    try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 400,
-          system: `Você é Sofia, atendente da Moncié Esthetique, clínica de estética premium em Planaltina, Brasília/DF. Seja calorosa, feminina e acolhedora. Responda sempre em português brasileiro de forma concisa.
-
-REGRAS ABSOLUTAS:
-- JAMAIS mencione valores, preços ou condições de pagamento. Se perguntarem, diga: "Para informações sobre valores, nossa equipe terá o prazer de te atender pelo WhatsApp 💛"
-- JAMAIS diga que é uma IA, robô ou assistente virtual. Você é a Sofia, atendente humana.
-- Não fale sobre temas fora da clínica.
-- Não invente informações que não estão listadas abaixo.
-
-SOBRE A MONCIÉ ESTHETIQUE:
-Endereço: Av. Independência, Centro Clínico CDC, 3º andar sala 300, QD51 LT16A, Setor Tradicional (Planaltina), Brasília/DF. CEP 73330-003.
-Horário: Segunda a Sexta 8h–19h | Sábado 8h–18h | Domingo fechado.
-WhatsApp: (61) 9357-8458
-Instagram: @moncieclinica
-
-PROCEDIMENTOS:
-Harmonização Facial (Rejuvenescimento): Botox Terço Superior, Botox Full Face, Botox Pescoço, Bioestimulador de Colágeno.
-Harmonização Facial (Preenchimento): Preenchimento Labial, Rinomodelação, Bigode Chinês, Preenchimento de Olheiras, Perfiloplastia (nariz, boca e queixo).
-Depilação a Laser: Pacotes femininos e masculinos com 6 sessões inclusas. Fechando qualquer pacote, ganha 1 área pequena de brinde.
-Técnicas Fisioterapêuticas: Dry Needling, Quiropraxia, Liberação Miofascial, Ventosaterapia.
-Protocolos Faciais: Limpeza de Pele, Protocolo Pele Perfeita (6 sessões), Protocolo Capilar (6 sessões).
-Protocolos Corporais: Protocolo PEIM (vasinhos, 4 sessões), Lipo de Papada Enzimática (5 sessões), Lipo Corporal Enzimática (8 sessões), Protocolo Celulite (5 sessões), Protocolo de Estrias (6 sessões), Protocolo Emagrecimento Plus (programa completo com personal trainer e nutricionista).
-Todos os procedimentos podem ser parcelados em até 12x com juros da máquina.`,
-          messages: [{ role: "user", content: pergunta }],
-        }),
-      });
-      const data = await res.json();
-      const resposta = data.content?.[0]?.text ?? "Ops, não consegui processar. Tente novamente!";
-      setMsgs(m => [...m, { de: "bot", texto: resposta }]);
-    } catch {
-      setMsgs(m => [...m, { de: "bot", texto: "Ops, tive um problema de conexão. Pode tentar de novo? 😊" }]);
-    }
-    setCarregando(false);
-  };
-
-  return (
-    <>
-      <button onClick={() => setOpen(o => !o)} className="fixed bottom-24 right-5 w-14 h-14 rounded-full flex items-center justify-center shadow-2xl transition hover:scale-110 active:scale-95 z-50" style={{ background: "#c8a078" }} aria-label="Abrir chat">
-        {open
-          ? <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={2} className="w-6 h-6"><path d="M18 6L6 18M6 6l12 12"/></svg>
-          : <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={1.8} className="w-6 h-6"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-        }
-      </button>
-
-      {open && (
-        <div className="fixed bottom-44 right-5 w-[340px] rounded-3xl z-50 flex flex-col overflow-hidden" style={{ background: "#120d0d", border: "1px solid rgba(200,160,120,0.2)", maxHeight: "480px", boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}>
-          <div className="flex items-center gap-3 px-5 py-4" style={{ background: "#1a1010", borderBottom: "1px solid rgba(200,160,120,0.1)" }}>
-            <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold" style={{ background: "#c8a078", color: "#0a0707" }}>S</div>
-            <div>
-              <p className="text-sm font-semibold" style={{ color: "#c8a078" }}>Sofia — Moncié</p>
-              <p className="text-xs" style={{ color: "#6b5a4e" }}>● Online agora</p>
-            </div>
-          </div>
-
-          <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3" style={{ minHeight: 0 }}>
-            {msgs.map((m, i) => (
-              <div key={i} className={`flex ${m.de === "user" ? "justify-end" : "justify-start"}`}>
-                <div className="rounded-2xl px-4 py-3 text-sm leading-6 max-w-[85%] whitespace-pre-line"
-                  style={m.de === "bot"
-                    ? { background: "#1e1212", color: "#d4b896", borderBottomLeftRadius: 4 }
-                    : { background: "#c8a078", color: "#0a0707", borderBottomRightRadius: 4 }
-                  }>
-                  {m.texto}
-                </div>
-              </div>
-            ))}
-
-            {carregando && (
-              <div className="flex justify-start">
-                <div className="rounded-2xl px-4 py-3" style={{ background: "#1e1212", borderBottomLeftRadius: 4 }}>
-                  <div className="flex gap-1">
-                    {[0,1,2].map(i => <div key={i} className="w-2 h-2 rounded-full" style={{ background: "#c8a078", animation: `bounce 1s ease ${i*0.2}s infinite` }}/>)}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {etapa === "inicio" && msgs.length === 1 && (
-              <div className="flex flex-col gap-2 mt-1">
-                <button onClick={escolherEquipe} className="w-full py-2.5 rounded-xl text-sm font-semibold transition hover:scale-[1.02]" style={{ background: "#c8a078", color: "#0a0707" }}>Falar com a equipe</button>
-                <button onClick={escolherChat} className="w-full py-2.5 rounded-xl text-sm font-semibold transition hover:scale-[1.02]" style={{ border: "1px solid rgba(200,160,120,0.35)", color: "#c8a078" }}>Tirar dúvidas por aqui</button>
-              </div>
-            )}
-
-            {etapa === "equipe" && (
-              <a href="https://wa.me/556193578458" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition hover:scale-[1.02]" style={{ background: "#25D366", color: "white" }}>
-                <svg viewBox="0 0 24 24" fill="white" className="w-5 h-5"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-                Abrir WhatsApp
-              </a>
-            )}
-            <div ref={fimRef} />
-          </div>
-
-          {etapa === "chat" && (
-            <div className="px-3 py-3 flex gap-2" style={{ borderTop: "1px solid rgba(200,160,120,0.1)" }}>
-              <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && enviarMensagem()} placeholder="Digite sua mensagem..." className="flex-1 rounded-full px-4 py-2 text-sm outline-none" style={{ background: "#1e1212", color: "#d4b896", border: "1px solid rgba(200,160,120,0.15)" }} />
-              <button onClick={enviarMensagem} className="w-9 h-9 rounded-full flex items-center justify-center transition hover:scale-110" style={{ background: "#c8a078" }}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="#0a0707" strokeWidth={2} className="w-4 h-4"><path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z"/></svg>
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-    </>
-  );
-}
 
 // ── DADOS ──
 const categoriasProcedimentos = [
@@ -236,8 +84,8 @@ const categoriasProcedimentos = [
   {
     categoria: "Depilação a Laser",
     items: [
-      { nome: "Pacotes Femininos", descricao: "5 combos com 6 sessões inclusas. Áreas: virilha, axila, perna completa, buço, rosto e braço. Fechando qualquer pacote, ganhe 1 área pequena de brinde!", img: "https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=800&q=80" },
-      { nome: "Pacotes Masculinos", descricao: "5 combos com 6 sessões inclusas. Áreas: barba, peitoral, nuca, axila, abdômen, costas e perna. Fechando qualquer pacote, ganhe 1 área pequena de brinde!", img: "https://images.unsplash.com/photo-1519823551278-64ac92734fb1?w=800&q=80" },
+      { nome: "Pacotes Femininos", descricao: "5 combos com 6 sessões inclusas. Áreas: virilha, axila, perna completa, buço, rosto e braço. Fechando qualquer pacote, ganhe 1 área pequena de brinde!", img: "/depilacao_a_laser.jpg" },
+      { nome: "Pacotes Masculinos", descricao: "5 combos com 6 sessões inclusas. Áreas: barba, peitoral, nuca, axila, abdômen, costas e perna. Fechando qualquer pacote, ganhe 1 área pequena de brinde!", img: "/depilacao_a_laser.jpg" },
     ],
   },
   {
@@ -271,12 +119,45 @@ const categoriasProcedimentos = [
   },
 ];
 
+// tipo "composta" = imagem já tem antes+depois juntos (lado a lado ou topo/base)
+// tipo "slider"   = duas imagens separadas para o slider interativo
 const antesDepois = [
-  { id: "botox", label: "Botox", antes: "https://images.unsplash.com/photo-1523264653568-d3d4032d1476?w=800&q=80", depois: "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=800&q=80", descricao: "Suavização natural das linhas de expressão da testa e ao redor dos olhos, com resultado harmonioso e duradouro." },
-  { id: "labial", label: "Preenchimento Labial", antes: "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=800&q=80", depois: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=800&q=80", descricao: "Volume e definição natural nos lábios, corrigindo assimetrias e realçando a beleza com resultado imediato." },
-  { id: "pele", label: "Protocolo Pele Perfeita", antes: "https://images.unsplash.com/photo-1567157577867-05ccb1388e66?w=800&q=80", depois: "https://images.unsplash.com/photo-1515377905703-c4788e51af15?w=800&q=80", descricao: "Tratamento completo para manchas, acne e oleosidade. Pele renovada, uniforme e radiante após as sessões." },
-  { id: "corporal", label: "Lipo Corporal", antes: "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=800&q=80", depois: "https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=800&q=80", descricao: "Redução de gordura localizada em abdômen, flancos e culote com enzimas de última geração, sem cirurgia." },
-  { id: "laser", label: "Depilação a Laser", antes: "https://images.unsplash.com/photo-1519823551278-64ac92734fb1?w=800&q=80", depois: "https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=800&q=80", descricao: "Pele lisa e sem pelos indesejados de forma definitiva, com tecnologia laser de alta performance." },
+  {
+    id: "botox",
+    label: "Botox",
+    tipo: "composta" as const,
+    orientacao: "vertical" as const, // antes em cima, depois embaixo
+    imagem: "/Antes_e_Depois_de_Botox.jpg",
+    thumb: "/Antes_e_Depois_de_Botox.jpg",
+    descricao: "Suavização natural das linhas de expressão da testa e ao redor dos olhos, com resultado harmonioso e duradouro.",
+  },
+  {
+    id: "labial",
+    label: "Preenchimento Labial",
+    tipo: "composta" as const,
+    orientacao: "horizontal" as const, // antes esquerda, depois direita
+    imagem: "/preenchimento_labial_antes_e_depois.jpg",
+    thumb: "/preenchimento_labial_antes_e_depois.jpg",
+    descricao: "Volume e definição natural nos lábios, corrigindo assimetrias e realçando a beleza com resultado imediato.",
+  },
+  {
+    id: "corporal",
+    label: "Lipo Corporal",
+    tipo: "composta" as const,
+    orientacao: "horizontal" as const,
+    imagem: "/Lipo_Corporal_antes_e_depois.jpg",
+    thumb: "/Lipo_Corporal_antes_e_depois.jpg",
+    descricao: "Redução de gordura localizada em abdômen, flancos e culote com enzimas de última geração, sem cirurgia.",
+  },
+  {
+    id: "laser",
+    label: "Depilação a Laser",
+    tipo: "procedimento" as const,
+    orientacao: "horizontal" as const,
+    imagem: "/depilacao_a_laser.jpg",
+    thumb: "/depilacao_a_laser.jpg",
+    descricao: "Pele lisa e sem pelos indesejados de forma definitiva. Tecnologia laser de alta performance com resultados duradouros.",
+  },
 ];
 
 const depoimentos = [
@@ -444,7 +325,36 @@ export default function Home() {
           </FadeSection>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
             <FadeSection delay={150}>
-              <BeforeAfterSlider key={itemAtivo.id} before={itemAtivo.antes} after={itemAtivo.depois} label={itemAtivo.label} />
+              {/* Imagem composta — já tem antes+depois numa foto só */}
+              <div className="relative w-full rounded-3xl overflow-hidden" style={{ aspectRatio: itemAtivo.orientacao === "vertical" ? "3/4" : "4/3" }}>
+                <img
+                  key={itemAtivo.id}
+                  src={itemAtivo.imagem}
+                  alt={`Antes e depois - ${itemAtivo.label}`}
+                  className="w-full h-full object-cover"
+                  draggable={false}
+                />
+                {/* Labels flutuantes para imagens compostas */}
+                {itemAtivo.tipo === "composta" && itemAtivo.orientacao === "horizontal" && (
+                  <>
+                    <span className="absolute bottom-4 left-4 text-xs uppercase tracking-widest px-3 py-1.5 rounded-full font-semibold" style={{ background: "rgba(10,7,7,0.75)", color: "#c8a078", backdropFilter: "blur(8px)" }}>Antes</span>
+                    <span className="absolute bottom-4 right-4 text-xs uppercase tracking-widest px-3 py-1.5 rounded-full font-semibold" style={{ background: "rgba(10,7,7,0.75)", color: "#c8a078", backdropFilter: "blur(8px)" }}>Depois</span>
+                    <div className="absolute top-0 bottom-0 left-1/2 w-[2px]" style={{ background: "rgba(200,160,120,0.5)", transform: "translateX(-50%)" }} />
+                  </>
+                )}
+                {itemAtivo.tipo === "composta" && itemAtivo.orientacao === "vertical" && (
+                  <>
+                    <span className="absolute top-4 left-4 text-xs uppercase tracking-widest px-3 py-1.5 rounded-full font-semibold" style={{ background: "rgba(10,7,7,0.75)", color: "#c8a078", backdropFilter: "blur(8px)" }}>Antes</span>
+                    <span className="absolute bottom-4 left-4 text-xs uppercase tracking-widest px-3 py-1.5 rounded-full font-semibold" style={{ background: "rgba(10,7,7,0.75)", color: "#c8a078", backdropFilter: "blur(8px)" }}>Depois</span>
+                    <div className="absolute left-0 right-0 top-1/2 h-[2px]" style={{ background: "rgba(200,160,120,0.5)", transform: "translateY(-50%)" }} />
+                  </>
+                )}
+                {itemAtivo.tipo === "procedimento" && (
+                  <div className="absolute inset-0 flex items-end p-5" style={{ background: "linear-gradient(to top, rgba(10,7,7,0.7), transparent)" }}>
+                    <span className="text-sm uppercase tracking-widest font-semibold" style={{ color: "#c8a078" }}>Em procedimento</span>
+                  </div>
+                )}
+              </div>
             </FadeSection>
             <FadeSection delay={250}>
               <div className="flex flex-col justify-center">
@@ -460,11 +370,11 @@ export default function Home() {
               </div>
             </FadeSection>
           </div>
-          <div className="mt-16 grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-4">
             {antesDepois.map((item, i) => (
               <FadeSection key={item.id} delay={i * 60}>
                 <button onClick={() => setAntesDepoisAtivo(item.id)} className="w-full rounded-2xl overflow-hidden transition-all duration-300 relative group" style={{ border: antesDepoisAtivo === item.id ? "2px solid #c8a078" : "1px solid rgba(200,160,120,0.15)", opacity: antesDepoisAtivo === item.id ? 1 : 0.65 }}>
-                  <img src={item.depois} alt={item.label} className="w-full h-28 object-cover transition group-hover:scale-105 duration-500" loading="lazy" />
+                  <img src={item.thumb} alt={item.label} className="w-full h-32 object-cover object-top transition group-hover:scale-105 duration-500" loading="lazy" />
                   <div className="absolute inset-0 flex items-end p-2" style={{ background: "linear-gradient(to top, rgba(10,7,7,0.85), transparent)" }}>
                     <span className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: "#c8a078" }}>{item.label}</span>
                   </div>
@@ -588,12 +498,8 @@ export default function Home() {
         </svg>
       </a>
 
-      {/* ── CHAT ── */}
-      <ChatWidget />
-
       <style>{`
         @keyframes fadeUp { from { opacity: 0; transform: translateY(28px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
       `}</style>
     </main>
   );
