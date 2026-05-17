@@ -34,7 +34,7 @@ export default function Login() {
       }
 
       setMensagem("Login realizado!");
-      window.location.href = "/admin";
+      window.location.href = "/dashboard";
 
 
 
