@@ -356,7 +356,7 @@ export default function Home() {
       <section id="sobre" className="py-28 px-5 bg-[#0d0909]">
         <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-20 items-center">
           <FadeSection>
-            <img src="/imagem-clinica-5.jpg" alt="Clínica Moncié" className="rounded-3xl h-72 md:h-[560px] w-full object-cover" loading="lazy" />
+            <img src="/imagem-clinica-5.jpeg" alt="Clínica Moncié" className="rounded-3xl h-72 md:h-[560px] w-full object-cover" loading="lazy" />
           </FadeSection>
           <FadeSection delay={150}>
             <p className="uppercase tracking-[0.3em] text-xs mb-4" style={{ color: "#c8a078" }}>Sobre a Moncié</p>
