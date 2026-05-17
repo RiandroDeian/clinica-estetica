@@ -84,8 +84,8 @@ const categoriasProcedimentos = [
   {
     categoria: "Depilação a Laser",
     items: [
-      { nome: "Pacotes Femininos", descricao: "5 combos com 6 sessões inclusas. Áreas: virilha, axila, perna completa, buço, rosto e braço. Fechando qualquer pacote, ganhe 1 área pequena de brinde!", img: "/depilacao_a_laser.jpg" },
-      { nome: "Pacotes Masculinos", descricao: "5 combos com 6 sessões inclusas. Áreas: barba, peitoral, nuca, axila, abdômen, costas e perna. Fechando qualquer pacote, ganhe 1 área pequena de brinde!", img: "/depilacao_a_laser.jpg" },
+      { nome: "Pacotes Femininos", descricao: "5 combos com 6 sessões inclusas. Áreas: virilha, axila, perna completa, buço, rosto e braço. Fechando qualquer pacote, ganhe 1 área pequena de brinde!", img: "/depilacao-antes.jpg" },
+      { nome: "Pacotes Masculinos", descricao: "5 combos com 6 sessões inclusas. Áreas: barba, peitoral, nuca, axila, abdômen, costas e perna. Fechando qualquer pacote, ganhe 1 área pequena de brinde!", img: "/depilacao-antes.jpg" },
     ],
   },
   {
@@ -119,25 +119,23 @@ const categoriasProcedimentos = [
   },
 ];
 
-// tipo "composta" = imagem já tem antes+depois juntos (lado a lado ou topo/base)
-// tipo "slider"   = duas imagens separadas para o slider interativo
 const antesDepois = [
   {
     id: "botox",
     label: "Botox",
     tipo: "composta" as const,
-    orientacao: "vertical" as const, // antes em cima, depois embaixo
-    imagem: "/Antes_e_Depois_de_Botox.jpg",
-    thumb: "/Antes_e_Depois_de_Botox.jpg",
+    orientacao: "vertical" as const,
+    imagem: "/antes-botox.jpg",
+    thumb: "/antes-botox.jpg",
     descricao: "Suavização natural das linhas de expressão da testa e ao redor dos olhos, com resultado harmonioso e duradouro.",
   },
   {
     id: "labial",
     label: "Preenchimento Labial",
     tipo: "composta" as const,
-    orientacao: "horizontal" as const, // antes esquerda, depois direita
-    imagem: "/preenchimento_labial_antes_e_depois.jpg",
-    thumb: "/preenchimento_labial_antes_e_depois.jpg",
+    orientacao: "horizontal" as const,
+    imagem: "/preenchimento-antes.jpg",
+    thumb: "/preenchimento-antes.jpg",
     descricao: "Volume e definição natural nos lábios, corrigindo assimetrias e realçando a beleza com resultado imediato.",
   },
   {
@@ -145,8 +143,8 @@ const antesDepois = [
     label: "Lipo Corporal",
     tipo: "composta" as const,
     orientacao: "horizontal" as const,
-    imagem: "/Lipo_Corporal_antes_e_depois.jpg",
-    thumb: "/Lipo_Corporal_antes_e_depois.jpg",
+    imagem: "/lipo-antes.jpg",
+    thumb: "/lipo-antes.jpg",
     descricao: "Redução de gordura localizada em abdômen, flancos e culote com enzimas de última geração, sem cirurgia.",
   },
   {
@@ -154,8 +152,8 @@ const antesDepois = [
     label: "Depilação a Laser",
     tipo: "procedimento" as const,
     orientacao: "horizontal" as const,
-    imagem: "/depilacao_a_laser.jpg",
-    thumb: "/depilacao_a_laser.jpg",
+    imagem: "/depilacao-antes.jpg",
+    thumb: "/depilacao-antes.jpg",
     descricao: "Pele lisa e sem pelos indesejados de forma definitiva. Tecnologia laser de alta performance com resultados duradouros.",
   },
 ];
