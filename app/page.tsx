@@ -59,6 +59,112 @@ function BeforeAfterSlider({ before, after, label }: { before: string; after: st
   );
 }
 
+// ── Slider para imagens compostas (antes+depois numa foto só) ──
+function CompositeSlider({ item }: { item: typeof antesDepois[0] }) {
+  const [pos, setPos] = useState(50);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const dragging = useRef(false);
+
+  const updatePos = (clientX: number) => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setPos(Math.max(5, Math.min(95, ((clientX - rect.left) / rect.width) * 100)));
+  };
+
+  if (item.tipo === "procedimento") {
+    return (
+      <div className="relative w-full rounded-3xl overflow-hidden" style={{ aspectRatio: "4/3" }}>
+        <img src={item.imagem} alt={item.label} className="w-full h-full object-cover" draggable={false} />
+        <div className="absolute inset-0 flex items-end p-5" style={{ background: "linear-gradient(to top, rgba(10,7,7,0.7), transparent)" }}>
+          <span className="text-sm uppercase tracking-widest font-semibold" style={{ color: "#c8a078" }}>Em procedimento</span>
+        </div>
+      </div>
+    );
+  }
+
+  const isVertical = item.orientacao === "vertical";
+
+  return (
+    <div
+      ref={containerRef}
+      className="relative w-full rounded-3xl overflow-hidden select-none"
+      style={{ aspectRatio: isVertical ? "1/1" : "4/3", cursor: isVertical ? "row-resize" : "col-resize", touchAction: "none" }}
+      onMouseDown={() => { dragging.current = true; }}
+      onMouseMove={(e) => { if (dragging.current) updatePos(e.clientX); }}
+      onMouseUp={() => { dragging.current = false; }}
+      onMouseLeave={() => { dragging.current = false; }}
+      onTouchStart={() => { dragging.current = true; }}
+      onTouchMove={(e) => { updatePos(e.touches[0].clientX); }}
+      onTouchEnd={() => { dragging.current = false; }}
+    >
+      {/* Imagem inteira como fundo — mostra o lado DEPOIS */}
+      <img
+        src={item.imagem}
+        alt={item.label}
+        className="absolute inset-0 w-full h-full object-cover"
+        style={isVertical
+          ? { objectPosition: "center bottom" }  // metade de baixo = depois
+          : { objectPosition: "right center" }   // metade direita = depois
+        }
+        draggable={false}
+      />
+
+      {/* Recorte revelando o lado ANTES */}
+      <div
+        className="absolute inset-0 overflow-hidden"
+        style={isVertical
+          ? { height: `${pos}%` }
+          : { width: `${pos}%` }
+        }
+      >
+        <img
+          src={item.imagem}
+          alt={`Antes - ${item.label}`}
+          className="absolute inset-0 w-full h-full"
+          style={isVertical
+            ? { objectFit: "cover", objectPosition: "center top", height: `${10000 / pos}%` }
+            : { objectFit: "cover", objectPosition: "left center", width: `${10000 / pos}%`, maxWidth: "none" }
+          }
+          draggable={false}
+        />
+      </div>
+
+      {/* Linha divisória + handle */}
+      {!isVertical && (
+        <div className="absolute top-0 bottom-0 w-[2px] z-10 flex items-center justify-center" style={{ left: `${pos}%`, background: "rgba(200,160,120,0.9)", transform: "translateX(-50%)" }}>
+          <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "#c8a078", boxShadow: "0 0 0 3px rgba(200,160,120,0.25)" }}>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M5 8L2 5M2 8h12M11 8l3-3M2 8l3 3M14 8l-3 3" stroke="#0a0707" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
+        </div>
+      )}
+      {isVertical && (
+        <div className="absolute left-0 right-0 h-[2px] z-10 flex items-center justify-center" style={{ top: `${pos}%`, background: "rgba(200,160,120,0.9)", transform: "translateY(-50%)" }}>
+          <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "#c8a078", boxShadow: "0 0 0 3px rgba(200,160,120,0.25)" }}>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M8 5L5 2M8 2v12M5 11l3 3M11 2L8 5M11 14L8 11" stroke="#0a0707" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
+        </div>
+      )}
+
+      {/* Labels */}
+      {!isVertical && (
+        <>
+          <span className="absolute bottom-4 left-4 text-xs uppercase tracking-widest px-3 py-1.5 rounded-full font-semibold z-10" style={{ background: "rgba(10,7,7,0.75)", color: "#c8a078", backdropFilter: "blur(8px)" }}>Antes</span>
+          <span className="absolute bottom-4 right-4 text-xs uppercase tracking-widest px-3 py-1.5 rounded-full font-semibold z-10" style={{ background: "rgba(10,7,7,0.75)", color: "#c8a078", backdropFilter: "blur(8px)" }}>Depois</span>
+        </>
+      )}
+      {isVertical && (
+        <>
+          <span className="absolute top-4 left-4 text-xs uppercase tracking-widest px-3 py-1.5 rounded-full font-semibold z-10" style={{ background: "rgba(10,7,7,0.75)", color: "#c8a078", backdropFilter: "blur(8px)" }}>Antes</span>
+          <span className="absolute bottom-4 left-4 text-xs uppercase tracking-widest px-3 py-1.5 rounded-full font-semibold z-10" style={{ background: "rgba(10,7,7,0.75)", color: "#c8a078", backdropFilter: "blur(8px)" }}>Depois</span>
+        </>
+      )}
+    </div>
+  );
+}
 
 // ── DADOS ──
 const categoriasProcedimentos = [
@@ -323,36 +429,7 @@ export default function Home() {
           </FadeSection>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
             <FadeSection delay={150}>
-              {/* Imagem composta — já tem antes+depois numa foto só */}
-              <div className="relative w-full rounded-3xl overflow-hidden" style={{ aspectRatio: itemAtivo.orientacao === "vertical" ? "3/4" : "4/3" }}>
-                <img
-                  key={itemAtivo.id}
-                  src={itemAtivo.imagem}
-                  alt={`Antes e depois - ${itemAtivo.label}`}
-                  className="w-full h-full object-cover"
-                  draggable={false}
-                />
-                {/* Labels flutuantes para imagens compostas */}
-                {itemAtivo.tipo === "composta" && itemAtivo.orientacao === "horizontal" && (
-                  <>
-                    <span className="absolute bottom-4 left-4 text-xs uppercase tracking-widest px-3 py-1.5 rounded-full font-semibold" style={{ background: "rgba(10,7,7,0.75)", color: "#c8a078", backdropFilter: "blur(8px)" }}>Antes</span>
-                    <span className="absolute bottom-4 right-4 text-xs uppercase tracking-widest px-3 py-1.5 rounded-full font-semibold" style={{ background: "rgba(10,7,7,0.75)", color: "#c8a078", backdropFilter: "blur(8px)" }}>Depois</span>
-                    <div className="absolute top-0 bottom-0 left-1/2 w-[2px]" style={{ background: "rgba(200,160,120,0.5)", transform: "translateX(-50%)" }} />
-                  </>
-                )}
-                {itemAtivo.tipo === "composta" && itemAtivo.orientacao === "vertical" && (
-                  <>
-                    <span className="absolute top-4 left-4 text-xs uppercase tracking-widest px-3 py-1.5 rounded-full font-semibold" style={{ background: "rgba(10,7,7,0.75)", color: "#c8a078", backdropFilter: "blur(8px)" }}>Antes</span>
-                    <span className="absolute bottom-4 left-4 text-xs uppercase tracking-widest px-3 py-1.5 rounded-full font-semibold" style={{ background: "rgba(10,7,7,0.75)", color: "#c8a078", backdropFilter: "blur(8px)" }}>Depois</span>
-                    <div className="absolute left-0 right-0 top-1/2 h-[2px]" style={{ background: "rgba(200,160,120,0.5)", transform: "translateY(-50%)" }} />
-                  </>
-                )}
-                {itemAtivo.tipo === "procedimento" && (
-                  <div className="absolute inset-0 flex items-end p-5" style={{ background: "linear-gradient(to top, rgba(10,7,7,0.7), transparent)" }}>
-                    <span className="text-sm uppercase tracking-widest font-semibold" style={{ color: "#c8a078" }}>Em procedimento</span>
-                  </div>
-                )}
-              </div>
+              <CompositeSlider key={itemAtivo.id} item={itemAtivo} />
             </FadeSection>
             <FadeSection delay={250}>
               <div className="flex flex-col justify-center">
