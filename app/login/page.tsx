@@ -34,10 +34,8 @@ export default function Login() {
       }
 
       setMensagem("Login realizado!");
+      window.location.href = "/admin";
 
-
-      router.push("/admin");
-      router.refresh();
 
 
     } catch (err) {
