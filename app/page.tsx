@@ -56,7 +56,7 @@ const categoriasProcedimentos = [
   {
     categoria: "Técnicas Fisioterapêuticas",
     items: [
-      { nome: "Dry Needling", descricao: "Técnica com agulhas finas para liberação de pontos de tensão muscular, aliviando dores e melhorando a mobilidade.", img: "dry--needling.jpg" },
+      { nome: "Dry Needling", descricao: "Técnica com agulhas finas para liberação de pontos de tensão muscular, aliviando dores e melhorando a mobilidade.", img: "dry-needling.jpg" },
       { nome: "Quiropraxia", descricao: "Ajustes manuais para alinhamento da coluna e articulações, promovendo alívio de dores e bem-estar.", img: "quiropraxia.jpg" },
       { nome: "Liberação Miofascial", descricao: "Técnica manual que libera tensões na fáscia muscular, reduzindo dores crônicas e melhorando a postura.", img: "liberacao-miofascial.jpg" },
       { nome: "Ventosaterapia", descricao: "Uso de ventosas para estimular a circulação, reduzir tensões musculares e promover relaxamento profundo.", img: "ventosaterapia.jpg" },
