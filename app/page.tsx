@@ -25,6 +25,118 @@ function FadeSection({ children, className = "", delay = 0 }: { children: React.
   );
 }
 
+// ── Texto que digita sozinho ──
+function TypeWriter({ words }: { words: string[] }) {
+  const [wordIndex, setWordIndex] = useState(0);
+  const [charIndex, setCharIndex] = useState(0);
+  const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    const current = words[wordIndex];
+    const timeout = setTimeout(() => {
+      if (!deleting) {
+        if (charIndex < current.length) {
+          setCharIndex(c => c + 1);
+        } else {
+          setTimeout(() => setDeleting(true), 1200);
+        }
+      } else {
+        if (charIndex > 0) {
+          setCharIndex(c => c - 1);
+        } else {
+          setDeleting(false);
+          setWordIndex(i => (i + 1) % words.length);
+        }
+      }
+    }, deleting ? 45 : 90);
+    return () => clearTimeout(timeout);
+  }, [charIndex, deleting, wordIndex, words]);
+
+  return (
+    <span style={{ color: "#c8a078" }}>
+      {words[wordIndex].slice(0, charIndex)}
+      <span style={{ borderRight: "2px solid #c8a078", marginLeft: 2, animation: "blink 1s step-end infinite" }} />
+    </span>
+  );
+}
+
+// ── Contador animado ──
+function AnimatedCounter({ target, suffix = "", duration = 1800 }: { target: number; suffix?: string; duration?: number }) {
+  const [count, setCount] = useState(0);
+  const { ref, inView } = useInView(0.3);
+  const started = useRef(false);
+
+  useEffect(() => {
+    if (!inView || started.current) return;
+    started.current = true;
+    const steps = 60;
+    const increment = target / steps;
+    let current = 0;
+    const interval = setInterval(() => {
+      current += increment;
+      if (current >= target) { setCount(target); clearInterval(interval); }
+      else setCount(Math.floor(current));
+    }, duration / steps);
+    return () => clearInterval(interval);
+  }, [inView, target, duration]);
+
+  return <span ref={ref}>{count}{suffix}</span>;
+}
+
+// ── Accordion de procedimentos ──
+function AccordionProcedimentos({ categorias, categoriaAtiva, setCategoriaAtiva }: {
+  categorias: typeof categoriasProcedimentos;
+  categoriaAtiva: number;
+  setCategoriaAtiva: (i: number) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-3">
+      {categorias.map((cat, i) => {
+        const aberto = categoriaAtiva === i;
+        return (
+          <div key={i} className="rounded-3xl overflow-hidden transition-all duration-300" style={{ border: aberto ? "1px solid rgba(200,160,120,0.35)" : "1px solid rgba(200,160,120,0.1)", background: "#120d0d" }}>
+            {/* Header do accordion */}
+            <button
+              onClick={() => setCategoriaAtiva(aberto ? -1 : i)}
+              className="w-full flex items-center justify-between px-6 py-5 transition hover:opacity-80"
+            >
+              <span className="text-sm font-semibold uppercase tracking-wider text-left" style={{ color: aberto ? "#c8a078" : "#a89080" }}>
+                {cat.categoria}
+              </span>
+              <div className="flex items-center gap-3 flex-shrink-0">
+                <span className="text-xs px-2 py-1 rounded-full" style={{ background: "rgba(200,160,120,0.1)", color: "#c8a078" }}>
+                  {cat.items.length} {cat.items.length === 1 ? "procedimento" : "procedimentos"}
+                </span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="#c8a078" strokeWidth={1.5} className="w-4 h-4 transition-transform duration-300" style={{ transform: aberto ? "rotate(180deg)" : "rotate(0deg)" }}>
+                  <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+            </button>
+
+            {/* Conteúdo expandido */}
+            <div style={{ maxHeight: aberto ? "2000px" : "0px", overflow: "hidden", transition: "max-height 0.5s ease" }}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 px-4 pb-5">
+                {cat.items.map((item, j) => (
+                  <div key={j} className="rounded-2xl overflow-hidden flex flex-col transition hover:scale-[1.02] duration-300" style={{ background: "#0e0a0a", border: "1px solid rgba(200,160,120,0.08)" }}>
+                    <img src={item.img} alt={item.nome} className="w-full h-44 object-cover" loading="lazy" />
+                    <div className="p-4 flex flex-col flex-1">
+                      <h3 className="text-sm mb-2 font-semibold" style={{ color: "#c8a078" }}>{item.nome}</h3>
+                      <p className="text-xs leading-5 mb-4 flex-1" style={{ color: "#a89080" }}>{item.descricao}</p>
+                      <a href="/agendar" className="inline-block px-4 py-2.5 rounded-full text-xs uppercase tracking-widest transition hover:scale-105 text-center font-semibold" style={{ background: "#c8a078", color: "#0a0707" }}>
+                        Agendar
+                      </a>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── DADOS ──
 const categoriasProcedimentos = [
   {
@@ -130,10 +242,10 @@ const depoimentos = [
 ];
 
 const stats = [
-  { valor: "+500", label: "Clientes", icone: "👥" },
-  { valor: "98%", label: "Satisfação", icone: "⭐" },
-  { valor: "Premium", label: "Experiência", icone: "✦" },
-  { valor: "Personalizado", label: "Atendimento", icone: "🌸" },
+  { valorNum: 500, suffix: "+", label: "Clientes", icone: "👥" },
+  { valorNum: 98, suffix: "%", label: "Satisfação", icone: "⭐" },
+  { valorTexto: "Premium", label: "Experiência", icone: "✦" },
+  { valorTexto: "Personalizado", label: "Atendimento", icone: "🌸" },
 ];
 
 const infoContato = [
@@ -202,9 +314,12 @@ export default function Home() {
         <div className="absolute w-[280px] h-[280px] md:w-[420px] md:h-[420px] rounded-full blur-3xl pointer-events-none" style={{ background: "rgba(200,160,120,0.07)", top: "8%", left: "3%" }} />
         <div className="relative z-10 max-w-5xl w-full">
           <p className="uppercase tracking-[0.35em] text-xs mb-5" style={{ color: "#c8a078" }}>Clínica Premium — Planaltina, Brasília</p>
-          <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold leading-tight mb-6" style={{ animation: "fadeUp 0.8s ease both" }}>
+          <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold leading-tight mb-4" style={{ animation: "fadeUp 0.8s ease both" }}>
             Beleza com<span style={{ color: "#c8a078" }}> sofisticação</span>
           </h1>
+          <p className="text-lg md:text-2xl font-light mb-6" style={{ animation: "fadeUp 0.8s ease 0.1s both", color: "#a89080", minHeight: "2rem" }}>
+            <TypeWriter words={["Botox", "Harmonização Facial", "Depilação a Laser", "Limpeza de Pele", "Bioestimulador", "Preenchimento Labial"]} />
+          </p>
           <p className="text-base md:text-xl max-w-2xl mx-auto leading-8 mb-12" style={{ color: "#a89080", animation: "fadeUp 0.8s ease 0.15s both" }}>
             Tratamentos modernos, atendimento personalizado e resultados naturais para elevar sua autoestima.
           </p>
@@ -224,7 +339,12 @@ export default function Home() {
               <FadeSection key={i} delay={i * 80}>
                 <div className="rounded-3xl p-6 md:p-8 text-center transition hover:scale-[1.03] duration-300" style={{ background: "#120d0d", border: "1px solid rgba(200,160,120,0.1)" }}>
                   <div className="text-2xl mb-3">{item.icone}</div>
-                  <h3 className="text-2xl md:text-3xl mb-2 font-bold" style={{ color: "#c8a078" }}>{item.valor}</h3>
+                  <h3 className="text-2xl md:text-3xl mb-2 font-bold" style={{ color: "#c8a078" }}>
+                    {"valorNum" in item
+                      ? <AnimatedCounter target={item.valorNum!} suffix={item.suffix} />
+                      : item.valorTexto
+                    }
+                  </h3>
                   <p className="text-sm" style={{ color: "#a89080" }}>{item.label}</p>
                 </div>
               </FadeSection>
@@ -242,29 +362,12 @@ export default function Home() {
             <p className="max-w-2xl mx-auto" style={{ color: "#a89080" }}>Procedimentos modernos para realçar sua beleza natural com segurança e sofisticação. Parcelamento em até 12x.</p>
           </FadeSection>
           <FadeSection delay={100}>
-            <div className="flex flex-wrap justify-center gap-2 mb-12">
-              {categoriasProcedimentos.map((cat, i) => (
-                <button key={i} onClick={() => setCategoriaAtiva(i)} className="px-4 py-2 rounded-full text-xs uppercase tracking-wider font-semibold transition-all duration-300"
-                  style={categoriaAtiva === i ? { background: "#c8a078", color: "#0a0707" } : { background: "transparent", color: "#c8a078", border: "1px solid rgba(200,160,120,0.25)" }}>
-                  {cat.categoria}
-                </button>
-              ))}
-            </div>
+            <AccordionProcedimentos
+              categorias={categoriasProcedimentos}
+              categoriaAtiva={categoriaAtiva}
+              setCategoriaAtiva={setCategoriaAtiva}
+            />
           </FadeSection>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {categoriasProcedimentos[categoriaAtiva].items.map((item, i) => (
-              <FadeSection key={`${categoriaAtiva}-${i}`} delay={i * 60}>
-                <div className="rounded-3xl overflow-hidden h-full flex flex-col transition hover:scale-[1.02] duration-300" style={{ background: "#120d0d", border: "1px solid rgba(200,160,120,0.1)" }}>
-                  <img src={item.img} alt={item.nome} className="w-full h-52 object-cover" loading="lazy" />
-                  <div className="p-6 flex flex-col flex-1">
-                    <h3 className="text-lg mb-2 font-semibold" style={{ color: "#c8a078" }}>{item.nome}</h3>
-                    <p className="text-sm leading-6 mb-5 flex-1" style={{ color: "#a89080" }}>{item.descricao}</p>
-                    <a href="/agendar" className="inline-block px-6 py-3 rounded-full text-sm uppercase tracking-widest transition hover:scale-105 active:scale-95 text-center font-semibold" style={{ background: "#c8a078", color: "#0a0707" }}>Agendar</a>
-                  </div>
-                </div>
-              </FadeSection>
-            ))}
-          </div>
         </div>
       </section>
 
@@ -446,6 +549,7 @@ export default function Home() {
 
       <style>{`
         @keyframes fadeUp { from { opacity: 0; transform: translateY(28px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
       `}</style>
     </main>
   );
