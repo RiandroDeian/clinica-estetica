@@ -172,7 +172,7 @@ export default function Agendar() {
 
             {/* WhatsApp */}
             <a
-              href={`https://wa.me/5561993578458?text=${mensagemWpp}`}
+              href={`https://wa.me/5561995039925?text=${mensagemWpp}`}
               target="_blank"
               rel="noopener noreferrer"
               className="w-full py-4 rounded-full font-semibold flex items-center justify-center gap-2 transition hover:scale-105 active:scale-95"
