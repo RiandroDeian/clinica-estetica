@@ -3,6 +3,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+} from "recharts";
+
 export default function Dashboard() {
   const [user, setUser] = useState<any>(null);
   const [agendamentos, setAgendamentos] = useState<any[]>([]);
@@ -15,6 +24,27 @@ export default function Dashboard() {
   useEffect(() => {
     verificarUsuario();
     buscarAgendamentos();
+
+    const channel = supabase
+      .channel("agendamentos-realtime")
+
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "agendamentos",
+        },
+        () => {
+          buscarAgendamentos();
+        }
+      )
+
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   async function verificarUsuario() {
@@ -22,9 +52,18 @@ export default function Dashboard() {
 
     if (!data.user) {
       window.location.href = "/login";
-    } else {
-      setUser(data.user);
+      return;
     }
+
+    // EMAIL DO ADMIN
+    const adminEmail = "admin@clinica.com";
+
+    if (data.user.email !== adminEmail) {
+      window.location.href = "/";
+      return;
+    }
+
+    setUser(data.user);
   }
 
   async function buscarAgendamentos() {
@@ -43,8 +82,46 @@ export default function Dashboard() {
     setLoading(false);
   }
 
+  async function atualizarStatus(
+    id: string,
+    status: string
+  ) {
+    const { error } = await supabase
+      .from("agendamentos")
+      .update({ status })
+      .eq("id", id);
+
+    if (error) {
+      console.log(error);
+      return;
+    }
+
+    buscarAgendamentos();
+  }
+
+  async function excluirAgendamento(id: string) {
+    const confirmar = confirm(
+      "Deseja excluir este agendamento?"
+    );
+
+    if (!confirmar) return;
+
+    const { error } = await supabase
+      .from("agendamentos")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      console.log(error);
+      return;
+    }
+
+    buscarAgendamentos();
+  }
+
   async function handleLogout() {
     await supabase.auth.signOut();
+
     window.location.href = "/login";
   }
 
@@ -54,7 +131,9 @@ export default function Dashboard() {
     // BUSCA
     if (busca) {
       dados = dados.filter((item) =>
-        item.nome?.toLowerCase().includes(busca.toLowerCase())
+        item.nome
+          ?.toLowerCase()
+          .includes(busca.toLowerCase())
       );
     }
 
@@ -89,9 +168,16 @@ export default function Dashboard() {
     }
 
     return dados;
-  }, [agendamentos, busca, filtroStatus, ordenacao]);
+  }, [
+    agendamentos,
+    busca,
+    filtroStatus,
+    ordenacao,
+  ]);
 
-  const hoje = new Date().toISOString().split("T")[0];
+  const hoje = new Date()
+    .toISOString()
+    .split("T")[0];
 
   const hojeCount = agendamentos.filter(
     (item) => item.data === hoje
@@ -147,6 +233,7 @@ export default function Dashboard() {
           >
             Sair
           </button>
+
         </div>
 
         {/* CARDS */}
@@ -171,12 +258,60 @@ export default function Dashboard() {
             titulo="Cancelados"
             valor={cancelados}
           />
+
+        </div>
+
+        {/* GRÁFICOS */}
+        <div
+          className="rounded-3xl p-6 mb-10"
+          style={{
+            background: "#120d0d",
+            border:
+              "1px solid rgba(200,160,120,0.15)",
+          }}
+        >
+
+          <h2 className="text-2xl font-bold mb-6">
+            Estatísticas
+          </h2>
+
+          <div className="w-full h-[300px]">
+
+            <ResponsiveContainer width="100%" height="100%">
+
+              <BarChart
+                data={[
+                  {
+                    nome: "Confirmados",
+                    total: confirmados,
+                  },
+                  {
+                    nome: "Pendentes",
+                    total: pendentes,
+                  },
+                  {
+                    nome: "Cancelados",
+                    total: cancelados,
+                  },
+                ]}
+              >
+
+                <XAxis dataKey="nome" />
+                <YAxis />
+                <Tooltip />
+                <Bar dataKey="total" />
+
+              </BarChart>
+
+            </ResponsiveContainer>
+
+          </div>
+
         </div>
 
         {/* FILTROS */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
 
-          {/* BUSCA */}
           <input
             type="text"
             placeholder="Buscar cliente..."
@@ -192,7 +327,6 @@ export default function Dashboard() {
             }}
           />
 
-          {/* STATUS */}
           <select
             value={filtroStatus}
             onChange={(e) =>
@@ -222,7 +356,6 @@ export default function Dashboard() {
             </option>
           </select>
 
-          {/* ORDENAÇÃO */}
           <select
             value={ordenacao}
             onChange={(e) =>
@@ -247,6 +380,7 @@ export default function Dashboard() {
               Ordem Alfabética
             </option>
           </select>
+
         </div>
 
         {/* TABELA */}
@@ -261,15 +395,17 @@ export default function Dashboard() {
 
           <div className="overflow-x-auto">
 
-            <table className="w-full min-w-[900px]">
+            <table className="w-full min-w-[1100px]">
 
               <thead>
+
                 <tr
                   style={{
                     borderBottom:
                       "1px solid rgba(200,160,120,0.1)",
                   }}
                 >
+
                   <th className="p-5 text-left">
                     Nome
                   </th>
@@ -293,7 +429,13 @@ export default function Dashboard() {
                   <th className="p-5 text-left">
                     Status
                   </th>
+
+                  <th className="p-5 text-left">
+                    Ações
+                  </th>
+
                 </tr>
+
               </thead>
 
               <tbody>
@@ -302,9 +444,6 @@ export default function Dashboard() {
                   <>
                     {[1, 2, 3, 4].map((item) => (
                       <tr key={item}>
-                        <td className="p-5">
-                          <div className="h-4 rounded bg-neutral-700 animate-pulse"></div>
-                        </td>
 
                         <td className="p-5">
                           <div className="h-4 rounded bg-neutral-700 animate-pulse"></div>
@@ -323,70 +462,136 @@ export default function Dashboard() {
                         </td>
 
                         <td className="p-5">
-                          <div className="h-8 w-24 rounded-full bg-neutral-700 animate-pulse"></div>
+                          <div className="h-4 rounded bg-neutral-700 animate-pulse"></div>
                         </td>
+
                       </tr>
                     ))}
                   </>
                 ) : (
                   <>
-                    {agendamentosFiltrados.map((item) => (
-                      <tr
-                        key={item.id}
-                        className="transition hover:bg-[#1a1414]"
-                        style={{
-                          borderBottom:
-                            "1px solid rgba(200,160,120,0.05)",
-                        }}
-                      >
-                        <td className="p-5">
-                          {item.nome}
-                        </td>
+                    {agendamentosFiltrados.map(
+                      (item) => (
+                        <tr
+                          key={item.id}
+                          className="transition hover:bg-[#1a1414]"
+                          style={{
+                            borderBottom:
+                              "1px solid rgba(200,160,120,0.05)",
+                          }}
+                        >
 
-                        <td className="p-5">
-                          {item.telefone}
-                        </td>
+                          <td className="p-5">
+                            {item.nome}
+                          </td>
 
-                        <td className="p-5">
-                          {item.procedimento}
-                        </td>
+                          <td className="p-5">
+                            {item.telefone}
+                          </td>
 
-                        <td className="p-5">
-                          {item.data}
-                        </td>
+                          <td className="p-5">
+                            {item.procedimento}
+                          </td>
 
-                        <td className="p-5">
-                          {item.horario}
-                        </td>
+                          <td className="p-5">
+                            {item.data}
+                          </td>
 
-                        <td className="p-5">
-                          <span
-                            className="px-4 py-2 rounded-full text-xs uppercase tracking-widest"
-                            style={{
-                              background:
-                                item.status ===
-                                "confirmado"
-                                  ? "rgba(34,197,94,0.15)"
-                                  : item.status ===
+                          <td className="p-5">
+                            {item.horario}
+                          </td>
+
+                          <td className="p-5">
+
+                            <span
+                              className="px-4 py-2 rounded-full text-xs uppercase tracking-widest"
+                              style={{
+                                background:
+                                  item.status ===
+                                  "confirmado"
+                                    ? "rgba(34,197,94,0.15)"
+                                    : item.status ===
+                                      "cancelado"
+                                    ? "rgba(239,68,68,0.15)"
+                                    : "rgba(234,179,8,0.15)",
+
+                                color:
+                                  item.status ===
+                                  "confirmado"
+                                    ? "#22c55e"
+                                    : item.status ===
+                                      "cancelado"
+                                    ? "#ef4444"
+                                    : "#eab308",
+                              }}
+                            >
+                              {item.status ||
+                                "pendente"}
+                            </span>
+
+                          </td>
+
+                          <td className="p-5">
+
+                            <div className="flex flex-wrap gap-2">
+
+                              <button
+                                onClick={() =>
+                                  atualizarStatus(
+                                    item.id,
+                                    "confirmado"
+                                  )
+                                }
+                                className="px-4 py-2 rounded-full text-xs font-bold"
+                                style={{
+                                  background:
+                                    "rgba(34,197,94,0.15)",
+                                  color: "#22c55e",
+                                }}
+                              >
+                                Confirmar
+                              </button>
+
+                              <button
+                                onClick={() =>
+                                  atualizarStatus(
+                                    item.id,
                                     "cancelado"
-                                  ? "rgba(239,68,68,0.15)"
-                                  : "rgba(234,179,8,0.15)",
+                                  )
+                                }
+                                className="px-4 py-2 rounded-full text-xs font-bold"
+                                style={{
+                                  background:
+                                    "rgba(239,68,68,0.15)",
+                                  color: "#ef4444",
+                                }}
+                              >
+                                Cancelar
+                              </button>
 
-                              color:
-                                item.status ===
-                                "confirmado"
-                                  ? "#22c55e"
-                                  : item.status ===
-                                    "cancelado"
-                                  ? "#ef4444"
-                                  : "#eab308",
-                            }}
-                          >
-                            {item.status || "pendente"}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
+                              <button
+                                onClick={() =>
+                                  excluirAgendamento(
+                                    item.id
+                                  )
+                                }
+                                className="px-4 py-2 rounded-full text-xs font-bold"
+                                style={{
+                                  background:
+                                    "rgba(255,255,255,0.08)",
+                                  color: "white",
+                                }}
+                              >
+                                Excluir
+                              </button>
+
+                            </div>
+
+                          </td>
+
+                        </tr>
+                      )
+                    )}
                   </>
                 )}
 
@@ -420,6 +625,7 @@ function Card({
           "1px solid rgba(200,160,120,0.15)",
       }}
     >
+
       <p style={{ color: "#a89080" }}>
         {titulo}
       </p>
@@ -427,6 +633,7 @@ function Card({
       <h2 className="text-4xl font-bold mt-3">
         {valor}
       </h2>
+
     </div>
   );
 }
