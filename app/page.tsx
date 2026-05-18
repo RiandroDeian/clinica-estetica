@@ -30,20 +30,20 @@ const categoriasProcedimentos = [
   {
     categoria: "Harmonização — Rejuvenescimento",
     items: [
-      { nome: "Botox Terço Superior", descricao: "Suaviza rugas da testa, glabela e olhos. Relaxa a musculatura e deixa a pele mais lisa.", img: "/botox-tercosuperior.jpg" },
-      { nome: "Botox Full Face", descricao: "Trata o rosto de forma global e harmoniosa. Suaviza rugas e melhora o contorno, equilibrando as expressões.", img: "botox-fullface.jpg" },
-      { nome: "Botox Pescoço", descricao: "Suaviza as bandas musculares e linhas horizontais, proporcionando aspecto mais firme e rejuvenescido.", img: "botox-pescoco.webp" },
-      { nome: "Bioestimulador de Colágeno", descricao: "Estimula a produção natural de colágeno, melhorando firmeza e qualidade da pele com resultados graduais e duradouros.", img: "bioestimulador-colageno.webp" },
+      { nome: "Botox Terço Superior", descricao: "Suaviza rugas da testa, glabela e olhos. Relaxa a musculatura e deixa a pele mais lisa.", img: "https://images.unsplash.com/photo-1616394584738-fc6e612e71b9?w=800&q=80" },
+      { nome: "Botox Full Face", descricao: "Trata o rosto de forma global e harmoniosa. Suaviza rugas e melhora o contorno, equilibrando as expressões.", img: "https://images.unsplash.com/photo-1512290923902-8a9f81dc236c?w=800&q=80" },
+      { nome: "Botox Pescoço", descricao: "Suaviza as bandas musculares e linhas horizontais, proporcionando aspecto mais firme e rejuvenescido.", img: "https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=800&q=80" },
+      { nome: "Bioestimulador de Colágeno", descricao: "Estimula a produção natural de colágeno, melhorando firmeza e qualidade da pele com resultados graduais e duradouros.", img: "https://images.unsplash.com/photo-1598440947619-2c35fc9aa908?w=800&q=80" },
     ],
   },
   {
     categoria: "Harmonização — Preenchimento",
     items: [
-      { nome: "Preenchimento Labial", descricao: "Realça o volume e define o contorno dos lábios com naturalidade. Corrige assimetrias e hidrata.", img: "preenchimento-antes.jpg" },
-      { nome: "Rinomodelação", descricao: "Modela o nariz sem cirurgia, corrigindo imperfeições e alinhando o perfil com resultado imediato.", img: "rinomodelacao.jpg" },
-      { nome: "Bigode Chinês", descricao: "Suaviza os sulcos ao redor da boca, devolvendo um aspecto mais jovem e descansado ao rosto.", img: "bigode-chines.jpg" },
-      { nome: "Preenchimento de Olheiras", descricao: "Suaviza o aspecto cansado, devolve volume perdido e ilumina o olhar de forma rejuvenescida.", img: "preenchimento-de-olheiras.jpg" },
-      { nome: "Perfiloplastia", descricao: "Harmonização do perfil do rosto, equilibrando nariz, queixo e lábios para resultado mais proporcional. (1ml)", img: "perfiloplastia.jpg" },
+      { nome: "Preenchimento Labial", descricao: "Realça o volume e define o contorno dos lábios com naturalidade. Corrige assimetrias e hidrata.", img: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=800&q=80" },
+      { nome: "Rinomodelação", descricao: "Modela o nariz sem cirurgia, corrigindo imperfeições e alinhando o perfil com resultado imediato.", img: "https://images.unsplash.com/photo-1560750588-73207b1ef5b8?w=800&q=80" },
+      { nome: "Bigode Chinês", descricao: "Suaviza os sulcos ao redor da boca, devolvendo um aspecto mais jovem e descansado ao rosto.", img: "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=800&q=80" },
+      { nome: "Preenchimento de Olheiras", descricao: "Suaviza o aspecto cansado, devolve volume perdido e ilumina o olhar de forma rejuvenescida.", img: "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=800&q=80" },
+      { nome: "Perfiloplastia", descricao: "Harmonização do perfil do rosto, equilibrando nariz, queixo e lábios para resultado mais proporcional. (1ml)", img: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=800&q=80" },
     ],
   },
   {
@@ -56,30 +56,30 @@ const categoriasProcedimentos = [
   {
     categoria: "Técnicas Fisioterapêuticas",
     items: [
-      { nome: "Dry Needling", descricao: "Técnica com agulhas finas para liberação de pontos de tensão muscular, aliviando dores e melhorando a mobilidade.", img: "dry-needling.jpg" },
-      { nome: "Quiropraxia", descricao: "Ajustes manuais para alinhamento da coluna e articulações, promovendo alívio de dores e bem-estar.", img: "quiropraxia.jpg" },
-      { nome: "Liberação Miofascial", descricao: "Técnica manual que libera tensões na fáscia muscular, reduzindo dores crônicas e melhorando a postura.", img: "liberacao-miofascial.jpg" },
-      { nome: "Ventosaterapia", descricao: "Uso de ventosas para estimular a circulação, reduzir tensões musculares e promover relaxamento profundo.", img: "ventosaterapia.jpg" },
-      { nome: "Pacotes Fisioterapêuticos", descricao: "4 sessões por R$520 ou 8 sessões por R$920. Pacotes combinados: duplo (2 técnicas), triplo (3 técnicas) e completo (4 técnicas no mesmo dia).", img: "pele-perfeita.jpg" },
+      { nome: "Dry Needling", descricao: "Técnica com agulhas finas para liberação de pontos de tensão muscular, aliviando dores e melhorando a mobilidade.", img: "https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=800&q=80" },
+      { nome: "Quiropraxia", descricao: "Ajustes manuais para alinhamento da coluna e articulações, promovendo alívio de dores e bem-estar.", img: "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=800&q=80" },
+      { nome: "Liberação Miofascial", descricao: "Técnica manual que libera tensões na fáscia muscular, reduzindo dores crônicas e melhorando a postura.", img: "https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=800&q=80" },
+      { nome: "Ventosaterapia", descricao: "Uso de ventosas para estimular a circulação, reduzir tensões musculares e promover relaxamento profundo.", img: "https://images.unsplash.com/photo-1552693673-1bf958298935?w=800&q=80" },
+      { nome: "Pacotes Fisioterapêuticos", descricao: "4 sessões por R$520 ou 8 sessões por R$920. Pacotes combinados: duplo (2 técnicas), triplo (3 técnicas) e completo (4 técnicas no mesmo dia).", img: "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=800&q=80" },
     ],
   },
   {
     categoria: "Protocolos Faciais & Capilar",
     items: [
-      { nome: "Limpeza de Pele", descricao: "Cuidado essencial para remover impurezas, controlar a oleosidade e renovar a saúde da sua pele.", img: "limpeza-pele.jpg" },
-      { nome: "Protocolo Pele Perfeita", descricao: "Tratamento completo e personalizado para melasma, acne, rosácea e muito mais. 6 sessões inclusas.", img: "pele-perfeita.jpg" },
-      { nome: "Protocolo Capilar", descricao: "Tratamento para queda de cabelo e estimulação do fortalecimento dos fios. 6 sessões inclusas.", img: "protocolo-capilar.webp" },
+      { nome: "Limpeza de Pele", descricao: "Cuidado essencial para remover impurezas, controlar a oleosidade e renovar a saúde da sua pele.", img: "https://images.unsplash.com/photo-1507652313519-d4e9174996dd?w=800&q=80" },
+      { nome: "Protocolo Pele Perfeita", descricao: "Tratamento completo e personalizado para melasma, acne, rosácea e muito mais. 6 sessões inclusas.", img: "https://images.unsplash.com/photo-1515377905703-c4788e51af15?w=800&q=80" },
+      { nome: "Protocolo Capilar", descricao: "Tratamento para queda de cabelo e estimulação do fortalecimento dos fios. 6 sessões inclusas.", img: "https://images.unsplash.com/photo-1522337660859-02fbefca4702?w=800&q=80" },
     ],
   },
   {
     categoria: "Protocolos Corporais",
     items: [
-      { nome: "Protocolo PEIM", descricao: "Tratamento para eliminar vasinhos aparentes nas pernas, melhorando seu aspecto. 4 sessões.", img: "PEIM.webp" },
-      { nome: "Lipo de Papada Enzimática", descricao: "Reduz a gordura localizada na papada e redefine o contorno do rosto. 5 sessões.", img: "lipo-papada.jpg" },
-      { nome: "Lipo Corporal Enzimática", descricao: "Redução de gordura localizada em abdômen, flancos, culote e braços sem cirurgia. 8 sessões.", img: "lipo-enzimatica.jpg" },
-      { nome: "Protocolo Celulite", descricao: "Melhora a circulação e devolve firmeza à pele, reduzindo o aspecto da celulite. 5 sessões.", img: "celulite.jpg" },
-      { nome: "Protocolo de Estrias", descricao: "Suaviza a aparência das estrias e melhora a textura da pele. 6 sessões.", img: "protocolo-estrias.webp" },
-      { nome: "Protocolo Emagrecimento Plus", descricao: "Programa completo: 5x Lipo Papada + 8x Lipo Corporal + 1 mês mentoria com personal trainer e nutricionista.", img: "imagem-clinica-2.jpeg" },
+      { nome: "Protocolo PEIM", descricao: "Tratamento para eliminar vasinhos aparentes nas pernas, melhorando seu aspecto. 4 sessões.", img: "https://images.unsplash.com/photo-1519824145371-296894a0daa9?w=800&q=80" },
+      { nome: "Lipo de Papada Enzimática", descricao: "Reduz a gordura localizada na papada e redefine o contorno do rosto. 5 sessões.", img: "https://images.unsplash.com/photo-1498515816213-e7ba8b73ef01?w=800&q=80" },
+      { nome: "Lipo Corporal Enzimática", descricao: "Redução de gordura localizada em abdômen, flancos, culote e braços sem cirurgia. 8 sessões.", img: "https://images.unsplash.com/photo-1523264653568-d3d4032d1476?w=800&q=80" },
+      { nome: "Protocolo Celulite", descricao: "Melhora a circulação e devolve firmeza à pele, reduzindo o aspecto da celulite. 5 sessões.", img: "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=800&q=80" },
+      { nome: "Protocolo de Estrias", descricao: "Suaviza a aparência das estrias e melhora a textura da pele. 6 sessões.", img: "https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=800&q=80" },
+      { nome: "Protocolo Emagrecimento Plus", descricao: "Programa completo: 5x Lipo Papada + 8x Lipo Corporal + 1 mês mentoria com personal trainer e nutricionista.", img: "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=800&q=80" },
     ],
   },
 ];
@@ -356,7 +356,7 @@ export default function Home() {
       <section id="sobre" className="py-28 px-5 bg-[#0d0909]">
         <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-20 items-center">
           <FadeSection>
-            <img src="/imagem-clinica-5.jpeg" alt="Clínica Moncié" className="rounded-3xl h-72 md:h-[560px] w-full object-cover" loading="lazy" />
+            <img src="/imagem-clinica-5.jpg" alt="Clínica Moncié" className="rounded-3xl h-72 md:h-[560px] w-full object-cover" loading="lazy" />
           </FadeSection>
           <FadeSection delay={150}>
             <p className="uppercase tracking-[0.3em] text-xs mb-4" style={{ color: "#c8a078" }}>Sobre a Moncié</p>
@@ -430,6 +430,10 @@ export default function Home() {
         </div>
         <div className="max-w-6xl mx-auto mt-8 pt-6 text-center text-xs" style={{ color: "#4a3a32", borderTop: "1px solid rgba(200,160,120,0.06)" }}>
           © {new Date().getFullYear()} Moncié Esthetique. Todos os direitos reservados.
+          <br />
+          <span className="mt-2 inline-block" style={{ color: "#2a1f1a" }}>
+            Desenvolvido por Riandro Deian
+          </span>
         </div>
       </footer>
 
