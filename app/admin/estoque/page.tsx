@@ -1,0 +1,289 @@
+﻿"use client";
+
+import { useEffect, useState, useCallback } from "react";
+
+type Item = {
+  id: string;
+  nome: string;
+  categoria?: string;
+  quantidade: number;
+  unidade: string;
+  quantidade_minima: number;
+  custo_medio?: number;
+  fornecedor?: string;
+  validade?: string;
+};
+
+export default function EstoquePage() {
+  const [itens, setItens] = useState<Item[]>([]);
+  const [carregando, setCarregando] = useState(true);
+  const [modalAberto, setModalAberto] = useState(false);
+  const [modalMov, setModalMov] = useState<{ item: Item; tipo: "entrada" | "saida" } | null>(null);
+  const [salvando, setSalvando] = useState(false);
+  const [qtdMov, setQtdMov] = useState("");
+  const [motivoMov, setMotivoMov] = useState("");
+  const [form, setForm] = useState({
+    nome: "", categoria: "", quantidade: "0", unidade: "un",
+    quantidade_minima: "5", custo_medio: "", fornecedor: "", validade: ""
+  });
+
+  const buscar = useCallback(async () => {
+    setCarregando(true);
+    const res = await fetch("/api/estoque");
+    const data = await res.json();
+    setItens(Array.isArray(data) ? data : []);
+    setCarregando(false);
+  }, []);
+
+  useEffect(() => { buscar(); }, [buscar]);
+
+  async function salvar() {
+    setSalvando(true);
+    await fetch("/api/estoque", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...form,
+        quantidade: Number(form.quantidade),
+        quantidade_minima: Number(form.quantidade_minima),
+        custo_medio: form.custo_medio ? Number(form.custo_medio) : null,
+      }),
+    });
+    setModalAberto(false);
+    setForm({ nome: "", categoria: "", quantidade: "0", unidade: "un", quantidade_minima: "5", custo_medio: "", fornecedor: "", validade: "" });
+    buscar();
+    setSalvando(false);
+  }
+
+  async function movimentar() {
+    if (!modalMov || !qtdMov) return;
+    setSalvando(true);
+    await fetch(`/api/estoque/${modalMov.item.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tipo: modalMov.tipo, quantidade: Number(qtdMov), motivo: motivoMov }),
+    });
+    setModalMov(null);
+    setQtdMov("");
+    setMotivoMov("");
+    buscar();
+    setSalvando(false);
+  }
+
+  const baixo = itens.filter(i => i.quantidade <= i.quantidade_minima);
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-8 gap-4 flex-wrap">
+        <div>
+          <p className="text-xs uppercase tracking-widest mb-1" style={{ color: "#c8a078" }}>Gestao</p>
+          <h1 className="text-3xl font-bold" style={{ color: "#e8d5c0" }}>Estoque</h1>
+        </div>
+        <button onClick={() => setModalAberto(true)}
+          className="flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-semibold uppercase tracking-widest transition hover:scale-105"
+          style={{ background: "#c8a078", color: "#0a0707" }}>
+          <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth={2}>
+            <path d="M12 5v14M5 12h14" strokeLinecap="round"/>
+          </svg>
+          Novo Item
+        </button>
+      </div>
+
+      {baixo.length > 0 && (
+        <div className="mb-6 rounded-2xl px-5 py-4"
+          style={{ background: "rgba(232,201,122,0.08)", border: "1px solid rgba(232,201,122,0.25)" }}>
+          <p className="text-sm font-semibold mb-2" style={{ color: "#e8c97a" }}>
+            Estoque baixo ({baixo.length} {baixo.length === 1 ? "item" : "itens"})
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {baixo.map(i => (
+              <span key={i.id} className="text-xs px-2 py-1 rounded-lg"
+                style={{ background: "rgba(232,201,122,0.1)", color: "#e8c97a" }}>
+                {i.nome} ({i.quantidade} {i.unidade})
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {carregando ? (
+        <div className="flex items-center justify-center h-48">
+          <div className="w-8 h-8 rounded-full border-2 animate-spin"
+            style={{ borderColor: "rgba(200,160,120,0.2)", borderTopColor: "#c8a078" }} />
+        </div>
+      ) : itens.length === 0 ? (
+        <div className="text-center py-20 rounded-3xl"
+          style={{ background: "#120d0d", border: "1px solid rgba(200,160,120,0.1)" }}>
+          <p className="text-4xl mb-4">📦</p>
+          <p className="text-lg font-semibold mb-2" style={{ color: "#c8a078" }}>Estoque vazio</p>
+          <p className="text-sm" style={{ color: "#6b5a4e" }}>Adicione o primeiro item clicando em Novo Item</p>
+        </div>
+      ) : (
+        <div className="rounded-3xl overflow-hidden"
+          style={{ background: "#120d0d", border: "1px solid rgba(200,160,120,0.12)" }}>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr style={{ borderBottom: "1px solid rgba(200,160,120,0.1)" }}>
+                  {["Item", "Categoria", "Quantidade", "Minimo", "Custo", "Fornecedor", "Validade", "Acoes"].map(h => (
+                    <th key={h} className="text-left px-5 py-4 text-xs uppercase tracking-widest"
+                      style={{ color: "#6b5a4e" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {itens.map((item, i) => {
+                  const critico = item.quantidade <= item.quantidade_minima;
+                  return (
+                    <tr key={item.id}
+                      style={{ borderBottom: i < itens.length - 1 ? "1px solid rgba(200,160,120,0.06)" : "none" }}>
+                      <td className="px-5 py-4">
+                        <p className="text-sm font-semibold" style={{ color: "#e8d5c0" }}>{item.nome}</p>
+                      </td>
+                      <td className="px-5 py-4 text-sm" style={{ color: "#6b5a4e" }}>{item.categoria ?? "-"}</td>
+                      <td className="px-5 py-4">
+                        <span className="text-sm font-bold" style={{ color: critico ? "#e8c97a" : "#7ae8a0" }}>
+                          {item.quantidade} {item.unidade}
+                        </span>
+                        {critico && <span className="ml-2 text-xs" style={{ color: "#e8c97a" }}>baixo</span>}
+                      </td>
+                      <td className="px-5 py-4 text-sm" style={{ color: "#6b5a4e" }}>
+                        {item.quantidade_minima} {item.unidade}
+                      </td>
+                      <td className="px-5 py-4 text-sm" style={{ color: "#a89080" }}>
+                        {item.custo_medio
+                          ? `R$ ${Number(item.custo_medio).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
+                          : "-"}
+                      </td>
+                      <td className="px-5 py-4 text-sm" style={{ color: "#6b5a4e" }}>{item.fornecedor ?? "-"}</td>
+                      <td className="px-5 py-4 text-sm"
+                        style={{ color: item.validade && new Date(item.validade) < new Date() ? "#e87a7a" : "#6b5a4e" }}>
+                        {item.validade ? new Date(item.validade).toLocaleDateString("pt-BR") : "-"}
+                      </td>
+                      <td className="px-5 py-4">
+                        <div className="flex gap-2">
+                          <button onClick={() => setModalMov({ item, tipo: "entrada" })}
+                            className="px-3 py-1.5 rounded-xl text-xs transition hover:scale-105"
+                            style={{ background: "rgba(122,232,160,0.1)", color: "#7ae8a0", border: "1px solid rgba(122,232,160,0.2)" }}>
+                            + Entrada
+                          </button>
+                          <button onClick={() => setModalMov({ item, tipo: "saida" })}
+                            className="px-3 py-1.5 rounded-xl text-xs transition hover:scale-105"
+                            style={{ background: "rgba(232,122,122,0.1)", color: "#e87a7a", border: "1px solid rgba(232,122,122,0.2)" }}>
+                            - Saida
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {modalAberto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}>
+          <div className="w-full max-w-lg rounded-3xl p-8 max-h-[90vh] overflow-y-auto"
+            style={{ background: "#120d0d", border: "1px solid rgba(200,160,120,0.2)" }}>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold" style={{ color: "#c8a078" }}>Novo Item</h2>
+              <button onClick={() => setModalAberto(false)} style={{ color: "#6b5a4e" }}>
+                <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6" stroke="currentColor" strokeWidth={1.5}>
+                  <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round"/>
+                </svg>
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              {[
+                { label: "Nome", key: "nome", type: "text", col: 2 },
+                { label: "Categoria", key: "categoria", type: "text", col: 1 },
+                { label: "Unidade", key: "unidade", type: "text", col: 1 },
+                { label: "Quantidade inicial", key: "quantidade", type: "number", col: 1 },
+                { label: "Quantidade minima", key: "quantidade_minima", type: "number", col: 1 },
+                { label: "Custo medio (R$)", key: "custo_medio", type: "number", col: 1 },
+                { label: "Fornecedor", key: "fornecedor", type: "text", col: 1 },
+                { label: "Validade", key: "validade", type: "date", col: 2 },
+              ].map(field => (
+                <div key={field.key} className={field.col === 2 ? "col-span-2" : ""}>
+                  <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "#a89080" }}>
+                    {field.label}
+                  </label>
+                  <input
+                    type={field.type}
+                    value={(form as any)[field.key]}
+                    onChange={e => setForm(f => ({ ...f, [field.key]: e.target.value }))}
+                    className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
+                    style={{ background: "#0e0a0a", border: "1px solid rgba(200,160,120,0.15)", color: "#e8d5c0" }}
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button onClick={() => setModalAberto(false)}
+                className="flex-1 py-3 rounded-2xl text-sm uppercase tracking-widest transition hover:opacity-70"
+                style={{ border: "1px solid rgba(200,160,120,0.2)", color: "#6b5a4e" }}>
+                Cancelar
+              </button>
+              <button onClick={salvar} disabled={salvando || !form.nome}
+                className="flex-1 py-3 rounded-2xl text-sm uppercase tracking-widest font-semibold transition hover:scale-105"
+                style={{ background: form.nome ? "#c8a078" : "rgba(200,160,120,0.3)", color: "#0a0707" }}>
+                {salvando ? "Salvando..." : "Salvar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modalMov && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}>
+          <div className="w-full max-w-sm rounded-3xl p-8"
+            style={{ background: "#120d0d", border: "1px solid rgba(200,160,120,0.2)" }}>
+            <h2 className="text-xl font-bold mb-2"
+              style={{ color: modalMov.tipo === "entrada" ? "#7ae8a0" : "#e87a7a" }}>
+              {modalMov.tipo === "entrada" ? "Entrada" : "Saida"} de Estoque
+            </h2>
+            <p className="text-sm mb-6" style={{ color: "#6b5a4e" }}>
+              {modalMov.item.nome} - Atual: {modalMov.item.quantidade} {modalMov.item.unidade}
+            </p>
+            <div className="flex flex-col gap-4">
+              <div>
+                <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "#a89080" }}>
+                  Quantidade
+                </label>
+                <input type="number" value={qtdMov} onChange={e => setQtdMov(e.target.value)}
+                  placeholder="0" className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
+                  style={{ background: "#0e0a0a", border: "1px solid rgba(200,160,120,0.15)", color: "#e8d5c0" }} />
+              </div>
+              <div>
+                <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "#a89080" }}>
+                  Motivo
+                </label>
+                <input type="text" value={motivoMov} onChange={e => setMotivoMov(e.target.value)}
+                  placeholder="Ex: Compra, uso em procedimento..."
+                  className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
+                  style={{ background: "#0e0a0a", border: "1px solid rgba(200,160,120,0.15)", color: "#e8d5c0" }} />
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button onClick={() => setModalMov(null)}
+                className="flex-1 py-3 rounded-2xl text-sm uppercase tracking-widest transition hover:opacity-70"
+                style={{ border: "1px solid rgba(200,160,120,0.2)", color: "#6b5a4e" }}>
+                Cancelar
+              </button>
+              <button onClick={movimentar} disabled={salvando || !qtdMov}
+                className="flex-1 py-3 rounded-2xl text-sm uppercase tracking-widest font-semibold transition hover:scale-105"
+                style={{ background: qtdMov ? "#c8a078" : "rgba(200,160,120,0.3)", color: "#0a0707" }}>
+                {salvando ? "..." : "Confirmar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      <style>{`input::placeholder { color: #3a2e28; }`}</style>
+    </div>
+  );
+}
