@@ -61,6 +61,8 @@ export default function ChatPage() {
   useEffect(() => {
     fetch("/api/auth/me").then(r => r.json()).then(d => setMe(d));
     fetch("/api/chat/canais").then(r => r.json()).then(d => {
+      console.log("CANAIS:", d);
+      console.log("CANAL ATIVO:", d[0]);
       if (Array.isArray(d) && d.length > 0) {
         setCanais(d);
         setCanalAtivo(d[0]);
@@ -99,6 +101,7 @@ export default function ChatPage() {
       setTextoEdit("");
     } else {
       const mencoes = (texto.match(/@(\w+)/g) ?? []).map(m => m.slice(1));
+      console.log("ENVIANDO PARA CANAL:", canalAtivo);
       await fetch("/api/chat/mensagens", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
