@@ -274,7 +274,7 @@ export default function ChatPage() {
             </div>
           ) : (
             msgsFiltradas ? (
-              msgsFiltradas.map(msg => <MsgCard key={msg.id} msg={msg} me={me} menuMsgId={menuMsgId} setMenuMsgId={setMenuMsgId} emojiPickerId={emojiPickerId} setEmojiPickerId={setEmojiPickerId} onReply={setReplyMsg} onEditar={m => { setEditandoMsg(m); setTextoEdit(m.conteudo); }} onDeletar={deletar} onReagir={reagir} onFixar={fixar} reacoesPorEmoji={reacoesPorEmoji} formatarHora={formatarHora} />)
+              msgsFiltradas.map(msg => <MsgCard key={msg.id} msg={msg} me={me} menuMsgId={menuMsgId} setMenuMsgId={setMenuMsgId} emojiPickerId={emojiPickerId} setEmojiPickerId={setEmojiPickerId} onReply={setReplyMsg} onEditar={(m:Mensagem) => { setEditandoMsg(m); setTextoEdit(m.conteudo); }} onDeletar={deletar} onReagir={reagir} onFixar={fixar} reacoesPorEmoji={reacoesPorEmoji} formatarHora={formatarHora} />)
             ) : (
               agrupadas.map((grupo, gi) => (
                 <div key={gi}>
@@ -283,7 +283,7 @@ export default function ChatPage() {
                     <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "rgba(200,160,120,0.06)", color: "#3a2e28" }}>{grupo.data}</span>
                     <div className="flex-1 h-px" style={{ background: "rgba(200,160,120,0.08)" }} />
                   </div>
-                  {grupo.msgs.map(msg => <MsgCard key={msg.id} msg={msg} me={me} menuMsgId={menuMsgId} setMenuMsgId={setMenuMsgId} emojiPickerId={emojiPickerId} setEmojiPickerId={setEmojiPickerId} onReply={setReplyMsg} onEditar={m => { setEditandoMsg(m); setTextoEdit(m.conteudo); }} onDeletar={deletar} onReagir={reagir} onFixar={fixar} reacoesPorEmoji={reacoesPorEmoji} formatarHora={formatarHora} />)}
+                  {grupo.msgs.map(msg => <MsgCard key={msg.id} msg={msg} me={me} menuMsgId={menuMsgId} setMenuMsgId={setMenuMsgId} emojiPickerId={emojiPickerId} setEmojiPickerId={setEmojiPickerId} onReply={setReplyMsg} onEditar={(m:Mensagem) => { setEditandoMsg(m); setTextoEdit(m.conteudo); }} onDeletar={deletar} onReagir={reagir} onFixar={fixar} reacoesPorEmoji={reacoesPorEmoji} formatarHora={formatarHora} />)}
                 </div>
               ))
             )
