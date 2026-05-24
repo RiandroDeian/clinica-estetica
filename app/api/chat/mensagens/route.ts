@@ -16,7 +16,10 @@ export async function GET(request: NextRequest) {
 
   let query = supabaseAdmin
     .from("chat_mensagens")
-    .select("*, funcionarios(nome, cor)")
+    .select(`
+      *,
+      funcionarios(nome, cor)
+    `)
     .order("criado_em", { ascending: true })
     .limit(100);
 
@@ -55,7 +58,7 @@ export async function POST(request: NextRequest) {
     mencoes,
     arquivo_url,
     arquivo_nome,
-    arquivo_tipo,
+    arquivo_tipo
   } = body;
 
   if (!conteudo?.trim()) {
@@ -73,11 +76,14 @@ export async function POST(request: NextRequest) {
       canal_id,
       reply_id,
       mencoes: mencoes ?? [],
-      arquivo_url: arquivo_url ?? null,
-      arquivo_nome: arquivo_nome ?? null,
-      arquivo_tipo: arquivo_tipo ?? null,
+      arquivo_url,
+      arquivo_nome,
+      arquivo_tipo
     })
-    .select("*, funcionarios(nome, cor)")
+    .select(`
+      *,
+      funcionarios(nome, cor)
+    `)
     .single();
 
   if (error) {
