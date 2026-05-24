@@ -1,5 +1,6 @@
 ﻿"use client";
 
+import UploadFotos from "@/components/admin/upload-fotos";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
@@ -42,7 +43,7 @@ export default function ProntuarioPage() {
   const router = useRouter();
   const [paciente, setPaciente] = useState<Paciente | null>(null);
   const [carregando, setCarregando] = useState(true);
-  const [aba, setAba] = useState<"dados" | "historico" | "pacotes" | "anotacoes">("dados");
+  const [aba, setAba] = useState<"dados" | "historico" | "pacotes" | "anotacoes" | "arquivos">("dados");
   const [editando, setEditando] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [novaAnotacao, setNovaAnotacao] = useState("");
@@ -112,6 +113,7 @@ export default function ProntuarioPage() {
     { key: "historico", label: `Historico (${paciente.agendamentos.length})` },
     { key: "pacotes", label: `Pacotes (${paciente.pacotes.length})` },
     { key: "anotacoes", label: `Anotacoes (${paciente.anotacoes.length})` },
+    { key: "arquivos", label: "Fotos & Docs " },
   ] as const;
 
   return (
@@ -329,6 +331,9 @@ export default function ProntuarioPage() {
             </div>
           ))}
         </div>
+      )}
+      {aba === "arquivos" && (
+        <UploadFotos pacienteId={params.id as string} />
       )}
       <style>{`textarea::placeholder { color: #3a2e28; }`}</style>
     </div>
