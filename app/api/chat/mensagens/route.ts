@@ -12,17 +12,19 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const canalId = new URL(request.url).searchParams.get("canal_id");
+  const canalId = request.nextUrl.searchParams.get("canal_id");
 
-  const { data, error } = await supabaseAdmin
+  let query = supabaseAdmin
     .from("chat_mensagens")
-    .select(`
-      *,
-      funcionarios(nome, cor)
-    `)
-    .eq("canal_id", canalId)
+    .select("*, funcionarios(nome, cor)")
     .order("criado_em", { ascending: true })
     .limit(100);
+
+  if (canalId) {
+    query = query.eq("canal_id", canalId);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     return NextResponse.json(
@@ -44,6 +46,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const body = await request.json();
+
   const {
     conteudo,
     canal_id,
@@ -52,7 +56,7 @@ export async function POST(request: NextRequest) {
     arquivo_url,
     arquivo_nome,
     arquivo_tipo,
-  } = await request.json();
+  } = body;
 
   if (!conteudo?.trim()) {
     return NextResponse.json(
@@ -66,19 +70,14 @@ export async function POST(request: NextRequest) {
     .insert({
       conteudo: conteudo.trim(),
       funcionario_id: sessao.id,
-
-      canal_id: canal_id ?? null,
-      reply_id: reply_id ?? null,
+      canal_id,
+      reply_id,
       mencoes: mencoes ?? [],
-
       arquivo_url: arquivo_url ?? null,
       arquivo_nome: arquivo_nome ?? null,
       arquivo_tipo: arquivo_tipo ?? null,
     })
-    .select(`
-      *,
-      funcionarios(nome, cor)
-    `)
+    .select("*, funcionarios(nome, cor)")
     .single();
 
   if (error) {
