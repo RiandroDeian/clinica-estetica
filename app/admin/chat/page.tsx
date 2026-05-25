@@ -1,6 +1,5 @@
 ﻿"use client";
 
-import { useChatRealtime } from "@/hooks/chat/useChatRealtime";
 import { useEffect, useRef, useState, useCallback } from "react";
 
 type Canal = { id: string; nome: string; descricao?: string };
@@ -11,6 +10,7 @@ type Mensagem = {
   editado: boolean;
   deletado: boolean;
   funcionario_id: string;
+  canal_id: string;
   mencoes: string[];
   arquivo_url?: string;
   arquivo_nome?: string;
@@ -39,56 +39,57 @@ export default function ChatPage() {
   const [emojiPickerId, setEmojiPickerId] = useState<string | null>(null);
   const [busca, setBusca] = useState("");
   const [buscaAberta, setBuscaAberta] = useState(false);
-  const [digitando, setDigitando] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const canalAtivoRef = useRef<Canal | null>(null);
 
-  const buscarMensagens = useCallback(async () => {
-    if (!canalAtivo) return;
-    const res = await fetch(`/api/chat/mensagens?canal_id=${canalAtivo.id}`);
+  async function buscarMensagens(canalId: string) {
+    const res = await fetch(`/api/chat/mensagens?canal_id=${canalId}`);
     const data = await res.json();
     if (Array.isArray(data)) setMensagens(data);
-  }, [canalAtivo]);
+  }
 
-  const buscarOnline = useCallback(async () => {
+  async function buscarOnline() {
     await fetch("/api/chat/online", { method: "POST" });
     const res = await fetch("/api/chat/online");
     const data = await res.json();
     if (Array.isArray(data)) setOnline(data);
-  }, []);
+  }
 
   useEffect(() => {
     fetch("/api/auth/me").then(r => r.json()).then(d => setMe(d));
-    fetch("/api/chat/canais").then(r => r.json()).then(d => {
-      console.log("CANAIS:", d);
-      console.log("CANAL ATIVO:", d[0]);
+    fetch("/api/chat/canais").then(r => r.json()).then((d: Canal[]) => {
       if (Array.isArray(d) && d.length > 0) {
         setCanais(d);
-        setCanalAtivo(d[0]);
+        const primeiro = d[0];
+        setCanalAtivo(primeiro);
+        canalAtivoRef.current = primeiro;
+        buscarMensagens(primeiro.id);
       }
     });
-  }, []);
-
-  useEffect(() => {
-    if (!canalAtivo) return;
-    buscarMensagens();
-    const interval = setInterval(buscarMensagens, 3000);
-    return () => clearInterval(interval);
-  }, [buscarMensagens, canalAtivo]);
-
-  useEffect(() => {
     buscarOnline();
-    const interval = setInterval(buscarOnline, 30000);
-    return () => clearInterval(interval);
-  }, [buscarOnline]);
+    const intervalMsg = setInterval(() => {
+      if (canalAtivoRef.current) buscarMensagens(canalAtivoRef.current.id);
+    }, 3000);
+    const intervalOnline = setInterval(buscarOnline, 30000);
+    return () => { clearInterval(intervalMsg); clearInterval(intervalOnline); };
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [mensagens]);
 
+  function mudarCanal(canal: Canal) {
+    setCanalAtivo(canal);
+    canalAtivoRef.current = canal;
+    setMensagens([]);
+    buscarMensagens(canal.id);
+  }
+
   async function enviar() {
-    if ((!texto.trim() && !editandoMsg) || enviando) return;
+    const canal = canalAtivoRef.current;
+    if (!texto.trim() || enviando || !canal) return;
     setEnviando(true);
 
     if (editandoMsg) {
@@ -100,18 +101,22 @@ export default function ChatPage() {
       setEditandoMsg(null);
       setTextoEdit("");
     } else {
-      const mencoes = (texto.match(/@(\w+)/g) ?? []).map(m => m.slice(1));
-      console.log("ENVIANDO PARA CANAL:", canalAtivo);
+      const mencoes = (texto.match(/@(\w+)/g) ?? []).map((m: string) => m.slice(1));
       await fetch("/api/chat/mensagens", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conteudo: texto.trim(), canal_id: canalAtivo?.id, reply_id: replyMsg?.id ?? null, mencoes }),
+        body: JSON.stringify({
+          conteudo: texto.trim(),
+          canal_id: canal.id,
+          reply_id: replyMsg?.id ?? null,
+          mencoes,
+        }),
       });
       setTexto("");
       setReplyMsg(null);
     }
 
-    await buscarMensagens();
+    await buscarMensagens(canal.id);
     setEnviando(false);
     inputRef.current?.focus();
   }
@@ -123,7 +128,7 @@ export default function ChatPage() {
       body: JSON.stringify({ acao: "deletar" }),
     });
     setMenuMsgId(null);
-    buscarMensagens();
+    if (canalAtivoRef.current) buscarMensagens(canalAtivoRef.current.id);
   }
 
   async function reagir(msgId: string, emoji: string) {
@@ -133,22 +138,23 @@ export default function ChatPage() {
       body: JSON.stringify({ acao: "reagir", emoji }),
     });
     setEmojiPickerId(null);
-    buscarMensagens();
+    if (canalAtivoRef.current) buscarMensagens(canalAtivoRef.current.id);
   }
 
   async function fixar(msgId: string) {
     await fetch(`/api/chat/mensagens/${msgId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ acao: "fixar", canal_id: canalAtivo?.id }),
+      body: JSON.stringify({ acao: "fixar", canal_id: canalAtivoRef.current?.id }),
     });
     setMenuMsgId(null);
-    buscarMensagens();
+    if (canalAtivoRef.current) buscarMensagens(canalAtivoRef.current.id);
   }
 
   async function enviarArquivo(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (!file || !canalAtivo) return;
+    const canal = canalAtivoRef.current;
+    if (!file || !canal) return;
     const fd = new FormData();
     fd.append("arquivo", file);
     fd.append("paciente_id", "chat");
@@ -160,16 +166,20 @@ export default function ChatPage() {
       await fetch("/api/chat/mensagens", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conteudo: file.name, canal_id: canalAtivo.id, arquivo_url: data.url_publica, arquivo_nome: file.name, arquivo_tipo: file.type }),
+        body: JSON.stringify({
+          conteudo: file.name,
+          canal_id: canal.id,
+          arquivo_url: data.url_publica,
+          arquivo_nome: file.name,
+          arquivo_tipo: file.type,
+        }),
       });
-      buscarMensagens();
+      buscarMensagens(canal.id);
     }
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviar(); }
-    setDigitando(true);
-    setTimeout(() => setDigitando(false), 2000);
   }
 
   function formatarHora(iso: string) {
@@ -216,20 +226,28 @@ export default function ChatPage() {
         </div>
         <div className="flex-1 overflow-y-auto p-2">
           {canais.map(c => (
-            <button key={c.id} onClick={() => setCanalAtivo(c)}
+            <button key={c.id} onClick={() => mudarCanal(c)}
               className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-left transition mb-0.5"
-              style={{ background: canalAtivo?.id === c.id ? "rgba(200,160,120,0.12)" : "transparent", color: canalAtivo?.id === c.id ? "#c8a078" : "#6b5a4e", border: canalAtivo?.id === c.id ? "1px solid rgba(200,160,120,0.2)" : "1px solid transparent" }}>
+              style={{
+                background: canalAtivo?.id === c.id ? "rgba(200,160,120,0.12)" : "transparent",
+                color: canalAtivo?.id === c.id ? "#c8a078" : "#6b5a4e",
+                border: canalAtivo?.id === c.id ? "1px solid rgba(200,160,120,0.2)" : "1px solid transparent"
+              }}>
               <span className="text-sm">#</span>
               <span className="text-sm font-medium">{c.nome}</span>
             </button>
           ))}
         </div>
         <div className="p-3" style={{ borderTop: "1px solid rgba(200,160,120,0.08)" }}>
-          <p className="text-xs uppercase tracking-widest mb-2" style={{ color: "#3a2e28" }}>Online ({online.length})</p>
+          <p className="text-xs uppercase tracking-widest mb-2" style={{ color: "#3a2e28" }}>
+            Online ({online.length})
+          </p>
           {online.map(o => (
             <div key={o.funcionario_id} className="flex items-center gap-2 mb-1">
               <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: "#7ae8a0" }} />
-              <span className="text-xs truncate" style={{ color: "#6b5a4e" }}>{o.funcionarios?.nome?.split(" ")[0]}</span>
+              <span className="text-xs truncate" style={{ color: "#6b5a4e" }}>
+                {o.funcionarios?.nome?.split(" ")[0]}
+              </span>
             </div>
           ))}
         </div>
@@ -240,10 +258,11 @@ export default function ChatPage() {
         <div className="flex items-center justify-between px-5 py-3 flex-shrink-0"
           style={{ borderBottom: "1px solid rgba(200,160,120,0.08)" }}>
           <div className="flex items-center gap-3">
-            <span className="text-sm font-semibold" style={{ color: "#c8a078" }}>#{canalAtivo?.nome ?? "geral"}</span>
-            {canalAtivo?.descricao && <span className="text-xs hidden sm:block" style={{ color: "#3a2e28" }}>{canalAtivo.descricao}</span>}
+            <span className="text-sm font-semibold" style={{ color: "#c8a078" }}>
+              #{canalAtivo?.nome ?? "carregando..."}
+            </span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <button onClick={() => setBuscaAberta(!buscaAberta)}
               className="w-8 h-8 rounded-xl flex items-center justify-center transition hover:opacity-70"
               style={{ border: "1px solid rgba(200,160,120,0.15)", color: "#6b5a4e" }}>
@@ -259,7 +278,8 @@ export default function ChatPage() {
         </div>
 
         {buscaAberta && (
-          <div className="px-4 py-2 flex-shrink-0" style={{ borderBottom: "1px solid rgba(200,160,120,0.06)" }}>
+          <div className="px-4 py-2 flex-shrink-0"
+            style={{ borderBottom: "1px solid rgba(200,160,120,0.06)" }}>
             <input type="text" value={busca} onChange={e => setBusca(e.target.value)}
               placeholder="Buscar mensagens..." autoFocus
               className="w-full rounded-xl px-4 py-2 text-sm outline-none"
@@ -268,43 +288,55 @@ export default function ChatPage() {
         )}
 
         <div className="flex-1 overflow-y-auto px-4 py-3">
-          {(msgsFiltradas ?? agrupadas.flatMap(g => g.msgs)).length === 0 ? (
+          {mensagens.length === 0 ? (
             <div className="flex items-center justify-center h-full">
               <div className="text-center">
                 <p className="text-4xl mb-3">💬</p>
-                <p className="text-sm" style={{ color: "#6b5a4e" }}>{busca ? "Nenhuma mensagem encontrada" : "Nenhuma mensagem ainda"}</p>
+                <p className="text-sm" style={{ color: "#6b5a4e" }}>
+                  {busca ? "Nenhuma mensagem encontrada" : "Nenhuma mensagem ainda — seja o primeiro!"}
+                </p>
               </div>
             </div>
           ) : (
-            msgsFiltradas ? (
-              msgsFiltradas.map(msg => <MsgCard key={msg.id} msg={msg} me={me} menuMsgId={menuMsgId} setMenuMsgId={setMenuMsgId} emojiPickerId={emojiPickerId} setEmojiPickerId={setEmojiPickerId} onReply={setReplyMsg} onEditar={(m:Mensagem) => { setEditandoMsg(m); setTextoEdit(m.conteudo); }} onDeletar={deletar} onReagir={reagir} onFixar={fixar} reacoesPorEmoji={reacoesPorEmoji} formatarHora={formatarHora} />)
-            ) : (
-              agrupadas.map((grupo, gi) => (
-                <div key={gi}>
-                  <div className="flex items-center gap-3 my-3">
-                    <div className="flex-1 h-px" style={{ background: "rgba(200,160,120,0.08)" }} />
-                    <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "rgba(200,160,120,0.06)", color: "#3a2e28" }}>{grupo.data}</span>
-                    <div className="flex-1 h-px" style={{ background: "rgba(200,160,120,0.08)" }} />
-                  </div>
-                  {grupo.msgs.map(msg => <MsgCard key={msg.id} msg={msg} me={me} menuMsgId={menuMsgId} setMenuMsgId={setMenuMsgId} emojiPickerId={emojiPickerId} setEmojiPickerId={setEmojiPickerId} onReply={setReplyMsg} onEditar={(m:Mensagem) => { setEditandoMsg(m); setTextoEdit(m.conteudo); }} onDeletar={deletar} onReagir={reagir} onFixar={fixar} reacoesPorEmoji={reacoesPorEmoji} formatarHora={formatarHora} />)}
+            (msgsFiltradas ? [{ data: "Resultados", msgs: msgsFiltradas }] : agrupadas).map((grupo, gi) => (
+              <div key={gi}>
+                <div className="flex items-center gap-3 my-3">
+                  <div className="flex-1 h-px" style={{ background: "rgba(200,160,120,0.08)" }} />
+                  <span className="text-xs px-2 py-0.5 rounded-full"
+                    style={{ background: "rgba(200,160,120,0.06)", color: "#3a2e28" }}>
+                    {grupo.data}
+                  </span>
+                  <div className="flex-1 h-px" style={{ background: "rgba(200,160,120,0.08)" }} />
                 </div>
-              ))
-            )
+                {grupo.msgs.map(msg => (
+                  <MsgCard key={msg.id} msg={msg} me={me}
+                    menuMsgId={menuMsgId} setMenuMsgId={setMenuMsgId}
+                    emojiPickerId={emojiPickerId} setEmojiPickerId={setEmojiPickerId}
+                    onReply={setReplyMsg}
+                    onEditar={(m: Mensagem) => { setEditandoMsg(m); setTextoEdit(m.conteudo); }}
+                    onDeletar={deletar} onReagir={reagir} onFixar={fixar}
+                    reacoesPorEmoji={reacoesPorEmoji} formatarHora={formatarHora} />
+                ))}
+              </div>
+            ))
           )}
           <div ref={bottomRef} />
         </div>
 
-        <div className="flex-shrink-0 px-4 py-3" style={{ borderTop: "1px solid rgba(200,160,120,0.08)" }}>
+        <div className="flex-shrink-0 px-4 py-3"
+          style={{ borderTop: "1px solid rgba(200,160,120,0.08)" }}>
           {replyMsg && (
             <div className="flex items-center gap-3 mb-2 px-3 py-2 rounded-xl"
               style={{ background: "rgba(200,160,120,0.06)", border: "1px solid rgba(200,160,120,0.12)" }}>
-              <div className="w-0.5 h-full rounded-full" style={{ background: "#c8a078" }} />
+              <div className="w-0.5 h-8 rounded-full flex-shrink-0" style={{ background: "#c8a078" }} />
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-semibold" style={{ color: "#c8a078" }}>{replyMsg.funcionarios?.nome}</p>
                 <p className="text-xs truncate" style={{ color: "#6b5a4e" }}>{replyMsg.conteudo}</p>
               </div>
               <button onClick={() => setReplyMsg(null)} style={{ color: "#6b5a4e" }}>
-                <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth={2}><path d="M18 6L6 18M6 6l12 12" strokeLinecap="round"/></svg>
+                <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth={2}>
+                  <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round"/>
+                </svg>
               </button>
             </div>
           )}
@@ -313,7 +345,9 @@ export default function ChatPage() {
               style={{ background: "rgba(200,160,120,0.06)", border: "1px solid rgba(200,160,120,0.12)" }}>
               <p className="text-xs flex-1" style={{ color: "#c8a078" }}>Editando mensagem...</p>
               <button onClick={() => { setEditandoMsg(null); setTextoEdit(""); }} style={{ color: "#6b5a4e" }}>
-                <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth={2}><path d="M18 6L6 18M6 6l12 12" strokeLinecap="round"/></svg>
+                <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth={2}>
+                  <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round"/>
+                </svg>
               </button>
             </div>
           )}
@@ -328,7 +362,7 @@ export default function ChatPage() {
                 value={editandoMsg ? textoEdit : texto}
                 onChange={e => editandoMsg ? setTextoEdit(e.target.value) : setTexto(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={`Mensagem em #${canalAtivo?.nome ?? "geral"}... Use @nome para mencionar`}
+                placeholder={`Mensagem em #${canalAtivo?.nome ?? "geral"}...`}
                 className="flex-1 bg-transparent outline-none text-sm"
                 style={{ color: "#e8d5c0", caretColor: "#c8a078" }} />
               <button onClick={() => fileRef.current?.click()}
@@ -337,18 +371,18 @@ export default function ChatPage() {
                   <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </button>
-              <button onClick={enviar} disabled={enviando || (!texto.trim() && !editandoMsg)}
+              <button onClick={enviar} disabled={enviando || !texto.trim()}
                 className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 transition hover:scale-110"
-                style={{ background: (texto.trim() || editandoMsg) ? "#c8a078" : "rgba(200,160,120,0.2)" }}>
+                style={{ background: texto.trim() ? "#c8a078" : "rgba(200,160,120,0.2)" }}>
                 <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4"
-                  stroke={(texto.trim() || editandoMsg) ? "#0a0707" : "#6b5a4e"} strokeWidth={2}>
+                  stroke={texto.trim() ? "#0a0707" : "#6b5a4e"} strokeWidth={2}>
                   <path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </button>
             </div>
             <input ref={fileRef} type="file" className="hidden" onChange={enviarArquivo} />
           </div>
-          <p className="text-[10px] mt-1.5 ml-11" style={{ color: "#2a1f1a" }}>Enter para enviar - @nome para mencionar</p>
+          <p className="text-[10px] mt-1.5 ml-11" style={{ color: "#2a1f1a" }}>Enter para enviar</p>
         </div>
       </div>
     </div>
@@ -359,7 +393,6 @@ function MsgCard({ msg, me, menuMsgId, setMenuMsgId, emojiPickerId, setEmojiPick
   const isMe = msg.funcionario_id === me?.id;
   const cor = msg.funcionarios?.cor ?? "#c8a078";
   const reacoes = reacoesPorEmoji(msg.chat_reacoes ?? []);
-  const EMOJIS = ["👍","❤️","😂","😮","😢","🔥","✅","👏"];
 
   return (
     <div className={`flex ${isMe ? "justify-end" : "justify-start"} mb-2 group relative`}>
@@ -371,7 +404,6 @@ function MsgCard({ msg, me, menuMsgId, setMenuMsgId, emojiPickerId, setEmojiPick
       )}
       <div className="max-w-[70%]">
         {!isMe && <p className="text-xs mb-1 ml-1" style={{ color: cor }}>{msg.funcionarios?.nome}</p>}
-
         {msg.reply && (
           <div className="rounded-xl px-3 py-1.5 mb-1 ml-1"
             style={{ background: "rgba(200,160,120,0.06)", borderLeft: "2px solid rgba(200,160,120,0.3)" }}>
@@ -379,89 +411,78 @@ function MsgCard({ msg, me, menuMsgId, setMenuMsgId, emojiPickerId, setEmojiPick
             <p className="text-xs truncate" style={{ color: "#6b5a4e" }}>{msg.reply.conteudo}</p>
           </div>
         )}
-
         <div className="relative">
           <div className="px-4 py-2.5 rounded-2xl"
-            style={{ background: isMe ? "#c8a078" : "#0e0a0a", borderRadius: isMe ? "20px 20px 4px 20px" : "20px 20px 20px 4px", border: isMe ? "none" : "1px solid rgba(200,160,120,0.1)" }}>
+            style={{
+              background: isMe ? "#c8a078" : "#0e0a0a",
+              borderRadius: isMe ? "20px 20px 4px 20px" : "20px 20px 20px 4px",
+              border: isMe ? "none" : "1px solid rgba(200,160,120,0.1)"
+            }}>
             {msg.arquivo_url && (
               <div className="mb-2">
                 {msg.arquivo_tipo?.startsWith("image/") ? (
                   <img src={msg.arquivo_url} alt={msg.arquivo_nome} className="rounded-xl max-w-[200px] max-h-[200px] object-cover" />
                 ) : (
                   <a href={msg.arquivo_url} target="_blank" rel="noopener noreferrer"
-                    className="flex items-center gap-2 text-xs underline" style={{ color: isMe ? "#0a0707" : "#c8a078" }}>
-                    <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth={1.5}><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>
+                    className="flex items-center gap-2 text-xs underline"
+                    style={{ color: isMe ? "#0a0707" : "#c8a078" }}>
                     {msg.arquivo_nome}
                   </a>
                 )}
               </div>
             )}
-            <p className="text-sm leading-5 whitespace-pre-wrap" style={{ color: isMe ? "#0a0707" : msg.deletado ? "#3a2e28" : "#e8d5c0" }}>
+            <p className="text-sm leading-5 whitespace-pre-wrap"
+              style={{ color: isMe ? "#0a0707" : msg.deletado ? "#3a2e28" : "#e8d5c0" }}>
               {msg.conteudo}
             </p>
-            <div className="flex items-center gap-2 mt-1">
-              <p className="text-[10px]" style={{ color: isMe ? "rgba(10,7,7,0.5)" : "#3a2e28" }}>
-                {formatarHora(msg.criado_em)}{msg.editado && " (editado)"}
-              </p>
-            </div>
+            <p className="text-[10px] mt-1" style={{ color: isMe ? "rgba(10,7,7,0.5)" : "#3a2e28" }}>
+              {formatarHora(msg.criado_em)}{msg.editado && " (editado)"}
+            </p>
           </div>
 
-          <div className="absolute top-1 opacity-0 group-hover:opacity-100 transition flex gap-1"
-            style={{ [isMe ? "left" : "right"]: "-100px" }}>
+          <div className={`absolute top-1 opacity-0 group-hover:opacity-100 transition flex gap-1 ${isMe ? "right-full mr-2" : "left-full ml-2"}`}>
             <button onClick={() => setEmojiPickerId(emojiPickerId === msg.id ? null : msg.id)}
-              className="w-7 h-7 rounded-lg flex items-center justify-center text-xs transition hover:scale-110"
-              style={{ background: "#120d0d", border: "1px solid rgba(200,160,120,0.15)" }}>
-              😊
-            </button>
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-sm transition hover:scale-110"
+              style={{ background: "#120d0d", border: "1px solid rgba(200,160,120,0.15)" }}>😊</button>
             <button onClick={() => onReply(msg)}
               className="w-7 h-7 rounded-lg flex items-center justify-center transition hover:scale-110"
               style={{ background: "#120d0d", border: "1px solid rgba(200,160,120,0.15)", color: "#6b5a4e" }}>
               <svg viewBox="0 0 24 24" fill="none" className="w-3.5 h-3.5" stroke="currentColor" strokeWidth={2}>
-                <path d="M9 17H5a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v5" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M14 21l-3-3 3-3" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M3 10h10a8 8 0 018 8v2M3 10l6 6M3 10l6-6" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </button>
             <button onClick={() => setMenuMsgId(menuMsgId === msg.id ? null : msg.id)}
               className="w-7 h-7 rounded-lg flex items-center justify-center transition hover:scale-110"
               style={{ background: "#120d0d", border: "1px solid rgba(200,160,120,0.15)", color: "#6b5a4e" }}>
               <svg viewBox="0 0 24 24" fill="none" className="w-3.5 h-3.5" stroke="currentColor" strokeWidth={2}>
-                <circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/>
+                <circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>
               </svg>
             </button>
           </div>
 
           {emojiPickerId === msg.id && (
-            <div className="absolute z-20 flex gap-1 p-2 rounded-2xl"
+            <div className="absolute z-20 flex gap-1 p-2 rounded-2xl shadow-xl"
               style={{ background: "#120d0d", border: "1px solid rgba(200,160,120,0.2)", bottom: "100%", [isMe ? "right" : "left"]: 0 }}>
               {EMOJIS.map(e => (
-                <button key={e} onClick={() => onReagir(msg.id, e)}
-                  className="text-lg transition hover:scale-125">{e}</button>
+                <button key={e} onClick={() => onReagir(msg.id, e)} className="text-lg transition hover:scale-125">{e}</button>
               ))}
             </div>
           )}
 
           {menuMsgId === msg.id && (
-            <div className="absolute z-20 rounded-2xl overflow-hidden"
-              style={{ background: "#120d0d", border: "1px solid rgba(200,160,120,0.2)", bottom: "100%", [isMe ? "right" : "left"]: 0, minWidth: 140 }}>
+            <div className="absolute z-20 rounded-2xl overflow-hidden shadow-xl"
+              style={{ background: "#120d0d", border: "1px solid rgba(200,160,120,0.2)", bottom: "100%", [isMe ? "right" : "left"]: 0, minWidth: 150 }}>
               <button onClick={() => onFixar(msg.id)}
                 className="w-full flex items-center gap-2 px-4 py-2.5 text-xs transition hover:bg-[rgba(200,160,120,0.08)]"
-                style={{ color: "#a89080" }}>
-                Fixar mensagem
-              </button>
-              {isMe && !msg.deletado && (
-                <>
-                  <button onClick={() => { onEditar(msg); setMenuMsgId(null); }}
-                    className="w-full flex items-center gap-2 px-4 py-2.5 text-xs transition hover:bg-[rgba(200,160,120,0.08)]"
-                    style={{ color: "#a89080" }}>
-                    Editar
-                  </button>
-                  <button onClick={() => onDeletar(msg.id)}
-                    className="w-full flex items-center gap-2 px-4 py-2.5 text-xs transition hover:bg-[rgba(232,122,122,0.08)]"
-                    style={{ color: "#e87a7a" }}>
-                    Deletar
-                  </button>
-                </>
-              )}
+                style={{ color: "#a89080" }}>Fixar mensagem</button>
+              {isMe && !msg.deletado && <>
+                <button onClick={() => { onEditar(msg); setMenuMsgId(null); }}
+                  className="w-full flex items-center gap-2 px-4 py-2.5 text-xs transition hover:bg-[rgba(200,160,120,0.08)]"
+                  style={{ color: "#a89080" }}>Editar</button>
+                <button onClick={() => onDeletar(msg.id)}
+                  className="w-full flex items-center gap-2 px-4 py-2.5 text-xs transition hover:bg-[rgba(232,122,122,0.08)]"
+                  style={{ color: "#e87a7a" }}>Deletar</button>
+              </>}
             </div>
           )}
         </div>
