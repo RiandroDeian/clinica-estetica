@@ -9,7 +9,6 @@ export type Permissao =
   | "faturamento"
   | "estoque"
   | "relatorios"
-  | "avaliacoes"
   | "whatsapp"
   | "chat"
   | "procedimentos"
@@ -18,11 +17,11 @@ export type Permissao =
 export const permissoesPorCargo: Record<Cargo, Permissao[]> = {
   administrador: [
     "dashboard","recepcao","agenda","pacientes","laser",
-    "faturamento","estoque","relatorios","avaliacoes",
+    "faturamento","estoque","relatorios",
     "whatsapp","chat","procedimentos","configuracoes"
   ],
   recepcionista: [
-    "dashboard","recepcao","agenda","pacientes","chat","whatsapp","avaliacoes"
+    "dashboard","recepcao","agenda","pacientes","chat","whatsapp"
   ],
   massagista: [
     "agenda","pacientes","chat"
@@ -52,7 +51,6 @@ export const menuLinks: { href: string; label: string; icon: string; permissao: 
   { href: "/admin/faturamento",   label: "Faturamento",   icon: "faturamento",   permissao: "faturamento" },
   { href: "/admin/estoque",       label: "Estoque",       icon: "estoque",       permissao: "estoque" },
   { href: "/admin/relatorios",    label: "Relatorios",    icon: "relatorios",    permissao: "relatorios" },
-  { href: "/admin/avaliacoes",    label: "Avaliacoes",    icon: "avaliacoes",    permissao: "avaliacoes" },
   { href: "/admin/whatsapp",      label: "WhatsApp",      icon: "whatsapp",      permissao: "whatsapp" },
   { href: "/admin/chat",          label: "Chat",          icon: "chat",          permissao: "chat" },
   { href: "/admin/procedimentos", label: "Procedimentos", icon: "procedimentos", permissao: "procedimentos" },

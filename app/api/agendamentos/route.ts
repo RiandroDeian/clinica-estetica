@@ -3,37 +3,113 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { getSessao } from "@/lib/auth";
 
 export async function GET(request: NextRequest) {
-  const sessao = await getSessao();
-  if (!sessao) return NextResponse.json({ erro: "Nao autorizado" }, { status: 401 });
+  try {
+    const sessao = await getSessao();
 
-  const { searchParams } = new URL(request.url);
-  const inicio = searchParams.get("inicio");
-  const fim = searchParams.get("fim");
+    if (!sessao) {
+      return NextResponse.json(
+        { erro: "Nao autorizado" },
+        { status: 401 }
+      );
+    }
 
-  let query = supabaseAdmin
-    .from("agendamentos")
-    .select("*, pacientes(nome, telefone), procedimentos(nome, cor), funcionarios(nome)")
-    .order("inicio");
+    const { searchParams } = new URL(request.url);
 
-  if (inicio) query = query.gte("inicio", inicio);
-  if (fim) query = query.lte("inicio", fim);
+    const inicio = searchParams.get("inicio");
+    const fim = searchParams.get("fim");
 
-  const { data, error } = await query;
-  if (error) return NextResponse.json({ erro: error.message }, { status: 500 });
-  return NextResponse.json(data);
+    let query = supabaseAdmin
+      .from("agendamentos")
+      .select(`
+        *,
+        pacientes(nome, telefone),
+        procedimentos(nome, cor),
+        funcionarios(nome)
+      `)
+      .order("inicio", { ascending: true });
+
+    if (inicio) {
+      query = query.gte("inicio", inicio);
+    }
+
+    if (fim) {
+      query = query.lte("inicio", fim);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error("ERRO AO BUSCAR AGENDAMENTOS:", error);
+
+      return NextResponse.json(
+        { erro: error.message },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json(data);
+  } catch (err) {
+    console.error(err);
+
+    return NextResponse.json(
+      { erro: "Erro interno no servidor" },
+      { status: 500 }
+    );
+  }
 }
 
 export async function POST(request: NextRequest) {
-  const sessao = await getSessao();
-  if (!sessao) return NextResponse.json({ erro: "Nao autorizado" }, { status: 401 });
+  try {
+    const sessao = await getSessao();
 
-  const body = await request.json();
-  const { data, error } = await supabaseAdmin
-    .from("agendamentos")
-    .insert({ ...body, funcionario_id: body.funcionario_id ?? sessao.id })
-    .select("*, pacientes(nome), procedimentos(nome, cor)")
-    .single();
+    if (!sessao) {
+      return NextResponse.json(
+        { erro: "Nao autorizado" },
+        { status: 401 }
+      );
+    }
 
-  if (error) return NextResponse.json({ erro: error.message }, { status: 500 });
-  return NextResponse.json(data);
+    const body = await request.json();
+
+    console.log("BODY RECEBIDO:", body);
+
+    const novoAgendamento = {
+      paciente_id: body.paciente_id,
+      procedimento_id: body.procedimento_id,
+      funcionario_id: body.funcionario_id,
+      inicio: body.inicio,
+      fim: body.fim,
+      status: body.status || "confirmado",
+      observacoes: body.observacoes || "",
+    };
+
+    const { data, error } = await supabaseAdmin
+      .from("agendamentos")
+      .insert(novoAgendamento)
+      .select(`
+        *,
+        pacientes(nome, telefone),
+        procedimentos(nome, cor),
+        funcionarios(nome)
+      `)
+      .single();
+
+    if (error) {
+      console.error("ERRO AO SALVAR:", error);
+
+      return NextResponse.json(
+        { erro: error.message },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json(data);
+  } catch (err) {
+    console.error(err);
+
+    return NextResponse.json(
+      { erro: "Erro interno no servidor" },
+      { status: 500 }
+    );
+  }
 }
