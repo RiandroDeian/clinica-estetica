@@ -24,6 +24,9 @@ export default function PacientesPage() {
   const [modalAberto, setModalAberto] = useState(false);
   const [salvando, setSalvando] = useState(false);
 
+  // ✅ ADIÇÃO 1: estado para controlar edição
+  const [editando, setEditando] = useState<Paciente | null>(null);
+
   const [form, setForm] = useState({
     nome: "",
     telefone: "",
@@ -74,11 +77,51 @@ export default function PacientesPage() {
     return `${idade} anos`;
   }
 
+  // ✅ ADIÇÃO 2: funções de abrir novo e abrir edição
+  function abrirNovo() {
+    setEditando(null);
+    setForm({
+      nome: "",
+      telefone: "",
+      email: "",
+      cpf: "",
+      sexo: "",
+      data_nascimento: "",
+      alergias: "",
+      contraindicacoes: "",
+      observacoes: "",
+      assinou_termo: false,
+    });
+    setModalAberto(true);
+  }
+
+  function abrirEdicao(p: Paciente, e: React.MouseEvent) {
+    e.stopPropagation();
+    setEditando(p);
+    setForm({
+      nome: p.nome,
+      telefone: p.telefone,
+      email: p.email ?? "",
+      cpf: p.cpf ?? "",
+      sexo: p.sexo ?? "",
+      data_nascimento: p.data_nascimento ?? "",
+      alergias: (p as any).alergias ?? "",
+      contraindicacoes: (p as any).contraindicacoes ?? "",
+      observacoes: (p as any).observacoes ?? "",
+      assinou_termo: p.assinou_termo,
+    });
+    setModalAberto(true);
+  }
+
   async function salvarPaciente() {
     setSalvando(true);
 
-    const res = await fetch("/api/pacientes", {
-      method: "POST",
+    // ✅ ADIÇÃO 3: POST para novo, PATCH para edição
+    const method = editando ? "PATCH" : "POST";
+    const url = editando ? `/api/pacientes/${editando.id}` : "/api/pacientes";
+
+    const res = await fetch(url, {
+      method,
       headers: {
         "Content-Type": "application/json",
       },
@@ -87,6 +130,7 @@ export default function PacientesPage() {
 
     if (res.ok) {
       setModalAberto(false);
+      setEditando(null);
 
       setForm({
         nome: "",
@@ -126,8 +170,9 @@ export default function PacientesPage() {
           </h1>
         </div>
 
+        {/* ✅ botão chama abrirNovo() em vez de setModalAberto(true) */}
         <button
-          onClick={() => setModalAberto(true)}
+          onClick={abrirNovo}
           className="flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-semibold uppercase tracking-widest transition hover:scale-105"
           style={{
             background: "#c8a078",
@@ -358,21 +403,28 @@ export default function PacientesPage() {
                       ).toLocaleDateString("pt-BR")}
                     </td>
 
+                    {/* ✅ ADIÇÃO: botão editar substituindo a seta */}
                     <td className="px-5 py-4">
-                      <svg
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        className="w-4 h-4"
-                        stroke="currentColor"
-                        strokeWidth={1.5}
-                        style={{ color: "#6b5a4e" }}
+                      <button
+                        onClick={(e) => abrirEdicao(p, e)}
+                        className="p-1.5 rounded-lg transition hover:opacity-70"
+                        style={{ background: "rgba(200,160,120,0.1)" }}
+                        title="Editar paciente"
                       >
-                        <path
-                          d="M9 18l6-6-6-6"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
+                        <svg
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          className="w-4 h-4"
+                          stroke="#c8a078"
+                          strokeWidth={1.5}
+                        >
+                          <path
+                            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -398,11 +450,12 @@ export default function PacientesPage() {
             }}
           >
             <div className="flex items-center justify-between mb-6">
+              {/* ✅ título dinâmico */}
               <h2
                 className="text-xl font-bold"
                 style={{ color: "#c8a078" }}
               >
-                Novo Paciente
+                {editando ? "Editar Paciente" : "Novo Paciente"}
               </h2>
 
               <button
@@ -627,8 +680,11 @@ export default function PacientesPage() {
                   color: "#0f0b0b",
                 }}
               >
+                {/* ✅ texto dinâmico no botão */}
                 {salvando
                   ? "Salvando..."
+                  : editando
+                  ? "Salvar Alterações"
                   : "Salvar Paciente"}
               </button>
             </div>

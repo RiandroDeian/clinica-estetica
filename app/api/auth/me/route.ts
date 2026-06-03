@@ -1,6 +1,6 @@
 ﻿import { NextResponse } from "next/server";
 import { getSessao } from "@/lib/auth";
-import { supabaseAdmin } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 
 export async function GET() {
   const sessao = await getSessao();
