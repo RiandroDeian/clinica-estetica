@@ -62,12 +62,57 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   return NextResponse.json(data);
 }
 
-export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const sessao = await getSessao();
-  if (!sessao) return NextResponse.json({ erro: "Nao autorizado" }, { status: 401 });
+export async function DELETE(
+_: NextRequest,
+{ params }: { params: Promise<{ id: string }> }
+) {
+const sessao = await getSessao();
 
-  const { id } = await params;
-  const { error } = await supabaseAdmin.from("laser_pacotes").delete().eq("id", id);
-  if (error) return NextResponse.json({ erro: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true });
+if (!sessao) {
+return NextResponse.json(
+{ erro: "Nao autorizado" },
+{ status: 401 }
+);
+}
+
+const { id } = await params;
+
+try {
+// Remove primeiro as sessões vinculadas
+const { error: erroSessoes } = await supabaseAdmin
+.from("laser_sessoes")
+.delete()
+.eq("pacote_id", id);
+
+if (erroSessoes) {
+  return NextResponse.json(
+    { erro: erroSessoes.message },
+    { status: 500 }
+  );
+}
+
+// Depois remove o pacote
+const { error: erroPacote } = await supabaseAdmin
+  .from("laser_pacotes")
+  .delete()
+  .eq("id", id);
+
+if (erroPacote) {
+  return NextResponse.json(
+    { erro: erroPacote.message },
+    { status: 500 }
+  );
+}
+
+return NextResponse.json({
+  ok: true,
+  mensagem: "Pacote excluido com sucesso",
+});
+
+} catch (error: any) {
+return NextResponse.json(
+{ erro: error.message },
+{ status: 500 }
+);
+}
 }

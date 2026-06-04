@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 type Pacote = {
   id: string;
@@ -123,6 +124,33 @@ export default function LaserPage() {
     setForm(formInicial);
     setModalAberto(true);
   }
+  
+
+  async function excluirPacote (id: string, e: React.MouseEvent) {
+    e.stopPropagation();
+
+    const confirmar = confirm(
+      "Deseja realmente excluir? Todas as sessões vinculadas também serão removidas."
+    );
+
+    if (!confirmar) return;
+
+    try {
+    const res = await fetch(`/api/laser/${id}`, {
+      method: "DELETE",
+    });
+    const data = await res.json();
+    
+    if (!res.ok) {
+      toast.error(data.erro || "Erro ao excluir");
+      return;
+    }
+    buscar ();
+    toast.success("Pacote excluído com sucesso!");
+    } catch {
+      toast.error("Erro ao excluir pacote");
+    }
+  }
 
   function abrirEdicao(p: Pacote, e: React.MouseEvent) {
     e.stopPropagation();
@@ -165,6 +193,8 @@ export default function LaserPage() {
     buscar();
     setSalvando(false);
   }
+
+  
 
   const inputStyle = {
     background: "#0e0a0a",
@@ -319,16 +349,65 @@ export default function LaserPage() {
                       </td>
                       <td className="px-5 py-4 text-sm" style={{ color: "#6b5a4e" }}>{p.funcionarios?.nome ?? "-"}</td>
                       {/* ✅ Botão editar */}
-                      <td className="px-5 py-4">
-                        <button onClick={e => abrirEdicao(p, e)}
-                          className="p-1.5 rounded-lg transition hover:opacity-70"
-                          style={{ background: "rgba(200,160,120,0.1)" }}
-                          title="Editar pacote">
-                          <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4" stroke="#c8a078" strokeWidth={1.5}>
-                            <path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
-                        </button>
-                      </td>
+                        <td className="px-5 py-4">
+                           <div className="flex gap-2">
+    
+                            {/* EDITAR */}
+                            <button
+                              onClick={(e) => abrirEdicao(p, e)}
+                              className="p-1.5 rounded-lg transition hover:opacity-70"
+                              style={{ background: "rgba(200,160,120,0.1)" }}
+                              title="Editar pacote"
+                            >
+                              <svg
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                className="w-4 h-4"
+                                stroke="#c8a078"
+                                strokeWidth={1.5}
+                              >
+                                <path
+                                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                            </svg>
+                          </button>
+
+                            <button
+                              onClick={(e) => excluirPacote(p.id, e)}
+                              className="p-1.5 rounded-lg transition hover:opacity-70"
+                              style={{ background: "rgba(232,122,122,0.15)" }}
+                              title="Excluir pacote"
+                            >
+                              <svg
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                className="w-4 h-4"
+                                stroke="#e87a7a"
+                                strokeWidth={1.8}
+                              >
+                                <path
+                                  d="M3 6h18"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                                <path
+                                  d="M8 6V4a1 1 0 011-1h6a1     {/* EXCLUIR */}
+                        1 0 011 1v2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                                <path
+                                  d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                              </svg>
+                            </button>
+
+                      </div>
+                    </td>
                     </tr>
                   );
                 })}
