@@ -324,7 +324,7 @@ export default function EstoquePage() {
           <div className="w-full max-w-sm rounded-3xl p-8" style={{ background: "#120d0d", border: "1px solid rgba(232,122,122,0.3)" }}>
             <p className="text-xl font-bold mb-2" style={{ color: "#e87a7a" }}>Confirmar Exclusao</p>
             <p className="text-sm mb-6" style={{ color: "#a89080" }}>
-              Tem certeza que deseja excluir <strong style={{ color: "#e8d5c0" }}>{confirmDelete.nome}</strong>? Esta acao nao pode ser desfeita.
+              Tem certeza que deseja excluir <strong style={{ color: "#e8d5c0" }}>{confirmDelete.nome}</strong>? Esta ação não pode ser desfeita.
             </p>
             <div className="flex gap-3">
               <button onClick={() => setConfirmDelete(null)} className="flex-1 py-3 rounded-2xl text-sm uppercase tracking-widest"

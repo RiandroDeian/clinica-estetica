@@ -26,15 +26,14 @@ export async function GET() {
     const { data, error } = await supabaseAdmin
       .from("procedimentos")
       .select("*")
+      .eq("ativo", true)
       .order("nome");
 
     console.log("PROCEDIMENTOS:", data);
     console.log("ERRO:", error);
 
-    return NextResponse.json({
-      data,
-      error,
-    });
+    if (error) return NextResponse.json({ erro: error.message }, { status: 500 });
+    return NextResponse.json(data);
   } catch (err: any) {
     console.log("ERRO GERAL:", err);
 
@@ -83,3 +82,4 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+

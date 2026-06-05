@@ -1,13 +1,21 @@
 ﻿"use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { ModalAgendamentoRapido } from "@/components/agenda/ModalAgendamentoRapido";
+import { BadgeSemCadastro, ModalCadastrarPaciente } from "@/components/agenda/AgendamentoRapidoComponents";
 
 type Agendamento = {
   id: string;
+  nome?: string | null;
   inicio: string;
   fim: string;
   status: string;
   observacoes?: string;
+  sem_cadastro?: boolean;
+  nome_temporario?: string | null;
+  telefone_temporario?: string | null;
+  paciente_id?: string | null;
+  procedimento?: string | null;
   pacientes?: { nome: string; telefone: string };
   procedimentos?: { nome: string; cor: string; duracao_minutos: number };
   funcionarios?: { nome: string; cor: string };
@@ -24,7 +32,7 @@ const statusConfig: Record<string, { label: string; color: string; bg: string }>
   finalizado: { label: "Finalizado", color: "#a89080", bg: "rgba(168,144,128,0.15)" },
 };
 
-const HORAS = Array.from({ length: 13 }, (_, i) => i + 7);
+const HORAS = Array.from({ length: 17 }, (_, i) => i + 7);
 
 function horaStr(h: number) { return `${String(h).padStart(2, "0")}:00`; }
 function addDias(data: Date, dias: number) { const d = new Date(data); d.setDate(d.getDate() + dias); return d; }
@@ -38,6 +46,14 @@ function inicioSemana(data: Date) {
 
 const diasSemana = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sab", "Dom"];
 
+function nomePaciente(ag: Agendamento) {
+  return ag.pacientes?.nome ?? ag.nome_temporario ?? ag.nome ?? "Sem nome";
+}
+
+function procedimentoNome(ag: Agendamento) {
+  return ag.procedimentos?.nome ?? ag.procedimento ?? "";
+}
+
 export default function AgendaPage() {
   const [view, setView] = useState<"dia" | "semana" | "mes">("semana");
   const [dataAtual, setDataAtual] = useState(new Date());
@@ -48,6 +64,10 @@ export default function AgendaPage() {
   const [modalAberto, setModalAberto] = useState(false);
   const [agendamentoSelecionado, setAgendamentoSelecionado] = useState<Agendamento | null>(null);
   const [salvando, setSalvando] = useState(false);
+  const [procedimentosSelecionados, setProcedimentosSelecionados] = useState<string[]>([]);
+  const [excluindo, setExcluindo] = useState(false);
+  const [modalRapidoAberto, setModalRapidoAberto] = useState(false);
+  const [agendamentoParaCadastrar, setAgendamentoParaCadastrar] = useState<Agendamento | null>(null);
   const [form, setForm] = useState({
     paciente_id: "", procedimento_id: "", funcionario_id: "",
     inicio: "", fim: "", status: "pendente", observacoes: "",
@@ -99,6 +119,7 @@ export default function AgendaPage() {
 
   function abrirNovoAgendamento(dataStr?: string) {
     setAgendamentoSelecionado(null);
+    setProcedimentosSelecionados([]);
     const inicio = dataStr ?? new Date().toISOString().slice(0, 16);
     const fim = new Date(new Date(inicio).getTime() + 60 * 60000).toISOString().slice(0, 16);
     setForm({ paciente_id: "", procedimento_id: "", funcionario_id: "", inicio, fim, status: "pendente", observacoes: "" });
@@ -108,7 +129,7 @@ export default function AgendaPage() {
   function abrirEditar(ag: Agendamento) {
     setAgendamentoSelecionado(ag);
     setForm({
-      paciente_id: "",
+      paciente_id: ag.paciente_id ?? "",
       procedimento_id: "",
       funcionario_id: "",
       inicio: new Date(ag.inicio).toISOString().slice(0, 16),
@@ -119,14 +140,21 @@ export default function AgendaPage() {
     setModalAberto(true);
   }
 
-  function selecionarProcedimento(id: string) {
+  function toggleProcedimentoNovo(id: string) {
     const proc = procedimentos.find(p => p.id === id);
-    if (proc && form.inicio) {
-      const fim = new Date(new Date(form.inicio).getTime() + proc.duracao_minutos * 60000).toISOString().slice(0, 16);
-      setForm(f => ({ ...f, procedimento_id: id, fim }));
-    } else {
-      setForm(f => ({ ...f, procedimento_id: id }));
-    }
+    if (!proc) return;
+    setProcedimentosSelecionados(prev => {
+      const novos = prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id];
+      const totalMin = novos.reduce((acc, pid) => {
+        const p = procedimentos.find(p => p.id === pid);
+        return acc + (p?.duracao_minutos ?? 60);
+      }, 0);
+      if (form.inicio) {
+        const novoFim = new Date(new Date(form.inicio).getTime() + Math.max(totalMin, 60) * 60000).toISOString().slice(0, 16);
+        setForm(f => ({ ...f, procedimento_id: novos[0] ?? "", fim: novoFim }));
+      }
+      return novos;
+    });
   }
 
   async function salvar() {
@@ -145,6 +173,15 @@ export default function AgendaPage() {
     setModalAberto(false);
     buscarDados();
     setSalvando(false);
+  }
+
+  async function excluirAgendamento(id: string) {
+    if (!confirm("Tem certeza que deseja excluir este agendamento? Esta ação não pode ser desfeita.")) return;
+    setExcluindo(true);
+    await fetch(`/api/agendamentos/${id}`, { method: "DELETE" });
+    setModalAberto(false);
+    setExcluindo(false);
+    buscarDados();
   }
 
   async function cancelarAgendamento(id: string) {
@@ -182,15 +219,26 @@ export default function AgendaPage() {
   };
 
   function EventoCard({ ag, compacto = false }: { ag: Agendamento; compacto?: boolean }) {
-    const cor = corProfissional(ag);
+    const cor = ag.sem_cadastro ? "#fbbf24" : corProfissional(ag);
+    const semCadastro = ag.sem_cadastro === true;
     return (
       <div onClick={(e) => { e.stopPropagation(); abrirEditar(ag); }}
         className="rounded-xl px-2 py-1.5 mb-1 cursor-pointer transition hover:scale-[1.02] text-left w-full"
-        style={{ background: `${cor}22`, borderLeft: `3px solid ${cor}` }}>
-        <p className="text-[11px] font-semibold truncate" style={{ color: cor }}>{ag.pacientes?.nome}</p>
+        style={{
+          background: semCadastro ? "rgba(251,191,36,0.08)" : `${cor}22`,
+          borderLeft: `3px solid ${cor}`,
+          borderStyle: semCadastro ? "dashed" : "solid",
+          borderWidth: "1px 1px 1px 3px",
+          borderColor: semCadastro ? `#fbbf24` : `${cor}33`,
+          borderLeftStyle: "solid",
+        }}>
+        <div className="flex items-center gap-1 flex-wrap">
+          {semCadastro && <span className="text-[9px] px-1 rounded" style={{ background: "rgba(251,191,36,0.2)", color: "#fbbf24" }}>⚠</span>}
+          <p className="text-[11px] font-semibold truncate" style={{ color: cor }}>{nomePaciente(ag)}</p>
+        </div>
         {!compacto && (
           <>
-            <p className="text-[10px] truncate" style={{ color: "#a89080" }}>{ag.procedimentos?.nome}</p>
+            <p className="text-[10px] truncate" style={{ color: "#a89080" }}>{procedimentoNome(ag)}</p>
             {ag.funcionarios?.nome && (
               <p className="text-[10px] truncate" style={{ color: "#6b5a4e" }}>{ag.funcionarios.nome}</p>
             )}
@@ -219,6 +267,12 @@ export default function AgendaPage() {
               ))}
             </div>
           )}
+          <button onClick={() => setModalRapidoAberto(true)}
+            className="flex items-center gap-2 px-5 py-3 rounded-2xl text-sm font-semibold uppercase tracking-widest transition hover:scale-105"
+            style={{ background: "rgba(251,191,36,0.12)", color: "#fbbf24", border: "1px solid rgba(251,191,36,0.3)" }}>
+            <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth={2}><path d="M12 5v14M5 12h14" strokeLinecap="round"/></svg>
+            Agend. Rápido
+          </button>
           <button onClick={() => abrirNovoAgendamento()}
             className="flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-semibold uppercase tracking-widest transition hover:scale-105"
             style={{ background: "#c8a078", color: "#0a0707" }}>
@@ -342,16 +396,28 @@ export default function AgendaPage() {
                         abrirNovoAgendamento(d.toISOString().slice(0, 16));
                       }}>
                       {ags.map(ag => {
-                        const cor = corProfissional(ag);
+                        const cor = ag.sem_cadastro ? "#fbbf24" : corProfissional(ag);
                         return (
                           <div key={ag.id} onClick={(e) => { e.stopPropagation(); abrirEditar(ag); }}
                             className="rounded-xl px-3 py-2 mb-1 cursor-pointer transition hover:scale-[1.02]"
-                            style={{ background: `${cor}22`, borderLeft: `3px solid ${cor}` }}>
+                            style={{
+                              background: ag.sem_cadastro ? "rgba(251,191,36,0.08)" : `${cor}22`,
+                              borderTop: ag.sem_cadastro ? "1px dashed #fbbf2466" : `1px solid ${cor}33`,
+                              borderRight: ag.sem_cadastro ? "1px dashed #fbbf2466" : `1px solid ${cor}33`,
+                              borderBottom: ag.sem_cadastro ? "1px dashed #fbbf2466" : `1px solid ${cor}33`,
+                              borderLeft: `3px solid ${ag.sem_cadastro ? "#fbbf24" : cor}`,
+                            }}>
                             <div className="flex items-center justify-between gap-2 flex-wrap">
-                              <div>
-                                <p className="text-sm font-semibold" style={{ color: cor }}>{ag.pacientes?.nome}</p>
-                                <p className="text-xs mt-0.5" style={{ color: "#a89080" }}>
-                                  {ag.procedimentos?.nome}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  {ag.sem_cadastro && (
+                                    <span className="text-[9px] px-1.5 py-0.5 rounded font-medium flex-shrink-0"
+                                      style={{ background: "rgba(251,191,36,0.15)", color: "#fbbf24" }}>⚠ Sem cadastro</span>
+                                  )}
+                                  <p className="text-sm font-semibold truncate" style={{ color: cor }}>{nomePaciente(ag)}</p>
+                                </div>
+                                <p className="text-xs mt-0.5 truncate" style={{ color: "#a89080" }}>
+                                  {procedimentoNome(ag)}
                                   {ag.procedimentos?.duracao_minutos && ` - ${ag.procedimentos.duracao_minutos} min`}
                                 </p>
                                 {ag.funcionarios?.nome && (
@@ -378,12 +444,14 @@ export default function AgendaPage() {
         </div>
       </div>
 
+      {/* MODAL EDITAR / NOVO AGENDAMENTO */}
       {modalAberto && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ background: "rgba(0,0,0,0.8)", backdropFilter: "blur(8px)" }}>
           <div className="w-full max-w-lg rounded-3xl p-8 max-h-[90vh] overflow-y-auto"
             style={{ background: "#120d0d", border: "1px solid rgba(200,160,120,0.2)" }}>
-            <div className="flex items-center justify-between mb-6">
+
+            <div className="flex items-center justify-between mb-2">
               <h2 className="text-xl font-bold" style={{ color: "#c8a078" }}>
                 {agendamentoSelecionado ? "Editar Agendamento" : "Novo Agendamento"}
               </h2>
@@ -391,6 +459,24 @@ export default function AgendaPage() {
                 <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6" stroke="currentColor" strokeWidth={1.5}><path d="M18 6L6 18M6 6l12 12" strokeLinecap="round"/></svg>
               </button>
             </div>
+
+            {/* Badge sem cadastro + botão cadastrar paciente */}
+            {agendamentoSelecionado?.sem_cadastro && (
+              <div className="flex items-center justify-between mb-5 px-4 py-3 rounded-2xl"
+                style={{ background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.2)" }}>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium" style={{ color: "#fbbf24" }}>⚠ Sem cadastro</span>
+                  <span className="text-xs" style={{ color: "#6b5a4e" }}>{agendamentoSelecionado.nome_temporario} · {agendamentoSelecionado.telefone_temporario}</span>
+                </div>
+                <button
+                  onClick={() => { setModalAberto(false); setAgendamentoParaCadastrar(agendamentoSelecionado); }}
+                  className="text-xs px-3 py-1.5 rounded-xl font-medium transition hover:scale-105"
+                  style={{ background: "rgba(200,160,120,0.15)", color: "#c8a078", border: "1px solid rgba(200,160,120,0.3)" }}>
+                  Cadastrar Paciente
+                </button>
+              </div>
+            )}
+
             <div className="flex flex-col gap-4">
               {!agendamentoSelecionado && (
                 <>
@@ -404,13 +490,33 @@ export default function AgendaPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "#a89080" }}>Procedimento</label>
-                    <select value={form.procedimento_id} onChange={e => selecionarProcedimento(e.target.value)}
-                      className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
-                      style={{ background: "#0e0a0a", border: "1px solid rgba(200,160,120,0.15)", color: form.procedimento_id ? "#e8d5c0" : "#3a2e28" }}>
-                      <option value="">Selecionar procedimento...</option>
-                      {procedimentos.map(p => <option key={p.id} value={p.id}>{p.nome} - {p.duracao_minutos}min</option>)}
-                    </select>
+                    <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "#a89080" }}>
+                      Procedimentos
+                      {procedimentosSelecionados.length > 0 && (
+                        <span className="ml-2 normal-case" style={{ color: "#c8a078" }}>
+                          ({procedimentosSelecionados.length} · {procedimentosSelecionados.reduce((acc, id) => {
+                            const p = procedimentos.find(p => p.id === id);
+                            return acc + (p?.duracao_minutos ?? 0);
+                          }, 0)}min)
+                        </span>
+                      )}
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {procedimentos.map(p => {
+                        const sel = procedimentosSelecionados.includes(p.id);
+                        return (
+                          <button key={p.id} type="button" onClick={() => toggleProcedimentoNovo(p.id)}
+                            className="px-3 py-1.5 rounded-xl text-xs transition hover:scale-105"
+                            style={{
+                              background: sel ? `${p.cor}22` : "#0e0a0a",
+                              color: sel ? p.cor : "#6b5a4e",
+                              border: sel ? `1px solid ${p.cor}` : "1px solid rgba(200,160,120,0.12)",
+                            }}>
+                            {sel ? "✓ " : ""}{p.nome}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                   <div>
                     <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "#a89080" }}>Profissional Responsavel</label>
@@ -418,16 +524,12 @@ export default function AgendaPage() {
                       className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
                       style={{ background: "#0e0a0a", border: "1px solid rgba(200,160,120,0.15)", color: form.funcionario_id ? "#e8d5c0" : "#3a2e28" }}>
                       <option value="">Selecionar profissional...</option>
-                      {funcionarios.map(f => (
-                        <option key={f.id} value={f.id}>{f.nome}</option>
-                      ))}
+                      {funcionarios.map(f => <option key={f.id} value={f.id}>{f.nome}</option>)}
                     </select>
                     {form.funcionario_id && (
                       <div className="flex items-center gap-2 mt-2">
                         <div className="w-3 h-3 rounded-full" style={{ background: funcionarios.find(f => f.id === form.funcionario_id)?.cor ?? "#c8a078" }} />
-                        <span className="text-xs" style={{ color: "#6b5a4e" }}>
-                          {funcionarios.find(f => f.id === form.funcionario_id)?.nome}
-                        </span>
+                        <span className="text-xs" style={{ color: "#6b5a4e" }}>{funcionarios.find(f => f.id === form.funcionario_id)?.nome}</span>
                       </div>
                     )}
                   </div>
@@ -467,13 +569,21 @@ export default function AgendaPage() {
                   style={{ background: "#0e0a0a", border: "1px solid rgba(200,160,120,0.15)", color: "#e8d5c0" }} />
               </div>
             </div>
+
             <div className="flex gap-3 mt-6">
               {agendamentoSelecionado && (
-                <button onClick={() => cancelarAgendamento(agendamentoSelecionado.id)}
-                  className="px-4 py-3 rounded-2xl text-sm uppercase tracking-widest transition hover:opacity-70"
-                  style={{ border: "1px solid rgba(232,122,122,0.3)", color: "#e87a7a" }}>
-                  Cancelar
-                </button>
+                <>
+                  <button onClick={() => excluirAgendamento(agendamentoSelecionado.id)} disabled={excluindo}
+                    className="px-4 py-3 rounded-2xl text-sm uppercase tracking-widest transition hover:opacity-70"
+                    style={{ border: "1px solid rgba(239,68,68,0.3)", color: "#ef4444" }}>
+                    {excluindo ? "..." : "Excluir"}
+                  </button>
+                  <button onClick={() => cancelarAgendamento(agendamentoSelecionado.id)}
+                    className="px-4 py-3 rounded-2xl text-sm uppercase tracking-widest transition hover:opacity-70"
+                    style={{ border: "1px solid rgba(232,122,122,0.3)", color: "#e87a7a" }}>
+                    Cancelar
+                  </button>
+                </>
               )}
               <button onClick={() => setModalAberto(false)}
                 className="flex-1 py-3 rounded-2xl text-sm uppercase tracking-widest transition hover:opacity-70"
@@ -489,7 +599,26 @@ export default function AgendaPage() {
           </div>
         </div>
       )}
+
+      {modalRapidoAberto && (
+        <ModalAgendamentoRapido
+          inicioSugerido={new Date().toISOString().slice(0, 16)}
+          onClose={() => setModalRapidoAberto(false)}
+          onSuccess={buscarDados}
+        />
+      )}
+      {agendamentoParaCadastrar && (
+        <ModalCadastrarPaciente
+          agendamento={agendamentoParaCadastrar}
+          onClose={() => setAgendamentoParaCadastrar(null)}
+          onSuccess={buscarDados}
+        />
+      )}
       <style>{`select option { background: #120d0d; } textarea::placeholder { color: #3a2e28; }`}</style>
     </div>
   );
 }
+
+
+
+

@@ -106,6 +106,8 @@ export async function POST(request: NextRequest) {
 
       procedimento: Array.isArray(body.procedimento)
         ? body.procedimento.join(", ")
+        : Array.isArray(body.areas)
+        ? body.areas.join(", ")
         : body.procedimento,
 
       status: "em_tratamento",

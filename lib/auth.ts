@@ -3,15 +3,15 @@ import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
 import { SignJWT, jwtVerify } from "jose";
 
-const SECRET = new TextEncoder().encode(
-  process.env.AUTH_SECRET ?? "moncie-secret-mude-em-producao"
-);
+const SECRET = new TextEncoder().encode(process.env.AUTH_SECRET ?? "moncie-secret-mude-em-producao");
 
 export type SessionUser = {
   id: string;
   nome: string;
   email: string;
   role: "admin" | "funcionario";
+  cargo?: string;
+  permissoes?: Record<string, boolean>;
 };
 
 export async function criarSessao(user: SessionUser) {
@@ -50,16 +50,24 @@ export async function destruirSessao() {
 export async function verificarCredenciais(email: string, senha: string) {
   const { data, error } = await supabaseAdmin
     .from("funcionarios")
-    .select("id, nome, email, role, senha_hash, ativo")
+    .select("id, nome, email, role, cargo, senha_hash, ativo, permissoes")
     .eq("email", email.toLowerCase().trim())
     .eq("ativo", true)
     .single();
   if (error || !data) return null;
   const senhaValida = await bcrypt.compare(senha, data.senha_hash);
   if (!senhaValida) return null;
-  return { id: data.id, nome: data.nome, email: data.email, role: data.role } as SessionUser;
+  return {
+    id: data.id,
+    nome: data.nome,
+    email: data.email,
+    role: data.role,
+    cargo: data.cargo,
+    permissoes: data.permissoes,
+  } as SessionUser;
 }
 
 export async function hashSenha(senha: string) {
   return bcrypt.hash(senha, 12);
 }
+

@@ -2,34 +2,77 @@
 
 import { useEffect, useState } from "react";
 
+type Permissoes = {
+  agenda: boolean; pacientes: boolean; pacotes: boolean;
+  procedimentos: boolean; financeiro: boolean;
+  relatorios: boolean; configuracoes: boolean; whatsapp: boolean;
+};
+
 type Funcionario = {
-  id: string;
-  nome: string;
-  email: string;
-  role: string;
-  cargo: string;
-  cor: string;
-  ativo: boolean;
+  id: string; nome: string; email: string; role: string; cargo: string;
+  cor: string; ativo: boolean; telefone?: string; data_admissao?: string;
+  status?: string; especialidades?: string[]; permissoes?: Permissoes; criado_em?: string;
 };
 
 const cargos = [
-  { key: "administrador", label: "Administrador" },
-  { key: "recepcionista", label: "Recepcionista" },
-  { key: "massagista", label: "Massagista" },
-  { key: "laser", label: "Laser" },
-  { key: "esteticista", label: "Esteticista" },
-  { key: "financeiro", label: "Financeiro" },
+  "Administrador","Recepcionista","Esteticista","Biomédica",
+  "Massoterapeuta","Gerente","Financeiro","Laser",
+];
+
+const todasEspecialidades = [
+  "Limpeza de Pele","Botox","Bioestimulador de Colágeno","Preenchimento Labial",
+  "Rinomodelação","Perfiloplastia","Depilação a Laser","Dry Needling",
+  "Quiropraxia","Liberação Miofascial","Ventosaterapia","Protocolo Pele Perfeita",
+  "Protocolo Capilar","Lipo de Papada Enzimática","Lipo Corporal Enzimática",
+];
+
+const permissoesConfig = [
+  { key: "agenda",        label: "Agenda" },
+  { key: "pacientes",     label: "Pacientes" },
+  { key: "pacotes",       label: "Pacotes" },
+  { key: "procedimentos", label: "Procedimentos" },
+  { key: "financeiro",    label: "Financeiro" },
+  { key: "relatorios",    label: "Relatórios" },
+  { key: "configuracoes", label: "Configurações" },
+  { key: "whatsapp",      label: "WhatsApp" },
 ];
 
 const cores = ["#c8a078","#7ae8a0","#7ab8e8","#e87a7a","#e8c97a","#c87ae8","#e8a07a","#7ae8d8"];
 
+const statusConfig: Record<string, { label: string; color: string }> = {
+  ativo:    { label: "Ativo",   color: "#7ae8a0" },
+  ferias:   { label: "Férias",  color: "#e8c97a" },
+  inativo:  { label: "Inativo", color: "#e87a7a" },
+  licenca:  { label: "Licença", color: "#7ab8e8" },
+};
+
+const permissoesPadrao: Record<string, Permissoes> = {
+  administrador: { agenda:true, pacientes:true, pacotes:true, procedimentos:true, financeiro:true, relatorios:true, configuracoes:true, whatsapp:true },
+  recepcionista: { agenda:true, pacientes:true, pacotes:true, procedimentos:false, financeiro:false, relatorios:false, configuracoes:false, whatsapp:true },
+  esteticista:   { agenda:true, pacientes:true, pacotes:false, procedimentos:false, financeiro:false, relatorios:false, configuracoes:false, whatsapp:false },
+  default:       { agenda:true, pacientes:true, pacotes:false, procedimentos:false, financeiro:false, relatorios:false, configuracoes:false, whatsapp:false },
+};
+
+function getPermissoesPadrao(cargo: string): Permissoes {
+  const key = cargo.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  return permissoesPadrao[key] ?? permissoesPadrao.default;
+}
+
 export default function ConfiguracoesPage() {
   const [funcionarios, setFuncionarios] = useState<Funcionario[]>([]);
   const [carregando, setCarregando] = useState(true);
-  const [modalAberto, setModalAberto] = useState(false);
+  const [drawerAberto, setDrawerAberto] = useState(false);
+  const [funcionarioSelecionado, setFuncionarioSelecionado] = useState<Funcionario | null>(null);
+  const [abaAtiva, setAbaAtiva] = useState<"perfil"|"permissoes"|"agenda">("perfil");
+  const [modalNovo, setModalNovo] = useState(false);
   const [salvando, setSalvando] = useState(false);
-  const [sucesso, setSucesso] = useState(false);
-  const [form, setForm] = useState({ nome: "", email: "", senha: "", role: "funcionario", cargo: "recepcionista", cor: "#c8a078" });
+  const [sucesso, setSucesso] = useState("");
+
+  const [form, setForm] = useState({
+    nome: "", email: "", senha: "", cargo: "Recepcionista", cor: "#c8a078",
+    telefone: "", data_admissao: "", status: "ativo", especialidades: [] as string[],
+    permissoes: permissoesPadrao.recepcionista,
+  });
 
   async function buscar() {
     setCarregando(true);
@@ -41,84 +84,306 @@ export default function ConfiguracoesPage() {
 
   useEffect(() => { buscar(); }, []);
 
-  async function salvar() {
+  function abrirDrawer(f: Funcionario) {
+    setFuncionarioSelecionado(f);
+    setAbaAtiva("perfil");
+    setDrawerAberto(true);
+  }
+
+  async function salvarEdicao(campos: Partial<Funcionario>) {
+    if (!funcionarioSelecionado) return;
     setSalvando(true);
     const res = await fetch("/api/funcionarios", {
-      method: "POST",
+      method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
+      body: JSON.stringify({ id: funcionarioSelecionado.id, ...campos }),
     });
     if (res.ok) {
-      setSucesso(true);
-      setModalAberto(false);
-      setForm({ nome: "", email: "", senha: "", role: "funcionario", cargo: "recepcionista", cor: "#c8a078" });
+      const atualizado = await res.json();
+      setFuncionarioSelecionado(atualizado);
       buscar();
-      setTimeout(() => setSucesso(false), 3000);
+      setSucesso("Salvo com sucesso!");
+      setTimeout(() => setSucesso(""), 2500);
     }
     setSalvando(false);
   }
 
+  async function criarFuncionario() {
+    setSalvando(true);
+    const res = await fetch("/api/funcionarios", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...form,
+        role: form.cargo.toLowerCase() === "administrador" ? "admin" : "funcionario",
+      }),
+    });
+    if (res.ok) {
+      setModalNovo(false);
+      setForm({ nome:"", email:"", senha:"", cargo:"Recepcionista", cor:"#c8a078", telefone:"", data_admissao:"", status:"ativo", especialidades:[], permissoes: permissoesPadrao.recepcionista });
+      buscar();
+      setSucesso("Funcionário criado!");
+      setTimeout(() => setSucesso(""), 2500);
+    }
+    setSalvando(false);
+  }
+
+  // KPIs
+  const total = funcionarios.length;
+  const ativos = funcionarios.filter(f => f.status === "ativo" || (!f.status && f.ativo)).length;
+  const ferias = funcionarios.filter(f => f.status === "ferias").length;
+
+  const s = funcionarioSelecionado;
+
   return (
-    <div>
-      <div className="flex items-center justify-between mb-8 gap-4 flex-wrap">
-        <div>
-          <p className="text-xs uppercase tracking-widest mb-1" style={{ color: "#c8a078" }}>Sistema</p>
-          <h1 className="text-3xl font-bold" style={{ color: "#e8d5c0" }}>Configuracoes</h1>
+    <div className="flex gap-6 h-full">
+      {/* COLUNA PRINCIPAL */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
+          <div>
+            <p className="text-xs uppercase tracking-widest mb-1" style={{ color: "#c8a078" }}>Sistema</p>
+            <h1 className="text-3xl font-bold" style={{ color: "#e8d5c0" }}>Configurações</h1>
+          </div>
+          <button onClick={() => setModalNovo(true)}
+            className="flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-semibold uppercase tracking-widest transition hover:scale-105"
+            style={{ background: "#c8a078", color: "#0a0707" }}>
+            <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth={2}><path d="M12 5v14M5 12h14" strokeLinecap="round"/></svg>
+            Novo Funcionário
+          </button>
         </div>
-        <button onClick={() => setModalAberto(true)}
-          className="flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-semibold uppercase tracking-widest transition hover:scale-105"
-          style={{ background: "#c8a078", color: "#0a0707" }}>
-          <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth={2}><path d="M12 5v14M5 12h14" strokeLinecap="round"/></svg>
-          Novo Funcionario
-        </button>
+
+        {sucesso && (
+          <div className="mb-4 rounded-2xl px-5 py-3 text-sm"
+            style={{ background: "rgba(122,232,160,0.1)", border: "1px solid rgba(122,232,160,0.2)", color: "#7ae8a0" }}>
+            {sucesso}
+          </div>
+        )}
+
+        {/* KPIs */}
+        <div className="grid grid-cols-3 gap-4 mb-6">
+          {[
+            { label: "Total", valor: total, cor: "#c8a078" },
+            { label: "Ativos", valor: ativos, cor: "#7ae8a0" },
+            { label: "Em Férias", valor: ferias, cor: "#e8c97a" },
+          ].map(k => (
+            <div key={k.label} className="rounded-2xl px-5 py-4"
+              style={{ background: "#120d0d", border: "1px solid rgba(200,160,120,0.1)" }}>
+              <p className="text-2xl font-bold" style={{ color: k.cor }}>{k.valor}</p>
+              <p className="text-xs uppercase tracking-widest mt-1" style={{ color: "#6b5a4e" }}>{k.label}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* LISTA */}
+        <div className="rounded-3xl overflow-hidden" style={{ background: "#120d0d", border: "1px solid rgba(200,160,120,0.12)" }}>
+          <div className="px-6 py-4" style={{ borderBottom: "1px solid rgba(200,160,120,0.1)" }}>
+            <h2 className="text-sm font-semibold uppercase tracking-widest" style={{ color: "#c8a078" }}>Equipe</h2>
+          </div>
+          {carregando ? (
+            <div className="flex items-center justify-center h-32">
+              <div className="w-6 h-6 rounded-full border-2 animate-spin" style={{ borderColor: "rgba(200,160,120,0.2)", borderTopColor: "#c8a078" }} />
+            </div>
+          ) : (
+            <div className="divide-y" style={{ borderColor: "rgba(200,160,120,0.06)" }}>
+              {funcionarios.map(f => {
+                const st = f.status ?? (f.ativo ? "ativo" : "inativo");
+                const stConfig = statusConfig[st] ?? statusConfig.ativo;
+                return (
+                  <div key={f.id} onClick={() => abrirDrawer(f)}
+                    className="flex items-center gap-4 px-6 py-4 cursor-pointer transition hover:bg-[rgba(200,160,120,0.03)]">
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
+                      style={{ background: `${f.cor}22`, color: f.cor }}>
+                      {f.nome.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold" style={{ color: "#e8d5c0" }}>{f.nome}</p>
+                      <p className="text-xs mt-0.5" style={{ color: "#6b5a4e" }}>{f.email}</p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className="text-xs px-2 py-0.5 rounded-full"
+                        style={{ background: `${stConfig.color}15`, color: stConfig.color }}>
+                        {stConfig.label}
+                      </span>
+                      <span className="text-xs px-3 py-1 rounded-full"
+                        style={{ background: "rgba(200,160,120,0.1)", color: "#c8a078" }}>
+                        {f.cargo}
+                      </span>
+                      <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth={1.5} style={{ color: "#3a2e28" }}>
+                        <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
 
-      {sucesso && (
-        <div className="mb-4 rounded-2xl px-5 py-3 text-sm"
-          style={{ background: "rgba(122,232,160,0.1)", border: "1px solid rgba(122,232,160,0.2)", color: "#7ae8a0" }}>
-          Funcionario criado com sucesso!
+      {/* DRAWER LATERAL */}
+      {drawerAberto && s && (
+        <div className="w-96 flex-shrink-0 rounded-3xl overflow-hidden flex flex-col"
+          style={{ background: "#120d0d", border: "1px solid rgba(200,160,120,0.2)" }}>
+
+          {/* Header drawer */}
+          <div className="px-6 py-5 flex items-center gap-4" style={{ borderBottom: "1px solid rgba(200,160,120,0.1)" }}>
+            <div className="w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold flex-shrink-0"
+              style={{ background: `${s.cor}22`, color: s.cor }}>
+              {s.nome.charAt(0).toUpperCase()}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold truncate" style={{ color: "#e8d5c0" }}>{s.nome}</p>
+              <p className="text-xs" style={{ color: "#6b5a4e" }}>{s.cargo}</p>
+            </div>
+            <button onClick={() => setDrawerAberto(false)} style={{ color: "#6b5a4e" }}>
+              <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5" stroke="currentColor" strokeWidth={1.5}><path d="M18 6L6 18M6 6l12 12" strokeLinecap="round"/></svg>
+            </button>
+          </div>
+
+          {/* Abas */}
+          <div className="flex" style={{ borderBottom: "1px solid rgba(200,160,120,0.1)" }}>
+            {(["perfil","permissoes","agenda"] as const).map(aba => (
+              <button key={aba} onClick={() => setAbaAtiva(aba)}
+                className="flex-1 py-3 text-xs uppercase tracking-widest transition"
+                style={{ background: abaAtiva === aba ? "rgba(200,160,120,0.1)" : "transparent", color: abaAtiva === aba ? "#c8a078" : "#6b5a4e", borderBottom: abaAtiva === aba ? "2px solid #c8a078" : "2px solid transparent" }}>
+                {aba === "perfil" ? "Perfil" : aba === "permissoes" ? "Permissões" : "Agenda"}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-4">
+
+            {/* ABA PERFIL */}
+            {abaAtiva === "perfil" && (
+              <>
+                {[
+                  { label: "Nome", campo: "nome", valor: s.nome },
+                  { label: "Email", campo: "email", valor: s.email },
+                  { label: "Telefone", campo: "telefone", valor: s.telefone ?? "" },
+                ].map(item => (
+                  <div key={item.campo}>
+                    <label className="block text-xs uppercase tracking-widest mb-2" style={{ color: "#6b5a4e" }}>{item.label}</label>
+                    <input type="text" defaultValue={item.valor}
+                      onBlur={e => salvarEdicao({ [item.campo]: e.target.value })}
+                      className="w-full px-4 py-3 rounded-2xl outline-none text-sm"
+                      style={{ background: "#0e0a0a", border: "1px solid rgba(200,160,120,0.15)", color: "#e8d5c0" }} />
+                  </div>
+                ))}
+
+                <div>
+                  <label className="block text-xs uppercase tracking-widest mb-2" style={{ color: "#6b5a4e" }}>Cargo</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {cargos.map(c => (
+                      <button key={c} onClick={() => salvarEdicao({ cargo: c, permissoes: getPermissoesPadrao(c) })}
+                        className="py-2 rounded-xl text-xs transition"
+                        style={{ background: s.cargo === c ? "rgba(200,160,120,0.15)" : "transparent", color: s.cargo === c ? "#c8a078" : "#6b5a4e", border: `1px solid ${s.cargo === c ? "rgba(200,160,120,0.3)" : "rgba(200,160,120,0.08)"}` }}>
+                        {c}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs uppercase tracking-widest mb-2" style={{ color: "#6b5a4e" }}>Status</label>
+                  <div className="flex gap-2 flex-wrap">
+                    {Object.entries(statusConfig).map(([key, cfg]) => (
+                      <button key={key} onClick={() => salvarEdicao({ status: key })}
+                        className="px-3 py-1.5 rounded-xl text-xs transition"
+                        style={{ background: (s.status ?? "ativo") === key ? `${cfg.color}20` : "transparent", color: cfg.color, border: `1px solid ${(s.status ?? "ativo") === key ? cfg.color : `${cfg.color}40`}` }}>
+                        {cfg.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs uppercase tracking-widest mb-2" style={{ color: "#6b5a4e" }}>Admissão</label>
+                  <input type="date" defaultValue={s.data_admissao ?? ""}
+                    onBlur={e => salvarEdicao({ data_admissao: e.target.value || null })}
+                    className="w-full px-4 py-3 rounded-2xl outline-none text-sm"
+                    style={{ background: "#0e0a0a", border: "1px solid rgba(200,160,120,0.15)", color: "#e8d5c0", colorScheme: "dark" }} />
+                </div>
+
+                <div>
+                  <label className="block text-xs uppercase tracking-widest mb-3" style={{ color: "#6b5a4e" }}>Cor da agenda</label>
+                  <div className="flex gap-2 flex-wrap">
+                    {cores.map(cor => (
+                      <button key={cor} onClick={() => salvarEdicao({ cor })}
+                        className="w-8 h-8 rounded-full transition hover:scale-110"
+                        style={{ background: cor, border: s.cor === cor ? "3px solid white" : "2px solid transparent" }} />
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs uppercase tracking-widest mb-3" style={{ color: "#6b5a4e" }}>Especialidades</label>
+                  <div className="flex flex-wrap gap-2">
+                    {todasEspecialidades.map(esp => {
+                      const ativa = (s.especialidades ?? []).includes(esp);
+                      return (
+                        <button key={esp} onClick={() => {
+                          const atual = s.especialidades ?? [];
+                          const novas = ativa ? atual.filter(e => e !== esp) : [...atual, esp];
+                          salvarEdicao({ especialidades: novas });
+                        }}
+                          className="px-2.5 py-1 rounded-xl text-xs transition"
+                          style={{ background: ativa ? "rgba(200,160,120,0.15)" : "transparent", color: ativa ? "#c8a078" : "#6b5a4e", border: `1px solid ${ativa ? "rgba(200,160,120,0.3)" : "rgba(200,160,120,0.08)"}` }}>
+                          {ativa ? "✓ " : ""}{esp}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {sucesso && <p className="text-xs text-center" style={{ color: "#7ae8a0" }}>{sucesso}</p>}
+              </>
+            )}
+
+            {/* ABA PERMISSOES */}
+            {abaAtiva === "permissoes" && (
+              <>
+                <div className="px-4 py-3 rounded-2xl text-xs mb-2"
+                  style={{ background: "rgba(200,160,120,0.06)", border: "1px solid rgba(200,160,120,0.12)", color: "#a89080" }}>
+                  Permissões são aplicadas automaticamente ao trocar o cargo, mas podem ser ajustadas individualmente.
+                </div>
+                {permissoesConfig.map(p => {
+                  const ativa = s.permissoes?.[p.key as keyof Permissoes] ?? false;
+                  return (
+                    <div key={p.key} className="flex items-center justify-between px-4 py-3 rounded-2xl"
+                      style={{ background: "#0e0a0a", border: "1px solid rgba(200,160,120,0.08)" }}>
+                      <span className="text-sm" style={{ color: "#e8d5c0" }}>{p.label}</span>
+                      <button onClick={() => salvarEdicao({ permissoes: { ...(s.permissoes ?? {}), [p.key]: !ativa } as Permissoes })}
+                        className="w-11 h-6 rounded-full transition relative"
+                        style={{ background: ativa ? "#c8a078" : "rgba(200,160,120,0.15)" }}>
+                        <span className="absolute top-1 w-4 h-4 rounded-full transition-all"
+                          style={{ background: "white", left: ativa ? "calc(100% - 20px)" : "4px" }} />
+                      </button>
+                    </div>
+                  );
+                })}
+                {sucesso && <p className="text-xs text-center" style={{ color: "#7ae8a0" }}>{sucesso}</p>}
+              </>
+            )}
+
+            {/* ABA AGENDA */}
+            {abaAtiva === "agenda" && (
+              <div className="flex flex-col gap-3">
+                <p className="text-xs" style={{ color: "#6b5a4e" }}>Horários de trabalho em breve.</p>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
-      <div className="rounded-3xl overflow-hidden" style={{ background: "#120d0d", border: "1px solid rgba(200,160,120,0.12)" }}>
-        <div className="px-6 py-4" style={{ borderBottom: "1px solid rgba(200,160,120,0.1)" }}>
-          <h2 className="text-sm font-semibold uppercase tracking-widest" style={{ color: "#c8a078" }}>Equipe</h2>
-        </div>
-        {carregando ? (
-          <div className="flex items-center justify-center h-32">
-            <div className="w-6 h-6 rounded-full border-2 animate-spin" style={{ borderColor: "rgba(200,160,120,0.2)", borderTopColor: "#c8a078" }} />
-          </div>
-        ) : (
-          <div className="divide-y" style={{ borderColor: "rgba(200,160,120,0.06)" }}>
-            {funcionarios.map(f => (
-              <div key={f.id} className="flex items-center gap-4 px-6 py-4">
-                <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
-                  style={{ background: `${f.cor}22`, color: f.cor }}>
-                  {f.nome.charAt(0).toUpperCase()}
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-semibold" style={{ color: "#e8d5c0" }}>{f.nome}</p>
-                  <p className="text-xs mt-0.5" style={{ color: "#6b5a4e" }}>{f.email}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full" style={{ background: f.cor }} />
-                  <span className="text-xs px-3 py-1 rounded-full"
-                    style={{ background: "rgba(200,160,120,0.1)", color: "#c8a078" }}>
-                    {cargos.find(c => c.key === f.cargo)?.label ?? f.cargo}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {modalAberto && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}>
-          <div className="w-full max-w-md rounded-3xl p-8 max-h-[90vh] overflow-y-auto" style={{ background: "#120d0d", border: "1px solid rgba(200,160,120,0.2)" }}>
+      {/* MODAL NOVO FUNCIONÁRIO */}
+      {modalNovo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}>
+          <div className="w-full max-w-md rounded-3xl p-8 max-h-[90vh] overflow-y-auto"
+            style={{ background: "#120d0d", border: "1px solid rgba(200,160,120,0.2)" }}>
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold" style={{ color: "#c8a078" }}>Novo Funcionario</h2>
-              <button onClick={() => setModalAberto(false)} style={{ color: "#6b5a4e" }}>
+              <h2 className="text-xl font-bold" style={{ color: "#c8a078" }}>Novo Funcionário</h2>
+              <button onClick={() => setModalNovo(false)} style={{ color: "#6b5a4e" }}>
                 <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6" stroke="currentColor" strokeWidth={1.5}><path d="M18 6L6 18M6 6l12 12" strokeLinecap="round"/></svg>
               </button>
             </div>
@@ -127,6 +392,7 @@ export default function ConfiguracoesPage() {
                 { label: "Nome completo", key: "nome", type: "text" },
                 { label: "Email", key: "email", type: "email" },
                 { label: "Senha", key: "senha", type: "password" },
+                { label: "Telefone", key: "telefone", type: "tel" },
               ].map(campo => (
                 <div key={campo.key}>
                   <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "#a89080" }}>{campo.label}</label>
@@ -140,10 +406,10 @@ export default function ConfiguracoesPage() {
                 <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "#a89080" }}>Cargo</label>
                 <div className="grid grid-cols-2 gap-2">
                   {cargos.map(c => (
-                    <button key={c.key} onClick={() => setForm(f => ({ ...f, cargo: c.key, role: c.key === "administrador" ? "admin" : "funcionario" }))}
+                    <button key={c} onClick={() => setForm(f => ({ ...f, cargo: c, permissoes: getPermissoesPadrao(c) }))}
                       className="py-2.5 rounded-xl text-xs uppercase tracking-widest transition"
-                      style={{ background: form.cargo === c.key ? "rgba(200,160,120,0.15)" : "transparent", color: form.cargo === c.key ? "#c8a078" : "#6b5a4e", border: `1px solid ${form.cargo === c.key ? "rgba(200,160,120,0.3)" : "rgba(200,160,120,0.1)"}` }}>
-                      {c.label}
+                      style={{ background: form.cargo === c ? "rgba(200,160,120,0.15)" : "transparent", color: form.cargo === c ? "#c8a078" : "#6b5a4e", border: `1px solid ${form.cargo === c ? "rgba(200,160,120,0.3)" : "rgba(200,160,120,0.1)"}` }}>
+                      {c}
                     </button>
                   ))}
                 </div>
@@ -160,12 +426,12 @@ export default function ConfiguracoesPage() {
               </div>
             </div>
             <div className="flex gap-3 mt-6">
-              <button onClick={() => setModalAberto(false)}
+              <button onClick={() => setModalNovo(false)}
                 className="flex-1 py-3 rounded-2xl text-sm uppercase tracking-widest transition hover:opacity-70"
                 style={{ border: "1px solid rgba(200,160,120,0.2)", color: "#6b5a4e" }}>
                 Cancelar
               </button>
-              <button onClick={salvar} disabled={salvando || !form.nome || !form.email || !form.senha}
+              <button onClick={criarFuncionario} disabled={salvando || !form.nome || !form.email || !form.senha}
                 className="flex-1 py-3 rounded-2xl text-sm uppercase tracking-widest font-semibold transition hover:scale-105"
                 style={{ background: "#c8a078", color: "#0a0707" }}>
                 {salvando ? "Salvando..." : "Criar"}
@@ -174,7 +440,7 @@ export default function ConfiguracoesPage() {
           </div>
         </div>
       )}
-      <style>{`input::placeholder { color: #3a2e28; }`}</style>
+      <style>{`input::placeholder { color: #3a2e28; } input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.3); }`}</style>
     </div>
   );
 }
