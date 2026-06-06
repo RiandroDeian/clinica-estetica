@@ -634,6 +634,34 @@ export default function RecepcaoPage() {
             )}
           </div>
 
+          {/* Oportunidades de venda */}
+          {dadosPaciente && dadosPaciente.pacotesAtivos === 0 && (
+            <div className="mx-4 mb-2 px-4 py-3 rounded-2xl"
+              style={{ background: "var(--gold-bg)", border: "1px solid var(--border-color)" }}>
+              <p className="text-xs font-semibold mb-1" style={{ color: "var(--gold)" }}>💡 Oportunidade</p>
+              <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                Paciente sem pacotes ativos. Boa hora para oferecer um pacote!
+              </p>
+            </div>
+          )}
+          {dadosPaciente && dadosPaciente.sessoesRestantes <= 2 && dadosPaciente.sessoesRestantes > 0 && (
+            <div className="mx-4 mb-2 px-4 py-3 rounded-2xl"
+              style={{ background: "rgba(232,201,122,0.08)", border: "1px solid rgba(232,201,122,0.2)" }}>
+              <p className="text-xs font-semibold mb-1" style={{ color: "var(--warning)" }}>⚠ Pacote Acabando</p>
+              <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                Apenas {dadosPaciente.sessoesRestantes} sessão(ões) restante(s). Ofereça renovação!
+              </p>
+            </div>
+          )}
+          {dadosPaciente && dadosPaciente.sessoesRestantes === 0 && dadosPaciente.totalVisitas > 0 && (
+            <div className="mx-4 mb-2 px-4 py-3 rounded-2xl"
+              style={{ background: "rgba(122,232,160,0.08)", border: "1px solid rgba(122,232,160,0.2)" }}>
+              <p className="text-xs font-semibold mb-1" style={{ color: "var(--success)" }}>🎯 Pacote Concluído</p>
+              <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                Paciente finalizou o pacote. Hora de renovar!
+              </p>
+            </div>
+          )}
           {/* Ações */}
           <div className="p-4 flex flex-col gap-2" style={{ borderTop: "1px solid var(--border-subtle)" }}>
             {painelAberto.pacientes?.telefone && (
@@ -657,3 +685,4 @@ export default function RecepcaoPage() {
     </div>
   );
 }
+

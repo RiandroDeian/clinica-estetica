@@ -37,7 +37,7 @@ const permissoesConfig = [
   { key: "whatsapp",      label: "WhatsApp" },
 ];
 
-const cores = ["#c8a078","#7ae8a0","#7ab8e8","#e87a7a","#e8c97a","#c87ae8","#e8a07a","#7ae8d8"];
+const cores = ["var(--gold)","#7ae8a0","#7ab8e8","#e87a7a","#e8c97a","#c87ae8","#e8a07a","#7ae8d8"];
 
 const statusConfig: Record<string, { label: string; color: string }> = {
   ativo:    { label: "Ativo",   color: "#7ae8a0" },
@@ -69,7 +69,7 @@ export default function ConfiguracoesPage() {
   const [sucesso, setSucesso] = useState("");
 
   const [form, setForm] = useState({
-    nome: "", email: "", senha: "", cargo: "Recepcionista", cor: "#c8a078",
+    nome: "", email: "", senha: "", cargo: "Recepcionista", cor: "var(--gold)",
     telefone: "", data_admissao: "", status: "ativo", especialidades: [] as string[],
     permissoes: permissoesPadrao.recepcionista,
   });
@@ -120,7 +120,7 @@ export default function ConfiguracoesPage() {
     });
     if (res.ok) {
       setModalNovo(false);
-      setForm({ nome:"", email:"", senha:"", cargo:"Recepcionista", cor:"#c8a078", telefone:"", data_admissao:"", status:"ativo", especialidades:[], permissoes: permissoesPadrao.recepcionista });
+      setForm({ nome:"", email:"", senha:"", cargo:"Recepcionista", cor:"var(--gold)", telefone:"", data_admissao:"", status:"ativo", especialidades:[], permissoes: permissoesPadrao.recepcionista });
       buscar();
       setSucesso("Funcionário criado!");
       setTimeout(() => setSucesso(""), 2500);
@@ -141,12 +141,12 @@ export default function ConfiguracoesPage() {
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
           <div>
-            <p className="text-xs uppercase tracking-widest mb-1" style={{ color: "#c8a078" }}>Sistema</p>
-            <h1 className="text-3xl font-bold" style={{ color: "#e8d5c0" }}>Configurações</h1>
+            <p className="text-xs uppercase tracking-widest mb-1" style={{ color: "var(--gold)" }}>Sistema</p>
+            <h1 className="text-3xl font-bold" style={{ color: "var(--text-primary)" }}>Configurações</h1>
           </div>
           <button onClick={() => setModalNovo(true)}
             className="flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-semibold uppercase tracking-widest transition hover:scale-105"
-            style={{ background: "#c8a078", color: "#0a0707" }}>
+            style={{ background: "var(--gold)", color: "var(--bg-input)" }}>
             <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth={2}><path d="M12 5v14M5 12h14" strokeLinecap="round"/></svg>
             Novo Funcionário
           </button>
@@ -162,29 +162,29 @@ export default function ConfiguracoesPage() {
         {/* KPIs */}
         <div className="grid grid-cols-3 gap-4 mb-6">
           {[
-            { label: "Total", valor: total, cor: "#c8a078" },
+            { label: "Total", valor: total, cor: "var(--gold)" },
             { label: "Ativos", valor: ativos, cor: "#7ae8a0" },
             { label: "Em Férias", valor: ferias, cor: "#e8c97a" },
           ].map(k => (
             <div key={k.label} className="rounded-2xl px-5 py-4"
-              style={{ background: "#120d0d", border: "1px solid rgba(200,160,120,0.1)" }}>
+              style={{ background: "var(--bg-card)", border: "1px solid var(--gold-bg)" }}>
               <p className="text-2xl font-bold" style={{ color: k.cor }}>{k.valor}</p>
-              <p className="text-xs uppercase tracking-widest mt-1" style={{ color: "#6b5a4e" }}>{k.label}</p>
+              <p className="text-xs uppercase tracking-widest mt-1" style={{ color: "var(--text-muted)" }}>{k.label}</p>
             </div>
           ))}
         </div>
 
         {/* LISTA */}
-        <div className="rounded-3xl overflow-hidden" style={{ background: "#120d0d", border: "1px solid rgba(200,160,120,0.12)" }}>
-          <div className="px-6 py-4" style={{ borderBottom: "1px solid rgba(200,160,120,0.1)" }}>
-            <h2 className="text-sm font-semibold uppercase tracking-widest" style={{ color: "#c8a078" }}>Equipe</h2>
+        <div className="rounded-3xl overflow-hidden" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+          <div className="px-6 py-4" style={{ borderBottom: "1px solid var(--gold-bg)" }}>
+            <h2 className="text-sm font-semibold uppercase tracking-widest" style={{ color: "var(--gold)" }}>Equipe</h2>
           </div>
           {carregando ? (
             <div className="flex items-center justify-center h-32">
-              <div className="w-6 h-6 rounded-full border-2 animate-spin" style={{ borderColor: "rgba(200,160,120,0.2)", borderTopColor: "#c8a078" }} />
+              <div className="w-6 h-6 rounded-full border-2 animate-spin" style={{ borderColor: "rgba(200,160,120,0.2)", borderTopColor: "var(--gold)" }} />
             </div>
           ) : (
-            <div className="divide-y" style={{ borderColor: "rgba(200,160,120,0.06)" }}>
+            <div className="divide-y" style={{ borderColor: "var(--border-subtle)" }}>
               {funcionarios.map(f => {
                 const st = f.status ?? (f.ativo ? "ativo" : "inativo");
                 const stConfig = statusConfig[st] ?? statusConfig.ativo;
@@ -196,8 +196,8 @@ export default function ConfiguracoesPage() {
                       {f.nome.charAt(0).toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold" style={{ color: "#e8d5c0" }}>{f.nome}</p>
-                      <p className="text-xs mt-0.5" style={{ color: "#6b5a4e" }}>{f.email}</p>
+                      <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>{f.nome}</p>
+                      <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>{f.email}</p>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <span className="text-xs px-2 py-0.5 rounded-full"
@@ -205,10 +205,10 @@ export default function ConfiguracoesPage() {
                         {stConfig.label}
                       </span>
                       <span className="text-xs px-3 py-1 rounded-full"
-                        style={{ background: "rgba(200,160,120,0.1)", color: "#c8a078" }}>
+                        style={{ background: "var(--gold-bg)", color: "var(--gold)" }}>
                         {f.cargo}
                       </span>
-                      <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth={1.5} style={{ color: "#3a2e28" }}>
+                      <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth={1.5} style={{ color: "var(--text-muted)" }}>
                         <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round"/>
                       </svg>
                     </div>
@@ -223,29 +223,29 @@ export default function ConfiguracoesPage() {
       {/* DRAWER LATERAL */}
       {drawerAberto && s && (
         <div className="w-96 flex-shrink-0 rounded-3xl overflow-hidden flex flex-col"
-          style={{ background: "#120d0d", border: "1px solid rgba(200,160,120,0.2)" }}>
+          style={{ background: "var(--bg-card)", border: "1px solid rgba(200,160,120,0.2)" }}>
 
           {/* Header drawer */}
-          <div className="px-6 py-5 flex items-center gap-4" style={{ borderBottom: "1px solid rgba(200,160,120,0.1)" }}>
+          <div className="px-6 py-5 flex items-center gap-4" style={{ borderBottom: "1px solid var(--gold-bg)" }}>
             <div className="w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold flex-shrink-0"
               style={{ background: `${s.cor}22`, color: s.cor }}>
               {s.nome.charAt(0).toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-bold truncate" style={{ color: "#e8d5c0" }}>{s.nome}</p>
-              <p className="text-xs" style={{ color: "#6b5a4e" }}>{s.cargo}</p>
+              <p className="font-bold truncate" style={{ color: "var(--text-primary)" }}>{s.nome}</p>
+              <p className="text-xs" style={{ color: "var(--text-muted)" }}>{s.cargo}</p>
             </div>
-            <button onClick={() => setDrawerAberto(false)} style={{ color: "#6b5a4e" }}>
+            <button onClick={() => setDrawerAberto(false)} style={{ color: "var(--text-muted)" }}>
               <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5" stroke="currentColor" strokeWidth={1.5}><path d="M18 6L6 18M6 6l12 12" strokeLinecap="round"/></svg>
             </button>
           </div>
 
           {/* Abas */}
-          <div className="flex" style={{ borderBottom: "1px solid rgba(200,160,120,0.1)" }}>
+          <div className="flex" style={{ borderBottom: "1px solid var(--gold-bg)" }}>
             {(["perfil","permissoes","agenda"] as const).map(aba => (
               <button key={aba} onClick={() => setAbaAtiva(aba)}
                 className="flex-1 py-3 text-xs uppercase tracking-widest transition"
-                style={{ background: abaAtiva === aba ? "rgba(200,160,120,0.1)" : "transparent", color: abaAtiva === aba ? "#c8a078" : "#6b5a4e", borderBottom: abaAtiva === aba ? "2px solid #c8a078" : "2px solid transparent" }}>
+                style={{ background: abaAtiva === aba ? "var(--gold-bg)" : "transparent", color: abaAtiva === aba ? "var(--gold)" : "var(--text-muted)", borderBottom: abaAtiva === aba ? "2px solid #c8a078" : "2px solid transparent" }}>
                 {aba === "perfil" ? "Perfil" : aba === "permissoes" ? "Permissões" : "Agenda"}
               </button>
             ))}
@@ -262,21 +262,21 @@ export default function ConfiguracoesPage() {
                   { label: "Telefone", campo: "telefone", valor: s.telefone ?? "" },
                 ].map(item => (
                   <div key={item.campo}>
-                    <label className="block text-xs uppercase tracking-widest mb-2" style={{ color: "#6b5a4e" }}>{item.label}</label>
+                    <label className="block text-xs uppercase tracking-widest mb-2" style={{ color: "var(--text-muted)" }}>{item.label}</label>
                     <input type="text" defaultValue={item.valor}
                       onBlur={e => salvarEdicao({ [item.campo]: e.target.value })}
                       className="w-full px-4 py-3 rounded-2xl outline-none text-sm"
-                      style={{ background: "#0e0a0a", border: "1px solid rgba(200,160,120,0.15)", color: "#e8d5c0" }} />
+                      style={{ background: "var(--bg-input)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
                   </div>
                 ))}
 
                 <div>
-                  <label className="block text-xs uppercase tracking-widest mb-2" style={{ color: "#6b5a4e" }}>Cargo</label>
+                  <label className="block text-xs uppercase tracking-widest mb-2" style={{ color: "var(--text-muted)" }}>Cargo</label>
                   <div className="grid grid-cols-2 gap-2">
                     {cargos.map(c => (
                       <button key={c} onClick={() => salvarEdicao({ cargo: c, permissoes: getPermissoesPadrao(c) })}
                         className="py-2 rounded-xl text-xs transition"
-                        style={{ background: s.cargo === c ? "rgba(200,160,120,0.15)" : "transparent", color: s.cargo === c ? "#c8a078" : "#6b5a4e", border: `1px solid ${s.cargo === c ? "rgba(200,160,120,0.3)" : "rgba(200,160,120,0.08)"}` }}>
+                        style={{ background: s.cargo === c ? "var(--border-color)" : "transparent", color: s.cargo === c ? "var(--gold)" : "var(--text-muted)", border: `1px solid ${s.cargo === c ? "rgba(200,160,120,0.3)" : "var(--border-subtle)"}` }}>
                         {c}
                       </button>
                     ))}
@@ -284,7 +284,7 @@ export default function ConfiguracoesPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs uppercase tracking-widest mb-2" style={{ color: "#6b5a4e" }}>Status</label>
+                  <label className="block text-xs uppercase tracking-widest mb-2" style={{ color: "var(--text-muted)" }}>Status</label>
                   <div className="flex gap-2 flex-wrap">
                     {Object.entries(statusConfig).map(([key, cfg]) => (
                       <button key={key} onClick={() => salvarEdicao({ status: key })}
@@ -297,15 +297,15 @@ export default function ConfiguracoesPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs uppercase tracking-widest mb-2" style={{ color: "#6b5a4e" }}>Admissão</label>
+                  <label className="block text-xs uppercase tracking-widest mb-2" style={{ color: "var(--text-muted)" }}>Admissão</label>
                   <input type="date" defaultValue={s.data_admissao ?? ""}
                     onBlur={e => salvarEdicao({ data_admissao: e.target.value || null })}
                     className="w-full px-4 py-3 rounded-2xl outline-none text-sm"
-                    style={{ background: "#0e0a0a", border: "1px solid rgba(200,160,120,0.15)", color: "#e8d5c0", colorScheme: "dark" }} />
+                    style={{ background: "var(--bg-input)", border: "1px solid var(--border-color)", color: "var(--text-primary)", colorScheme: "dark" }} />
                 </div>
 
                 <div>
-                  <label className="block text-xs uppercase tracking-widest mb-3" style={{ color: "#6b5a4e" }}>Cor da agenda</label>
+                  <label className="block text-xs uppercase tracking-widest mb-3" style={{ color: "var(--text-muted)" }}>Cor da agenda</label>
                   <div className="flex gap-2 flex-wrap">
                     {cores.map(cor => (
                       <button key={cor} onClick={() => salvarEdicao({ cor })}
@@ -316,7 +316,7 @@ export default function ConfiguracoesPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs uppercase tracking-widest mb-3" style={{ color: "#6b5a4e" }}>Especialidades</label>
+                  <label className="block text-xs uppercase tracking-widest mb-3" style={{ color: "var(--text-muted)" }}>Especialidades</label>
                   <div className="flex flex-wrap gap-2">
                     {todasEspecialidades.map(esp => {
                       const ativa = (s.especialidades ?? []).includes(esp);
@@ -327,7 +327,7 @@ export default function ConfiguracoesPage() {
                           salvarEdicao({ especialidades: novas });
                         }}
                           className="px-2.5 py-1 rounded-xl text-xs transition"
-                          style={{ background: ativa ? "rgba(200,160,120,0.15)" : "transparent", color: ativa ? "#c8a078" : "#6b5a4e", border: `1px solid ${ativa ? "rgba(200,160,120,0.3)" : "rgba(200,160,120,0.08)"}` }}>
+                          style={{ background: ativa ? "var(--border-color)" : "transparent", color: ativa ? "var(--gold)" : "var(--text-muted)", border: `1px solid ${ativa ? "rgba(200,160,120,0.3)" : "var(--border-subtle)"}` }}>
                           {ativa ? "✓ " : ""}{esp}
                         </button>
                       );
@@ -343,18 +343,18 @@ export default function ConfiguracoesPage() {
             {abaAtiva === "permissoes" && (
               <>
                 <div className="px-4 py-3 rounded-2xl text-xs mb-2"
-                  style={{ background: "rgba(200,160,120,0.06)", border: "1px solid rgba(200,160,120,0.12)", color: "#a89080" }}>
+                  style={{ background: "var(--border-subtle)", border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}>
                   Permissões são aplicadas automaticamente ao trocar o cargo, mas podem ser ajustadas individualmente.
                 </div>
                 {permissoesConfig.map(p => {
                   const ativa = s.permissoes?.[p.key as keyof Permissoes] ?? false;
                   return (
                     <div key={p.key} className="flex items-center justify-between px-4 py-3 rounded-2xl"
-                      style={{ background: "#0e0a0a", border: "1px solid rgba(200,160,120,0.08)" }}>
-                      <span className="text-sm" style={{ color: "#e8d5c0" }}>{p.label}</span>
+                      style={{ background: "var(--bg-input)", border: "1px solid var(--border-subtle)" }}>
+                      <span className="text-sm" style={{ color: "var(--text-primary)" }}>{p.label}</span>
                       <button onClick={() => salvarEdicao({ permissoes: { ...(s.permissoes ?? {}), [p.key]: !ativa } as Permissoes })}
                         className="w-11 h-6 rounded-full transition relative"
-                        style={{ background: ativa ? "#c8a078" : "rgba(200,160,120,0.15)" }}>
+                        style={{ background: ativa ? "var(--gold)" : "var(--border-color)" }}>
                         <span className="absolute top-1 w-4 h-4 rounded-full transition-all"
                           style={{ background: "white", left: ativa ? "calc(100% - 20px)" : "4px" }} />
                       </button>
@@ -368,7 +368,7 @@ export default function ConfiguracoesPage() {
             {/* ABA AGENDA */}
             {abaAtiva === "agenda" && (
               <div className="flex flex-col gap-3">
-                <p className="text-xs" style={{ color: "#6b5a4e" }}>Horários de trabalho em breve.</p>
+                <p className="text-xs" style={{ color: "var(--text-muted)" }}>Horários de trabalho em breve.</p>
               </div>
             )}
           </div>
@@ -380,10 +380,10 @@ export default function ConfiguracoesPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}>
           <div className="w-full max-w-md rounded-3xl p-8 max-h-[90vh] overflow-y-auto"
-            style={{ background: "#120d0d", border: "1px solid rgba(200,160,120,0.2)" }}>
+            style={{ background: "var(--bg-card)", border: "1px solid rgba(200,160,120,0.2)" }}>
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold" style={{ color: "#c8a078" }}>Novo Funcionário</h2>
-              <button onClick={() => setModalNovo(false)} style={{ color: "#6b5a4e" }}>
+              <h2 className="text-xl font-bold" style={{ color: "var(--gold)" }}>Novo Funcionário</h2>
+              <button onClick={() => setModalNovo(false)} style={{ color: "var(--text-muted)" }}>
                 <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6" stroke="currentColor" strokeWidth={1.5}><path d="M18 6L6 18M6 6l12 12" strokeLinecap="round"/></svg>
               </button>
             </div>
@@ -395,27 +395,27 @@ export default function ConfiguracoesPage() {
                 { label: "Telefone", key: "telefone", type: "tel" },
               ].map(campo => (
                 <div key={campo.key}>
-                  <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "#a89080" }}>{campo.label}</label>
+                  <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>{campo.label}</label>
                   <input type={campo.type} value={(form as any)[campo.key]}
                     onChange={e => setForm(f => ({ ...f, [campo.key]: e.target.value }))}
                     className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
-                    style={{ background: "#0e0a0a", border: "1px solid rgba(200,160,120,0.15)", color: "#e8d5c0" }} />
+                    style={{ background: "var(--bg-input)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
                 </div>
               ))}
               <div>
-                <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "#a89080" }}>Cargo</label>
+                <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>Cargo</label>
                 <div className="grid grid-cols-2 gap-2">
                   {cargos.map(c => (
                     <button key={c} onClick={() => setForm(f => ({ ...f, cargo: c, permissoes: getPermissoesPadrao(c) }))}
                       className="py-2.5 rounded-xl text-xs uppercase tracking-widest transition"
-                      style={{ background: form.cargo === c ? "rgba(200,160,120,0.15)" : "transparent", color: form.cargo === c ? "#c8a078" : "#6b5a4e", border: `1px solid ${form.cargo === c ? "rgba(200,160,120,0.3)" : "rgba(200,160,120,0.1)"}` }}>
+                      style={{ background: form.cargo === c ? "var(--border-color)" : "transparent", color: form.cargo === c ? "var(--gold)" : "var(--text-muted)", border: `1px solid ${form.cargo === c ? "rgba(200,160,120,0.3)" : "var(--gold-bg)"}` }}>
                       {c}
                     </button>
                   ))}
                 </div>
               </div>
               <div>
-                <label className="text-xs uppercase tracking-widest block mb-3" style={{ color: "#a89080" }}>Cor identificadora</label>
+                <label className="text-xs uppercase tracking-widest block mb-3" style={{ color: "var(--text-secondary)" }}>Cor identificadora</label>
                 <div className="flex gap-2 flex-wrap">
                   {cores.map(cor => (
                     <button key={cor} onClick={() => setForm(f => ({ ...f, cor }))}
@@ -428,12 +428,12 @@ export default function ConfiguracoesPage() {
             <div className="flex gap-3 mt-6">
               <button onClick={() => setModalNovo(false)}
                 className="flex-1 py-3 rounded-2xl text-sm uppercase tracking-widest transition hover:opacity-70"
-                style={{ border: "1px solid rgba(200,160,120,0.2)", color: "#6b5a4e" }}>
+                style={{ border: "1px solid rgba(200,160,120,0.2)", color: "var(--text-muted)" }}>
                 Cancelar
               </button>
               <button onClick={criarFuncionario} disabled={salvando || !form.nome || !form.email || !form.senha}
                 className="flex-1 py-3 rounded-2xl text-sm uppercase tracking-widest font-semibold transition hover:scale-105"
-                style={{ background: "#c8a078", color: "#0a0707" }}>
+                style={{ background: "var(--gold)", color: "var(--bg-input)" }}>
                 {salvando ? "Salvando..." : "Criar"}
               </button>
             </div>
@@ -444,3 +444,4 @@ export default function ConfiguracoesPage() {
     </div>
   );
 }
+

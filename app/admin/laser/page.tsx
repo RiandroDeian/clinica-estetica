@@ -31,7 +31,7 @@ type Resumo = {
 
 const statusCfg: Record<string, { label: string; color: string; bg: string }> = {
   em_tratamento: { label: "Em tratamento", color: "#7ae8a0", bg: "rgba(122,232,160,0.1)" },
-  finalizado:    { label: "Finalizado",    color: "#a89080", bg: "rgba(168,144,128,0.1)" },
+  finalizado:    { label: "Finalizado",    color: "var(--text-secondary)", bg: "rgba(168,144,128,0.1)" },
   pausado:       { label: "Pausado",       color: "#e8c97a", bg: "rgba(232,201,122,0.1)" },
   cancelado:     { label: "Cancelado",     color: "#e87a7a", bg: "rgba(232,122,122,0.1)" },
 };
@@ -39,11 +39,11 @@ const statusCfg: Record<string, { label: string; color: string; bg: string }> = 
 const pagCfg: Record<string, { label: string; color: string; bg: string }> = {
   pago:     { label: "Pago",     color: "#7ae8a0", bg: "rgba(122,232,160,0.1)" },
   pendente: { label: "Pendente", color: "#e8c97a", bg: "rgba(232,201,122,0.1)" },
-  parcial:  { label: "Parcial",  color: "#c8a078", bg: "rgba(200,160,120,0.1)" },
+  parcial:  { label: "Parcial",  color: "var(--gold)", bg: "var(--gold-bg)" },
 };
 
 const categoriaCfg: Record<string, { label: string; color: string; bg: string }> = {
-  Pacote:    { label: "Pacote",    color: "#c8a078", bg: "rgba(200,160,120,0.1)" },
+  Pacote:    { label: "Pacote",    color: "var(--gold)", bg: "var(--gold-bg)" },
   Gratuito:  { label: "Gratuito", color: "#7ae8a0", bg: "rgba(122,232,160,0.1)" },
   Avulso:    { label: "Avulso",   color: "#a89bcc", bg: "rgba(168,155,204,0.1)" },
 };
@@ -197,9 +197,9 @@ export default function LaserPage() {
   
 
   const inputStyle = {
-    background: "#0e0a0a",
-    border: "1px solid rgba(200,160,120,0.15)",
-    color: "#e8d5c0",
+    background: "var(--bg-input)",
+    border: "1px solid var(--border-color)",
+    color: "var(--text-primary)",
   } as const;
 
   return (
@@ -207,12 +207,12 @@ export default function LaserPage() {
       {/* Cabeçalho */}
       <div className="flex items-center justify-between mb-8 gap-4 flex-wrap">
         <div>
-          <p className="text-xs uppercase tracking-widest mb-1" style={{ color: "#c8a078" }}>Controle</p>
-          <h1 className="text-3xl font-bold" style={{ color: "#e8d5c0" }}>Pacientes Laser</h1>
+          <p className="text-xs uppercase tracking-widest mb-1" style={{ color: "var(--gold)" }}>Controle</p>
+          <h1 className="text-3xl font-bold" style={{ color: "var(--text-primary)" }}>Pacientes Laser</h1>
         </div>
         <button onClick={abrirNovo}
           className="flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-semibold uppercase tracking-widest transition hover:scale-105"
-          style={{ background: "#c8a078", color: "#0a0707" }}>
+          style={{ background: "var(--gold)", color: "var(--bg-input)" }}>
           <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth={2}>
             <path d="M12 5v14M5 12h14" strokeLinecap="round" />
           </svg>
@@ -229,10 +229,10 @@ export default function LaserPage() {
             { label: "Sessões Realizadas", valor: resumo.sessoesMes, icon: "✅" },
             { label: "Faturamento", valor: `R$ ${resumo.faturamento.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`, icon: "💰" },
           ].map((c, i) => (
-            <div key={i} className="rounded-3xl p-6" style={{ background: "#120d0d", border: "1px solid rgba(200,160,120,0.12)" }}>
+            <div key={i} className="rounded-3xl p-6" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
               <div className="text-2xl mb-3">{c.icon}</div>
-              <p className="text-2xl font-bold mb-1" style={{ color: "#c8a078" }}>{c.valor}</p>
-              <p className="text-xs uppercase tracking-widest" style={{ color: "#6b5a4e" }}>{c.label}</p>
+              <p className="text-2xl font-bold mb-1" style={{ color: "var(--gold)" }}>{c.valor}</p>
+              <p className="text-xs uppercase tracking-widest" style={{ color: "var(--text-muted)" }}>{c.label}</p>
             </div>
           ))}
         </div>
@@ -241,29 +241,29 @@ export default function LaserPage() {
       {/* Filtros */}
       <div className="flex gap-3 mb-6 flex-wrap">
         <div className="relative flex-1 min-w-[200px]">
-          <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2" stroke="currentColor" strokeWidth={1.5} style={{ color: "#6b5a4e" }}>
+          <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2" stroke="currentColor" strokeWidth={1.5} style={{ color: "var(--text-muted)" }}>
             <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" strokeLinecap="round" />
           </svg>
           <input type="text" placeholder="Buscar paciente ou CPF..." value={busca}
             onChange={e => setBusca(e.target.value)}
             className="w-full rounded-2xl pl-11 pr-5 py-3 text-sm outline-none"
-            style={{ background: "#120d0d", border: "1px solid rgba(200,160,120,0.15)", color: "#e8d5c0" }} />
+            style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
         </div>
         <select value={filtroCategoria} onChange={e => setFiltroCategoria(e.target.value)}
           className="rounded-2xl px-4 py-3 text-sm outline-none"
-          style={{ background: "#120d0d", border: "1px solid rgba(200,160,120,0.15)", color: filtroCategoria ? "#e8d5c0" : "#6b5a4e" }}>
+          style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)", color: filtroCategoria ? "var(--text-primary)" : "var(--text-muted)" }}>
           <option value="">Todas categorias</option>
           {Object.entries(categoriaCfg).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
         </select>
         <select value={filtroStatus} onChange={e => setFiltroStatus(e.target.value)}
           className="rounded-2xl px-4 py-3 text-sm outline-none"
-          style={{ background: "#120d0d", border: "1px solid rgba(200,160,120,0.15)", color: filtroStatus ? "#e8d5c0" : "#6b5a4e" }}>
+          style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)", color: filtroStatus ? "var(--text-primary)" : "var(--text-muted)" }}>
           <option value="">Todos os status</option>
           {Object.entries(statusCfg).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
         </select>
         <select value={filtroPag} onChange={e => setFiltroPag(e.target.value)}
           className="rounded-2xl px-4 py-3 text-sm outline-none"
-          style={{ background: "#120d0d", border: "1px solid rgba(200,160,120,0.15)", color: filtroPag ? "#e8d5c0" : "#6b5a4e" }}>
+          style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)", color: filtroPag ? "var(--text-primary)" : "var(--text-muted)" }}>
           <option value="">Todos pagamentos</option>
           {Object.entries(pagCfg).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
         </select>
@@ -272,22 +272,22 @@ export default function LaserPage() {
       {/* Tabela */}
       {carregando ? (
         <div className="flex items-center justify-center h-48">
-          <div className="w-8 h-8 rounded-full border-2 animate-spin" style={{ borderColor: "rgba(200,160,120,0.2)", borderTopColor: "#c8a078" }} />
+          <div className="w-8 h-8 rounded-full border-2 animate-spin" style={{ borderColor: "rgba(200,160,120,0.2)", borderTopColor: "var(--gold)" }} />
         </div>
       ) : pacotes.length === 0 ? (
-        <div className="text-center py-20 rounded-3xl" style={{ background: "#120d0d", border: "1px solid rgba(200,160,120,0.1)" }}>
+        <div className="text-center py-20 rounded-3xl" style={{ background: "var(--bg-card)", border: "1px solid var(--gold-bg)" }}>
           <p className="text-4xl mb-4">🔆</p>
-          <p className="text-lg font-semibold mb-2" style={{ color: "#c8a078" }}>Nenhum pacote encontrado</p>
-          <p className="text-sm" style={{ color: "#6b5a4e" }}>Cadastre o primeiro pacote laser</p>
+          <p className="text-lg font-semibold mb-2" style={{ color: "var(--gold)" }}>Nenhum pacote encontrado</p>
+          <p className="text-sm" style={{ color: "var(--text-muted)" }}>Cadastre o primeiro pacote laser</p>
         </div>
       ) : (
-        <div className="rounded-3xl overflow-hidden" style={{ background: "#120d0d", border: "1px solid rgba(200,160,120,0.12)" }}>
+        <div className="rounded-3xl overflow-hidden" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr style={{ borderBottom: "1px solid rgba(200,160,120,0.1)" }}>
+                <tr style={{ borderBottom: "1px solid var(--gold-bg)" }}>
                   {["Paciente", "Áreas", "Categoria", "Sessões", "Progresso", "Status", "Pagamento", "Profissional", ""].map(h => (
-                    <th key={h} className="text-left px-5 py-4 text-xs uppercase tracking-widest" style={{ color: "#6b5a4e" }}>{h}</th>
+                    <th key={h} className="text-left px-5 py-4 text-xs uppercase tracking-widest" style={{ color: "var(--text-muted)" }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -300,18 +300,18 @@ export default function LaserPage() {
                   const pc = pagCfg[p.status_pagamento] ?? pagCfg.pendente;
                   const cc = categoriaCfg[p.categoria] ?? categoriaCfg.Pacote;
                   return (
-                    <tr key={p.id} className="transition hover:bg-[rgba(200,160,120,0.04)] cursor-pointer"
-                      style={{ borderBottom: i < pacotes.length - 1 ? "1px solid rgba(200,160,120,0.06)" : "none" }}
+                    <tr key={p.id} className="transition hover:bg-[var(--bg-hover)] cursor-pointer"
+                      style={{ borderBottom: i < pacotes.length - 1 ? "1px solid var(--border-subtle)" : "none" }}
                       onClick={() => router.push(`/admin/laser/${p.id}`)}>
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
-                            style={{ background: "rgba(200,160,120,0.12)", color: "#c8a078" }}>
+                            style={{ background: "var(--border-color)", color: "var(--gold)" }}>
                             {p.pacientes?.nome?.charAt(0).toUpperCase()}
                           </div>
                           <div>
-                            <p className="text-sm font-semibold" style={{ color: "#e8d5c0" }}>{p.pacientes?.nome}</p>
-                            <p className="text-xs" style={{ color: "#6b5a4e" }}>{p.pacientes?.telefone}</p>
+                            <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>{p.pacientes?.nome}</p>
+                            <p className="text-xs" style={{ color: "var(--text-muted)" }}>{p.pacientes?.telefone}</p>
                           </div>
                         </div>
                       </td>
@@ -320,7 +320,7 @@ export default function LaserPage() {
                         <div className="flex flex-wrap gap-1">
                           {areas.map(a => (
                             <span key={a} className="text-xs px-2 py-0.5 rounded-full"
-                              style={{ background: "rgba(200,160,120,0.1)", color: "#a89080" }}>{a}</span>
+                              style={{ background: "var(--gold-bg)", color: "var(--text-secondary)" }}>{a}</span>
                           ))}
                         </div>
                       </td>
@@ -329,16 +329,16 @@ export default function LaserPage() {
                       </td>
                       <td className="px-5 py-4">
                         <div className="text-center">
-                          <p className="text-lg font-bold" style={{ color: "#c8a078" }}>{restantes}</p>
-                          <p className="text-xs" style={{ color: "#6b5a4e" }}>restantes</p>
+                          <p className="text-lg font-bold" style={{ color: "var(--gold)" }}>{restantes}</p>
+                          <p className="text-xs" style={{ color: "var(--text-muted)" }}>restantes</p>
                         </div>
                       </td>
                       <td className="px-5 py-4" style={{ minWidth: 120 }}>
                         <div className="flex items-center gap-2">
-                          <div className="flex-1 h-2 rounded-full" style={{ background: "rgba(200,160,120,0.1)" }}>
-                            <div className="h-2 rounded-full transition-all" style={{ width: `${pct}%`, background: "#c8a078" }} />
+                          <div className="flex-1 h-2 rounded-full" style={{ background: "var(--gold-bg)" }}>
+                            <div className="h-2 rounded-full transition-all" style={{ width: `${pct}%`, background: "var(--gold)" }} />
                           </div>
-                          <span className="text-xs flex-shrink-0" style={{ color: "#6b5a4e" }}>{p.sessoes_feitas}/{p.total_sessoes}</span>
+                          <span className="text-xs flex-shrink-0" style={{ color: "var(--text-muted)" }}>{p.sessoes_feitas}/{p.total_sessoes}</span>
                         </div>
                       </td>
                       <td className="px-5 py-4">
@@ -347,7 +347,7 @@ export default function LaserPage() {
                       <td className="px-5 py-4">
                         <span className="text-xs px-2 py-1 rounded-full font-medium" style={{ color: pc.color, background: pc.bg }}>{pc.label}</span>
                       </td>
-                      <td className="px-5 py-4 text-sm" style={{ color: "#6b5a4e" }}>{p.funcionarios?.nome ?? "-"}</td>
+                      <td className="px-5 py-4 text-sm" style={{ color: "var(--text-muted)" }}>{p.funcionarios?.nome ?? "-"}</td>
                       {/* ✅ Botão editar */}
                         <td className="px-5 py-4">
                            <div className="flex gap-2">
@@ -356,14 +356,14 @@ export default function LaserPage() {
                             <button
                               onClick={(e) => abrirEdicao(p, e)}
                               className="p-1.5 rounded-lg transition hover:opacity-70"
-                              style={{ background: "rgba(200,160,120,0.1)" }}
+                              style={{ background: "var(--gold-bg)" }}
                               title="Editar pacote"
                             >
                               <svg
                                 viewBox="0 0 24 24"
                                 fill="none"
                                 className="w-4 h-4"
-                                stroke="#c8a078"
+                                stroke="var(--gold)"
                                 strokeWidth={1.5}
                               >
                                 <path
@@ -420,12 +420,12 @@ export default function LaserPage() {
       {/* Modal cadastro / edição */}
       {modalAberto && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}>
-          <div className="w-full max-w-2xl rounded-3xl p-8 max-h-[90vh] overflow-y-auto" style={{ background: "#120d0d", border: "1px solid rgba(200,160,120,0.2)" }}>
+          <div className="w-full max-w-2xl rounded-3xl p-8 max-h-[90vh] overflow-y-auto" style={{ background: "var(--bg-card)", border: "1px solid rgba(200,160,120,0.2)" }}>
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold" style={{ color: "#c8a078" }}>
+              <h2 className="text-xl font-bold" style={{ color: "var(--gold)" }}>
                 {editando ? "Editar Pacote Laser" : "Novo Pacote Laser"}
               </h2>
-              <button onClick={() => setModalAberto(false)} style={{ color: "#6b5a4e" }}>
+              <button onClick={() => setModalAberto(false)} style={{ color: "var(--text-muted)" }}>
                 <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6" stroke="currentColor" strokeWidth={1.5}><path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" /></svg>
               </button>
             </div>
@@ -433,7 +433,7 @@ export default function LaserPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Paciente */}
               <div className="sm:col-span-2">
-                <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "#a89080" }}>Paciente</label>
+                <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>Paciente</label>
                 <select value={form.paciente_id} onChange={e => setForm(f => ({ ...f, paciente_id: e.target.value }))}
                   className="w-full rounded-2xl px-4 py-3 text-sm outline-none" style={inputStyle}>
                   <option value="">Selecionar paciente...</option>
@@ -443,15 +443,15 @@ export default function LaserPage() {
 
               {/* Categoria */}
               <div className="sm:col-span-2">
-                <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "#a89080" }}>Categoria</label>
+                <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>Categoria</label>
                 <div className="flex gap-2">
                   {(["Pacote", "Gratuito", "Avulso"] as const).map(cat => (
                     <button key={cat} type="button"
                       onClick={() => setForm(f => ({ ...f, categoria: cat }))}
                       className="flex-1 py-2.5 rounded-2xl text-sm font-medium transition"
                       style={{
-                        background: form.categoria === cat ? "#c8a078" : "rgba(200,160,120,0.08)",
-                        color: form.categoria === cat ? "#0a0707" : "#a89080",
+                        background: form.categoria === cat ? "var(--gold)" : "var(--border-subtle)",
+                        color: form.categoria === cat ? "var(--bg-input)" : "var(--text-secondary)",
                         border: "1px solid rgba(200,160,120,0.2)",
                       }}>
                       {cat}
@@ -462,8 +462,8 @@ export default function LaserPage() {
 
               {/* ✅ Seleção múltipla de áreas por checkboxes */}
               <div className="sm:col-span-2">
-                <label className="text-xs uppercase tracking-widest block mb-3" style={{ color: "#a89080" }}>
-                  Áreas Tratadas <span style={{ color: "#6b5a4e" }}>({form.areas.length} selecionada{form.areas.length !== 1 ? "s" : ""})</span>
+                <label className="text-xs uppercase tracking-widest block mb-3" style={{ color: "var(--text-secondary)" }}>
+                  Áreas Tratadas <span style={{ color: "var(--text-muted)" }}>({form.areas.length} selecionada{form.areas.length !== 1 ? "s" : ""})</span>
                 </label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {AREAS.map(area => {
@@ -473,14 +473,14 @@ export default function LaserPage() {
                         onClick={() => setForm(f => ({ ...f, areas: toggleArea(f.areas, area) }))}
                         className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm text-left transition"
                         style={{
-                          background: selecionada ? "rgba(200,160,120,0.15)" : "rgba(200,160,120,0.04)",
-                          border: selecionada ? "1px solid rgba(200,160,120,0.5)" : "1px solid rgba(200,160,120,0.12)",
-                          color: selecionada ? "#e8d5c0" : "#6b5a4e",
+                          background: selecionada ? "var(--border-color)" : "var(--bg-hover)",
+                          border: selecionada ? "1px solid rgba(200,160,120,0.5)" : "1px solid var(--border-color)",
+                          color: selecionada ? "var(--text-primary)" : "var(--text-muted)",
                         }}>
                         <div className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0"
-                          style={{ background: selecionada ? "#c8a078" : "transparent", border: selecionada ? "none" : "1px solid rgba(200,160,120,0.3)" }}>
+                          style={{ background: selecionada ? "var(--gold)" : "transparent", border: selecionada ? "none" : "1px solid rgba(200,160,120,0.3)" }}>
                           {selecionada && (
-                            <svg viewBox="0 0 24 24" fill="none" className="w-3 h-3" stroke="#0a0707" strokeWidth={3}>
+                            <svg viewBox="0 0 24 24" fill="none" className="w-3 h-3" stroke="var(--bg-input)" strokeWidth={3}>
                               <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
                             </svg>
                           )}
@@ -494,13 +494,13 @@ export default function LaserPage() {
 
               {/* Sessões e Valor */}
               <div>
-                <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "#a89080" }}>Total de Sessões</label>
+                <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>Total de Sessões</label>
                 <input type="number" value={form.total_sessoes}
                   onChange={e => setForm(f => ({ ...f, total_sessoes: e.target.value }))}
                   className="w-full rounded-2xl px-4 py-3 text-sm outline-none" style={inputStyle} />
               </div>
               <div>
-                <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "#a89080" }}>
+                <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>
                   Valor (R$) {form.categoria === "Gratuito" && <span style={{ color: "#7ae8a0" }}>— Gratuito</span>}
                 </label>
                 <input type="number" value={form.valor}
@@ -513,7 +513,7 @@ export default function LaserPage() {
 
               {/* Pagamento */}
               <div>
-                <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "#a89080" }}>Forma de Pagamento</label>
+                <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>Forma de Pagamento</label>
                 <select value={form.forma_pagamento} onChange={e => setForm(f => ({ ...f, forma_pagamento: e.target.value }))}
                   className="w-full rounded-2xl px-4 py-3 text-sm outline-none" style={inputStyle}
                   disabled={form.categoria === "Gratuito"}>
@@ -521,7 +521,7 @@ export default function LaserPage() {
                 </select>
               </div>
               <div>
-                <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "#a89080" }}>Status Pagamento</label>
+                <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>Status Pagamento</label>
                 <select value={form.status_pagamento} onChange={e => setForm(f => ({ ...f, status_pagamento: e.target.value }))}
                   className="w-full rounded-2xl px-4 py-3 text-sm outline-none" style={inputStyle}
                   disabled={form.categoria === "Gratuito"}>
@@ -533,12 +533,12 @@ export default function LaserPage() {
 
               {/* Data início e Profissional */}
               <div>
-                <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "#a89080" }}>Data de Início</label>
+                <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>Data de Início</label>
                 <input type="date" value={form.data_inicio} onChange={e => setForm(f => ({ ...f, data_inicio: e.target.value }))}
                   className="w-full rounded-2xl px-4 py-3 text-sm outline-none" style={inputStyle} />
               </div>
               <div>
-                <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "#a89080" }}>Profissional</label>
+                <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>Profissional</label>
                 <select value={form.funcionario_id} onChange={e => setForm(f => ({ ...f, funcionario_id: e.target.value }))}
                   className="w-full rounded-2xl px-4 py-3 text-sm outline-none" style={inputStyle}>
                   <option value="">Selecionar profissional...</option>
@@ -548,7 +548,7 @@ export default function LaserPage() {
 
               {/* Observações */}
               <div className="sm:col-span-2">
-                <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "#a89080" }}>Observações</label>
+                <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>Observações</label>
                 <textarea value={form.observacoes} onChange={e => setForm(f => ({ ...f, observacoes: e.target.value }))}
                   rows={2} placeholder="Observações do pacote..."
                   className="w-full rounded-2xl px-4 py-3 text-sm outline-none resize-none" style={inputStyle} />
@@ -558,29 +558,29 @@ export default function LaserPage() {
               <div className="sm:col-span-2 flex items-center gap-3">
                 <button type="button" onClick={() => setForm(f => ({ ...f, assinou_termo: !f.assinou_termo }))}
                   className="w-6 h-6 rounded-lg flex items-center justify-center transition flex-shrink-0"
-                  style={{ background: form.assinou_termo ? "#c8a078" : "transparent", border: "1px solid rgba(200,160,120,0.4)" }}>
+                  style={{ background: form.assinou_termo ? "var(--gold)" : "transparent", border: "1px solid rgba(200,160,120,0.4)" }}>
                   {form.assinou_termo && (
-                    <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4" stroke="#0a0707" strokeWidth={2.5}>
+                    <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4" stroke="var(--bg-input)" strokeWidth={2.5}>
                       <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   )}
                 </button>
-                <span className="text-sm" style={{ color: "#a89080" }}>Assinou o termo de consentimento</span>
+                <span className="text-sm" style={{ color: "var(--text-secondary)" }}>Assinou o termo de consentimento</span>
               </div>
             </div>
 
             <div className="flex gap-3 mt-6">
               <button onClick={() => setModalAberto(false)}
                 className="flex-1 py-3 rounded-2xl text-sm uppercase tracking-widest transition hover:opacity-70"
-                style={{ border: "1px solid rgba(200,160,120,0.2)", color: "#6b5a4e" }}>
+                style={{ border: "1px solid rgba(200,160,120,0.2)", color: "var(--text-muted)" }}>
                 Cancelar
               </button>
               <button onClick={salvar}
                 disabled={salvando || !form.paciente_id || form.areas.length === 0}
                 className="flex-1 py-3 rounded-2xl text-sm uppercase tracking-widest font-semibold transition hover:scale-105"
                 style={{
-                  background: !salvando && form.paciente_id && form.areas.length > 0 ? "#c8a078" : "rgba(200,160,120,0.3)",
-                  color: "#0a0707",
+                  background: !salvando && form.paciente_id && form.areas.length > 0 ? "var(--gold)" : "rgba(200,160,120,0.3)",
+                  color: "var(--bg-input)",
                 }}>
                 {salvando ? "Salvando..." : editando ? "Salvar Alterações" : "Salvar Pacote"}
               </button>
@@ -592,4 +592,6 @@ export default function LaserPage() {
     </div>
   );
 }
+
+
 

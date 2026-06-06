@@ -29,7 +29,7 @@ const statusConfig: Record<string, { label: string; color: string; bg: string }>
   pendente:   { label: "Pendente",   color: "#e8c97a", bg: "rgba(232,201,122,0.15)" },
   confirmado: { label: "Confirmado", color: "#7ae8a0", bg: "rgba(122,232,160,0.15)" },
   cancelado:  { label: "Cancelado",  color: "#e87a7a", bg: "rgba(232,122,122,0.15)" },
-  finalizado: { label: "Finalizado", color: "#a89080", bg: "rgba(168,144,128,0.15)" },
+  finalizado: { label: "Finalizado", color: "var(--text-secondary)", bg: "rgba(168,144,128,0.15)" },
 };
 
 const HORAS = Array.from({ length: 17 }, (_, i) => i + 7);
@@ -206,7 +206,7 @@ export default function AgendaPage() {
     return agsDoDia(data).filter(ag => new Date(ag.inicio).getHours() === hora);
   }
 
-  const corProfissional = (ag: Agendamento) => ag.funcionarios?.cor ?? ag.procedimentos?.cor ?? "#c8a078";
+  const corProfissional = (ag: Agendamento) => ag.funcionarios?.cor ?? ag.procedimentos?.cor ?? "var(--gold)";
 
   const diasDoMes = () => {
     const primeiro = new Date(dataAtual.getFullYear(), dataAtual.getMonth(), 1);
@@ -238,9 +238,9 @@ export default function AgendaPage() {
         </div>
         {!compacto && (
           <>
-            <p className="text-[10px] truncate" style={{ color: "#a89080" }}>{procedimentoNome(ag)}</p>
+            <p className="text-[10px] truncate" style={{ color: "var(--text-secondary)" }}>{procedimentoNome(ag)}</p>
             {ag.funcionarios?.nome && (
-              <p className="text-[10px] truncate" style={{ color: "#6b5a4e" }}>{ag.funcionarios.nome}</p>
+              <p className="text-[10px] truncate" style={{ color: "var(--text-muted)" }}>{ag.funcionarios.nome}</p>
             )}
           </>
         )}
@@ -252,8 +252,8 @@ export default function AgendaPage() {
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
         <div>
-          <p className="text-xs uppercase tracking-widest mb-1" style={{ color: "#c8a078" }}>Gestao</p>
-          <h1 className="text-3xl font-bold" style={{ color: "#e8d5c0" }}>Agenda</h1>
+          <p className="text-xs uppercase tracking-widest mb-1" style={{ color: "var(--gold)" }}>Gestao</p>
+          <h1 className="text-3xl font-bold" style={{ color: "var(--text-primary)" }}>Agenda</h1>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
           {funcionarios.length > 0 && (
@@ -275,33 +275,33 @@ export default function AgendaPage() {
           </button>
           <button onClick={() => abrirNovoAgendamento()}
             className="flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-semibold uppercase tracking-widest transition hover:scale-105"
-            style={{ background: "#c8a078", color: "#0a0707" }}>
+            style={{ background: "var(--gold)", color: "var(--bg-input)" }}>
             <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth={2}><path d="M12 5v14M5 12h14" strokeLinecap="round"/></svg>
             Novo
           </button>
         </div>
       </div>
 
-      <div className="rounded-3xl overflow-hidden flex-1 flex flex-col" style={{ background: "#120d0d", border: "1px solid rgba(200,160,120,0.12)" }}>
-        <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: "1px solid rgba(200,160,120,0.1)" }}>
+      <div className="rounded-3xl overflow-hidden flex-1 flex flex-col" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+        <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: "1px solid var(--gold-bg)" }}>
           <div className="flex items-center gap-2">
             <button onClick={() => navegar(-1)} className="w-8 h-8 rounded-xl flex items-center justify-center transition hover:opacity-70"
-              style={{ border: "1px solid rgba(200,160,120,0.2)", color: "#c8a078" }}>
+              style={{ border: "1px solid rgba(200,160,120,0.2)", color: "var(--gold)" }}>
               <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth={1.5}><path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round"/></svg>
             </button>
             <button onClick={() => setDataAtual(new Date())} className="px-3 py-1.5 rounded-xl text-xs uppercase tracking-widest transition hover:opacity-70"
-              style={{ border: "1px solid rgba(200,160,120,0.2)", color: "#c8a078" }}>Hoje</button>
+              style={{ border: "1px solid rgba(200,160,120,0.2)", color: "var(--gold)" }}>Hoje</button>
             <button onClick={() => navegar(1)} className="w-8 h-8 rounded-xl flex items-center justify-center transition hover:opacity-70"
-              style={{ border: "1px solid rgba(200,160,120,0.2)", color: "#c8a078" }}>
+              style={{ border: "1px solid rgba(200,160,120,0.2)", color: "var(--gold)" }}>
               <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth={1.5}><path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round"/></svg>
             </button>
-            <span className="text-sm font-semibold ml-2 capitalize" style={{ color: "#e8d5c0" }}>{tituloAtual()}</span>
+            <span className="text-sm font-semibold ml-2 capitalize" style={{ color: "var(--text-primary)" }}>{tituloAtual()}</span>
           </div>
           <div className="flex rounded-xl overflow-hidden" style={{ border: "1px solid rgba(200,160,120,0.2)" }}>
             {(["dia", "semana", "mes"] as const).map((v) => (
               <button key={v} onClick={() => setView(v)}
                 className="px-4 py-2 text-xs uppercase tracking-widest transition"
-                style={{ background: view === v ? "rgba(200,160,120,0.15)" : "transparent", color: view === v ? "#c8a078" : "#6b5a4e" }}>
+                style={{ background: view === v ? "rgba(200,160,120,0.15)" : "transparent", color: view === v ? "var(--gold)" : "var(--text-muted)" }}>
                 {v === "dia" ? "Dia" : v === "semana" ? "Semana" : "Mes"}
               </button>
             ))}
@@ -313,7 +313,7 @@ export default function AgendaPage() {
             <div className="p-4">
               <div className="grid grid-cols-7 mb-2">
                 {diasSemana.map(d => (
-                  <div key={d} className="text-center text-xs uppercase tracking-widest py-2" style={{ color: "#6b5a4e" }}>{d}</div>
+                  <div key={d} className="text-center text-xs uppercase tracking-widest py-2" style={{ color: "var(--text-muted)" }}>{d}</div>
                 ))}
               </div>
               <div className="grid grid-cols-7 gap-1">
@@ -324,10 +324,10 @@ export default function AgendaPage() {
                   return (
                     <div key={i} onClick={() => { setDataAtual(dia); setView("dia"); }}
                       className="rounded-2xl p-2 min-h-[80px] cursor-pointer transition hover:scale-[1.02]"
-                      style={{ background: ehHoje ? "rgba(200,160,120,0.08)" : "#0e0a0a", border: ehHoje ? "1px solid rgba(200,160,120,0.3)" : "1px solid rgba(200,160,120,0.06)" }}>
-                      <p className="text-xs font-semibold mb-1" style={{ color: ehHoje ? "#c8a078" : "#a89080" }}>{dia.getDate()}</p>
+                      style={{ background: ehHoje ? "rgba(200,160,120,0.08)" : "var(--bg-input)", border: ehHoje ? "1px solid rgba(200,160,120,0.3)" : "1px solid var(--border-subtle)" }}>
+                      <p className="text-xs font-semibold mb-1" style={{ color: ehHoje ? "var(--gold)" : "var(--text-secondary)" }}>{dia.getDate()}</p>
                       {ags.slice(0, 2).map(ag => <EventoCard key={ag.id} ag={ag} compacto />)}
-                      {ags.length > 2 && <p className="text-[10px]" style={{ color: "#6b5a4e" }}>+{ags.length - 2}</p>}
+                      {ags.length > 2 && <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>+{ags.length - 2}</p>}
                     </div>
                   );
                 })}
@@ -337,28 +337,28 @@ export default function AgendaPage() {
 
           {view === "semana" && (
             <div className="min-w-[700px]">
-              <div className="grid sticky top-0 z-10" style={{ gridTemplateColumns: "64px repeat(7, 1fr)", borderBottom: "1px solid rgba(200,160,120,0.1)", background: "#120d0d" }}>
+              <div className="grid sticky top-0 z-10" style={{ gridTemplateColumns: "64px repeat(7, 1fr)", borderBottom: "1px solid var(--gold-bg)", background: "var(--bg-card)" }}>
                 <div />
                 {semana.map((dia, i) => {
                   const ehHoje = dia.toDateString() === new Date().toDateString();
                   return (
                     <div key={i} className="text-center py-3">
-                      <p className="text-xs" style={{ color: "#6b5a4e" }}>{diasSemana[i]}</p>
-                      <p className="text-lg font-bold mt-0.5" style={{ color: ehHoje ? "#c8a078" : "#e8d5c0" }}>{dia.getDate()}</p>
+                      <p className="text-xs" style={{ color: "var(--text-muted)" }}>{diasSemana[i]}</p>
+                      <p className="text-lg font-bold mt-0.5" style={{ color: ehHoje ? "var(--gold)" : "var(--text-primary)" }}>{dia.getDate()}</p>
                     </div>
                   );
                 })}
               </div>
               {HORAS.map(hora => (
-                <div key={hora} className="grid" style={{ gridTemplateColumns: "64px repeat(7, 1fr)", borderBottom: "1px solid rgba(200,160,120,0.04)", minHeight: 64 }}>
+                <div key={hora} className="grid" style={{ gridTemplateColumns: "64px repeat(7, 1fr)", borderBottom: "1px solid var(--bg-hover)", minHeight: 64 }}>
                   <div className="text-right pr-3 pt-1">
-                    <span className="text-xs" style={{ color: "#3a2e28" }}>{horaStr(hora)}</span>
+                    <span className="text-xs" style={{ color: "var(--text-muted)" }}>{horaStr(hora)}</span>
                   </div>
                   {semana.map((dia, i) => {
                     const ags = agsDaHora(dia, hora);
                     return (
                       <div key={i} className="border-l cursor-pointer transition hover:bg-[rgba(200,160,120,0.03)] relative p-1"
-                        style={{ borderColor: "rgba(200,160,120,0.06)" }}
+                        style={{ borderColor: "var(--border-subtle)" }}
                         onClick={() => {
                           const d = new Date(dia); d.setHours(hora, 0, 0, 0);
                           abrirNovoAgendamento(d.toISOString().slice(0, 16));
@@ -374,10 +374,10 @@ export default function AgendaPage() {
 
           {view === "dia" && (
             <div className="min-w-[400px]">
-              <div className="grid sticky top-0 z-10" style={{ gridTemplateColumns: "64px 1fr", borderBottom: "1px solid rgba(200,160,120,0.1)", background: "#120d0d" }}>
+              <div className="grid sticky top-0 z-10" style={{ gridTemplateColumns: "64px 1fr", borderBottom: "1px solid var(--gold-bg)", background: "var(--bg-card)" }}>
                 <div />
                 <div className="text-center py-3">
-                  <p className="text-sm font-semibold capitalize" style={{ color: "#c8a078" }}>
+                  <p className="text-sm font-semibold capitalize" style={{ color: "var(--gold)" }}>
                     {dataAtual.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })}
                   </p>
                 </div>
@@ -385,12 +385,12 @@ export default function AgendaPage() {
               {HORAS.map(hora => {
                 const ags = agsDaHora(dataAtual, hora);
                 return (
-                  <div key={hora} className="grid" style={{ gridTemplateColumns: "64px 1fr", borderBottom: "1px solid rgba(200,160,120,0.04)", minHeight: 72 }}>
+                  <div key={hora} className="grid" style={{ gridTemplateColumns: "64px 1fr", borderBottom: "1px solid var(--bg-hover)", minHeight: 72 }}>
                     <div className="text-right pr-3 pt-2">
-                      <span className="text-xs" style={{ color: "#3a2e28" }}>{horaStr(hora)}</span>
+                      <span className="text-xs" style={{ color: "var(--text-muted)" }}>{horaStr(hora)}</span>
                     </div>
                     <div className="border-l p-2 cursor-pointer transition hover:bg-[rgba(200,160,120,0.03)]"
-                      style={{ borderColor: "rgba(200,160,120,0.06)" }}
+                      style={{ borderColor: "var(--border-subtle)" }}
                       onClick={() => {
                         const d = new Date(dataAtual); d.setHours(hora, 0, 0, 0);
                         abrirNovoAgendamento(d.toISOString().slice(0, 16));
@@ -416,14 +416,14 @@ export default function AgendaPage() {
                                   )}
                                   <p className="text-sm font-semibold truncate" style={{ color: cor }}>{nomePaciente(ag)}</p>
                                 </div>
-                                <p className="text-xs mt-0.5 truncate" style={{ color: "#a89080" }}>
+                                <p className="text-xs mt-0.5 truncate" style={{ color: "var(--text-secondary)" }}>
                                   {procedimentoNome(ag)}
                                   {ag.procedimentos?.duracao_minutos && ` - ${ag.procedimentos.duracao_minutos} min`}
                                 </p>
                                 {ag.funcionarios?.nome && (
-                                  <p className="text-xs" style={{ color: "#6b5a4e" }}>{ag.funcionarios.nome}</p>
+                                  <p className="text-xs" style={{ color: "var(--text-muted)" }}>{ag.funcionarios.nome}</p>
                                 )}
-                                <p className="text-xs" style={{ color: "#6b5a4e" }}>
+                                <p className="text-xs" style={{ color: "var(--text-muted)" }}>
                                   {new Date(ag.inicio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} - {new Date(ag.fim).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
                                 </p>
                               </div>
@@ -449,13 +449,13 @@ export default function AgendaPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ background: "rgba(0,0,0,0.8)", backdropFilter: "blur(8px)" }}>
           <div className="w-full max-w-lg rounded-3xl p-8 max-h-[90vh] overflow-y-auto"
-            style={{ background: "#120d0d", border: "1px solid rgba(200,160,120,0.2)" }}>
+            style={{ background: "var(--bg-card)", border: "1px solid rgba(200,160,120,0.2)" }}>
 
             <div className="flex items-center justify-between mb-2">
-              <h2 className="text-xl font-bold" style={{ color: "#c8a078" }}>
+              <h2 className="text-xl font-bold" style={{ color: "var(--gold)" }}>
                 {agendamentoSelecionado ? "Editar Agendamento" : "Novo Agendamento"}
               </h2>
-              <button onClick={() => setModalAberto(false)} style={{ color: "#6b5a4e" }}>
+              <button onClick={() => setModalAberto(false)} style={{ color: "var(--text-muted)" }}>
                 <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6" stroke="currentColor" strokeWidth={1.5}><path d="M18 6L6 18M6 6l12 12" strokeLinecap="round"/></svg>
               </button>
             </div>
@@ -466,12 +466,12 @@ export default function AgendaPage() {
                 style={{ background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.2)" }}>
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-medium" style={{ color: "#fbbf24" }}>⚠ Sem cadastro</span>
-                  <span className="text-xs" style={{ color: "#6b5a4e" }}>{agendamentoSelecionado.nome_temporario} · {agendamentoSelecionado.telefone_temporario}</span>
+                  <span className="text-xs" style={{ color: "var(--text-muted)" }}>{agendamentoSelecionado.nome_temporario} · {agendamentoSelecionado.telefone_temporario}</span>
                 </div>
                 <button
                   onClick={() => { setModalAberto(false); setAgendamentoParaCadastrar(agendamentoSelecionado); }}
                   className="text-xs px-3 py-1.5 rounded-xl font-medium transition hover:scale-105"
-                  style={{ background: "rgba(200,160,120,0.15)", color: "#c8a078", border: "1px solid rgba(200,160,120,0.3)" }}>
+                  style={{ background: "rgba(200,160,120,0.15)", color: "var(--gold)", border: "1px solid rgba(200,160,120,0.3)" }}>
                   Cadastrar Paciente
                 </button>
               </div>
@@ -481,19 +481,19 @@ export default function AgendaPage() {
               {!agendamentoSelecionado && (
                 <>
                   <div>
-                    <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "#a89080" }}>Paciente</label>
+                    <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>Paciente</label>
                     <select value={form.paciente_id} onChange={e => setForm(f => ({ ...f, paciente_id: e.target.value }))}
                       className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
-                      style={{ background: "#0e0a0a", border: "1px solid rgba(200,160,120,0.15)", color: form.paciente_id ? "#e8d5c0" : "#3a2e28" }}>
+                      style={{ background: "var(--bg-input)", border: "1px solid rgba(200,160,120,0.15)", color: form.paciente_id ? "var(--text-primary)" : "var(--text-muted)" }}>
                       <option value="">Selecionar paciente...</option>
                       {pacientes.map(p => <option key={p.id} value={p.id}>{p.nome} - {p.telefone}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "#a89080" }}>
+                    <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>
                       Procedimentos
                       {procedimentosSelecionados.length > 0 && (
-                        <span className="ml-2 normal-case" style={{ color: "#c8a078" }}>
+                        <span className="ml-2 normal-case" style={{ color: "var(--gold)" }}>
                           ({procedimentosSelecionados.length} · {procedimentosSelecionados.reduce((acc, id) => {
                             const p = procedimentos.find(p => p.id === id);
                             return acc + (p?.duracao_minutos ?? 0);
@@ -508,9 +508,9 @@ export default function AgendaPage() {
                           <button key={p.id} type="button" onClick={() => toggleProcedimentoNovo(p.id)}
                             className="px-3 py-1.5 rounded-xl text-xs transition hover:scale-105"
                             style={{
-                              background: sel ? `${p.cor}22` : "#0e0a0a",
-                              color: sel ? p.cor : "#6b5a4e",
-                              border: sel ? `1px solid ${p.cor}` : "1px solid rgba(200,160,120,0.12)",
+                              background: sel ? `${p.cor}22` : "var(--bg-input)",
+                              color: sel ? p.cor : "var(--text-muted)",
+                              border: sel ? `1px solid ${p.cor}` : "1px solid var(--border-color)",
                             }}>
                             {sel ? "✓ " : ""}{p.nome}
                           </button>
@@ -519,17 +519,17 @@ export default function AgendaPage() {
                     </div>
                   </div>
                   <div>
-                    <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "#a89080" }}>Profissional Responsavel</label>
+                    <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>Profissional Responsavel</label>
                     <select value={form.funcionario_id} onChange={e => setForm(f => ({ ...f, funcionario_id: e.target.value }))}
                       className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
-                      style={{ background: "#0e0a0a", border: "1px solid rgba(200,160,120,0.15)", color: form.funcionario_id ? "#e8d5c0" : "#3a2e28" }}>
+                      style={{ background: "var(--bg-input)", border: "1px solid rgba(200,160,120,0.15)", color: form.funcionario_id ? "var(--text-primary)" : "var(--text-muted)" }}>
                       <option value="">Selecionar profissional...</option>
                       {funcionarios.map(f => <option key={f.id} value={f.id}>{f.nome}</option>)}
                     </select>
                     {form.funcionario_id && (
                       <div className="flex items-center gap-2 mt-2">
-                        <div className="w-3 h-3 rounded-full" style={{ background: funcionarios.find(f => f.id === form.funcionario_id)?.cor ?? "#c8a078" }} />
-                        <span className="text-xs" style={{ color: "#6b5a4e" }}>{funcionarios.find(f => f.id === form.funcionario_id)?.nome}</span>
+                        <div className="w-3 h-3 rounded-full" style={{ background: funcionarios.find(f => f.id === form.funcionario_id)?.cor ?? "var(--gold)" }} />
+                        <span className="text-xs" style={{ color: "var(--text-muted)" }}>{funcionarios.find(f => f.id === form.funcionario_id)?.nome}</span>
                       </div>
                     )}
                   </div>
@@ -537,20 +537,20 @@ export default function AgendaPage() {
               )}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "#a89080" }}>Inicio</label>
+                  <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>Inicio</label>
                   <input type="datetime-local" value={form.inicio} onChange={e => setForm(f => ({ ...f, inicio: e.target.value }))}
                     className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
-                    style={{ background: "#0e0a0a", border: "1px solid rgba(200,160,120,0.15)", color: "#e8d5c0" }} />
+                    style={{ background: "var(--bg-input)", border: "1px solid rgba(200,160,120,0.15)", color: "var(--text-primary)" }} />
                 </div>
                 <div>
-                  <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "#a89080" }}>Fim</label>
+                  <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>Fim</label>
                   <input type="datetime-local" value={form.fim} onChange={e => setForm(f => ({ ...f, fim: e.target.value }))}
                     className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
-                    style={{ background: "#0e0a0a", border: "1px solid rgba(200,160,120,0.15)", color: "#e8d5c0" }} />
+                    style={{ background: "var(--bg-input)", border: "1px solid rgba(200,160,120,0.15)", color: "var(--text-primary)" }} />
                 </div>
               </div>
               <div>
-                <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "#a89080" }}>Status</label>
+                <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>Status</label>
                 <div className="flex gap-2 flex-wrap">
                   {Object.entries(statusConfig).map(([key, cfg]) => (
                     <button key={key} onClick={() => setForm(f => ({ ...f, status: key }))}
@@ -562,11 +562,11 @@ export default function AgendaPage() {
                 </div>
               </div>
               <div>
-                <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "#a89080" }}>Observacoes</label>
+                <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>Observacoes</label>
                 <textarea value={form.observacoes} onChange={e => setForm(f => ({ ...f, observacoes: e.target.value }))}
                   rows={3} placeholder="Observacoes sobre o agendamento..."
                   className="w-full rounded-2xl px-4 py-3 text-sm outline-none resize-none"
-                  style={{ background: "#0e0a0a", border: "1px solid rgba(200,160,120,0.15)", color: "#e8d5c0" }} />
+                  style={{ background: "var(--bg-input)", border: "1px solid rgba(200,160,120,0.15)", color: "var(--text-primary)" }} />
               </div>
             </div>
 
@@ -587,12 +587,12 @@ export default function AgendaPage() {
               )}
               <button onClick={() => setModalAberto(false)}
                 className="flex-1 py-3 rounded-2xl text-sm uppercase tracking-widest transition hover:opacity-70"
-                style={{ border: "1px solid rgba(200,160,120,0.2)", color: "#6b5a4e" }}>
+                style={{ border: "1px solid rgba(200,160,120,0.2)", color: "var(--text-muted)" }}>
                 Fechar
               </button>
               <button onClick={salvar} disabled={salvando}
                 className="flex-1 py-3 rounded-2xl text-sm uppercase tracking-widest font-semibold transition hover:scale-105"
-                style={{ background: salvando ? "rgba(200,160,120,0.4)" : "#c8a078", color: "#0a0707" }}>
+                style={{ background: salvando ? "rgba(200,160,120,0.4)" : "var(--gold)", color: "var(--bg-input)" }}>
                 {salvando ? "Salvando..." : "Salvar"}
               </button>
             </div>
@@ -618,6 +618,7 @@ export default function AgendaPage() {
     </div>
   );
 }
+
 
 
 
