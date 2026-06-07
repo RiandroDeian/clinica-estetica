@@ -16,6 +16,7 @@ function Icon({ type }: { type: string }) {
   if (type === "faturamento") return <svg {...p}><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>;
   if (type === "whatsapp")    return <svg {...p}><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>;
   if (type === "laser")       return <svg {...p}><path d="M12 2l2 7h7l-5.5 4 2 7L12 16l-5.5 4 2-7L3 9h7z"/></svg>;
+  if (type === "prontuario")    return <svg {...p}><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" strokeLinecap="round" strokeLinejoin="round"/><path d="M9 7h1m-1 0h1" strokeLinecap="round"/></svg>;
   if (type === "procedimentos") return <svg {...p}><path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2v-4M9 21H5a2 2 0 01-2-2v-4m0 0h18" strokeLinecap="round" strokeLinejoin="round"/></svg>;
   if (type === "estoque")       return <svg {...p}><path d="M20 7l-8-4-8 4m16 0v10l-8 4m8-14l-8 4m-8 10l8-4m0 0V7" strokeLinecap="round" strokeLinejoin="round"/></svg>;
   if (type === "chat")          return <svg {...p}><path d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" strokeLinecap="round" strokeLinejoin="round"/></svg>;
@@ -31,6 +32,7 @@ const todosLinks: LinkItem[] = [
   { href: "/admin/recepcao",      label: "Recepção",      icon: "recepcao"    },
   { href: "/admin/agenda",        label: "Agenda",        icon: "agenda"      },
   { href: "/admin/pacientes",     label: "Pacientes",     icon: "pacientes"   },
+  { href: "/admin/prontuario",    label: "Prontuário",    icon: "prontuario"  },
   { href: "/admin/laser",         label: "Laser",         icon: "laser"       },
   { href: "/admin/pacotes",       label: "Pacotes",       icon: "pacotes"     },
   { href: "/admin/procedimentos", label: "Procedimentos", icon: "procedimentos" },
@@ -128,6 +130,7 @@ export default function AdminSidebar({ role }: { role: string }) {
     </aside>
   );
 }
+
 
 
 
