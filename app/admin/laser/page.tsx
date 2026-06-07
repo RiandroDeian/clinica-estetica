@@ -158,7 +158,7 @@ export default function LaserPage() {
     setForm({
       paciente_id: p.pacientes ? (pacientesLista.find(x => x.nome === p.pacientes?.nome)?.id ?? "") : "",
       funcionario_id: p.funcionarios ? (funcionariosLista.find(x => x.nome === p.funcionarios?.nome)?.id ?? "") : "",
-      areas: Array.isArray(p.procedimento) ? p.procedimento : (p.procedimento ?? "").split(", ").map((a: string) => a.trim()).filter(Boolean),
+      areas: Array.isArray(p.procedimento) ? p.procedimento : ((p.procedimento as string) ?? "").split(", ").map((a: string) => a.trim()).filter(Boolean),
       categoria: p.categoria ?? "Pacote",
       total_sessoes: String(p.total_sessoes),
       valor: String(p.valor ?? ""),
@@ -293,7 +293,7 @@ export default function LaserPage() {
               </thead>
               <tbody>
                 {pacotes.map((p, i) => {
-                  const areas = Array.isArray(p.procedimento) ? p.procedimento : (p.procedimento ?? "").split(", ").map((a: string) => a.trim()).filter(Boolean);
+                  const areas = Array.isArray(p.procedimento) ? p.procedimento : ((p.procedimento as string) ?? "").split(", ").map((a: string) => a.trim()).filter(Boolean);
                   const pct = Math.round((p.sessoes_feitas / p.total_sessoes) * 100);
                   const restantes = p.total_sessoes - p.sessoes_feitas;
                   const sc = statusCfg[p.status] ?? statusCfg.em_tratamento;
@@ -592,6 +592,8 @@ export default function LaserPage() {
     </div>
   );
 }
+
+
 
 
 
