@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
         acao: "login",
         tabela: "funcionarios",
         descricao: `Tentativa de login falha para ${email} — IP: ${ip} (tentativa ${novoCount}/5)`,
-      }).then(() => {}).catch(() => {});
+      }).then(() => {}).catch((_e: unknown) => {});
 
       await new Promise(r => setTimeout(r, 800));
       return NextResponse.json(
@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
       acao: "login",
       tabela: "funcionarios",
       descricao: `Login de ${user.nome} (${user.email}) — IP: ${ip}`,
-    }).then(() => {}).catch(() => {});
+    }).then(() => {}).catch((_e: unknown) => {});
 
     return NextResponse.json({ ok: true, user: { nome: user.nome, role: user.role, cargo: user.cargo } });
 
@@ -72,3 +72,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ erro: "Erro interno" }, { status: 500 });
   }
 }
+
