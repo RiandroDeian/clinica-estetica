@@ -15,6 +15,7 @@ type Agendamento = {
   nome_temporario?: string | null;
   telefone_temporario?: string | null;
   paciente_id?: string | null;
+  funcionario_id?: string | null;
   procedimento?: string | null;
   pacientes?: { nome: string; telefone: string };
   procedimentos?: { nome: string; cor: string; duracao_minutos: number };
@@ -639,6 +640,7 @@ export default function AgendaPage() {
     </div>
   );
 }
+
 
 
 
