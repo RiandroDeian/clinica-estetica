@@ -67,6 +67,8 @@ export default function AgendaPage() {
   const [procedimentosSelecionados, setProcedimentosSelecionados] = useState<string[]>([]);
   const [excluindo, setExcluindo] = useState(false);
   const [modalRapidoAberto, setModalRapidoAberto] = useState(false);
+  const [filtroFuncionario, setFiltroFuncionario] = useState<string>("");
+  const [usuarioLogado, setUsuarioLogado] = useState<{ id: string; role: string; cargo?: string } | null>(null);
   const [agendamentoParaCadastrar, setAgendamentoParaCadastrar] = useState<Agendamento | null>(null);
   const [form, setForm] = useState({
     paciente_id: "", procedimento_id: "", funcionario_id: "",
@@ -94,6 +96,13 @@ export default function AgendaPage() {
   useEffect(() => { buscarDados(); }, [buscarDados]);
 
   useEffect(() => {
+    fetch("/api/auth/me").then(r => r.json()).then(d => {
+      setUsuarioLogado(d);
+      // Se for funcionario comum, filtrar automaticamente pela propria agenda
+      if (d?.role !== "admin" && d?.cargo !== "Recepcionista" && d?.cargo !== "Recepção") {
+        setFiltroFuncionario(d?.id ?? "");
+      }
+    });
     fetch("/api/pacientes").then(r => r.json()).then(d => setPacientes(Array.isArray(d) ? d : []));
     fetch("/api/procedimentos").then(r => r.json()).then(d => setProcedimentos(Array.isArray(d) ? d : []));
     fetch("/api/funcionarios").then(r => r.json()).then(d => setFuncionarios(Array.isArray(d) ? d : []));
@@ -193,10 +202,14 @@ export default function AgendaPage() {
     buscarDados();
   }
 
+  const agendamentosFiltrados = filtroFuncionario
+    ? agendamentos.filter(ag => ag.funcionarios && (ag.funcionario_id === filtroFuncionario || funcionarios.find(f => f.id === filtroFuncionario)?.nome === ag.funcionarios?.nome))
+    : agendamentos;
+
   const semana = Array.from({ length: 7 }, (_, i) => addDias(inicioSemana(dataAtual), i));
 
   function agsDoDia(data: Date) {
-    return agendamentos.filter(ag => {
+    return agendamentosFiltrados.filter(ag => {
       const d = new Date(ag.inicio);
       return d.getFullYear() === data.getFullYear() && d.getMonth() === data.getMonth() && d.getDate() === data.getDate();
     });
@@ -253,17 +266,25 @@ export default function AgendaPage() {
       <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
         <div>
           <p className="text-xs uppercase tracking-widest mb-1" style={{ color: "var(--gold)" }}>Gestao</p>
-          <h1 className="text-3xl font-bold" style={{ color: "var(--text-primary)" }}>Agenda</h1>
+          <h1 className="text-3xl font-bold" style={{ color: "var(--text-primary)" }}>
+            Agenda {filtroFuncionario && usuarioLogado?.role !== "admin" ? `— ${funcionarios.find(f => f.id === filtroFuncionario)?.nome.split(" ")[0] ?? ""}` : ""}
+          </h1>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
-          {funcionarios.length > 0 && (
+          {funcionarios.length > 0 && (usuarioLogado?.role === "admin" || usuarioLogado?.cargo === "Recepcionista" || usuarioLogado?.cargo === "Recepção") && (
             <div className="flex items-center gap-2 flex-wrap">
+              <button onClick={() => setFiltroFuncionario("")}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition hover:opacity-80"
+                style={{ background: !filtroFuncionario ? "var(--gold-bg)" : "var(--bg-input)", border: `1px solid ${!filtroFuncionario ? "var(--border-color)" : "var(--border-subtle)"}`, color: !filtroFuncionario ? "var(--gold)" : "var(--text-muted)" }}>
+                <span className="text-xs">Todos</span>
+              </button>
               {funcionarios.map(f => (
-                <div key={f.id} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl"
-                  style={{ background: `${f.cor}15`, border: `1px solid ${f.cor}40` }}>
+                <button key={f.id} onClick={() => setFiltroFuncionario(filtroFuncionario === f.id ? "" : f.id)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition hover:opacity-80"
+                  style={{ background: filtroFuncionario === f.id ? `${f.cor}22` : "var(--bg-input)", border: `1px solid ${filtroFuncionario === f.id ? f.cor : "var(--border-subtle)"}` }}>
                   <div className="w-2 h-2 rounded-full" style={{ background: f.cor }} />
-                  <span className="text-xs" style={{ color: f.cor }}>{f.nome.split(" ")[0]}</span>
-                </div>
+                  <span className="text-xs" style={{ color: filtroFuncionario === f.id ? f.cor : "var(--text-muted)" }}>{f.nome.split(" ")[0]}</span>
+                </button>
               ))}
             </div>
           )}
@@ -618,6 +639,10 @@ export default function AgendaPage() {
     </div>
   );
 }
+
+
+
+
 
 
 
