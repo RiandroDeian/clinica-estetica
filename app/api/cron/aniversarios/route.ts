@@ -14,7 +14,6 @@ export async function GET(request: Request) {
   const dia = hoje.getDate();
 
   try {
-    // Busca pacientes que fazem aniversário hoje
     const { data: pacientes } = await supabaseAdmin
       .from("pacientes")
       .select("id, nome, telefone, data_nascimento")
@@ -31,21 +30,24 @@ export async function GET(request: Request) {
 
     for (const p of aniversariantes) {
       const nome = p.nome.split(" ")[0];
-      const mensagem = `Feliz Aniversário, ${nome}! 🎂🎉 A equipe Moncié deseja um dia incrível! Como presente especial, você ganhou um desconto na sua próxima visita. 💝 — Moncié Esthetique`;
+      const mensagem = `Feliz Aniversario, ${nome}! A equipe Moncie deseja um dia incrivel! Como presente especial, voce ganhou um desconto na sua proxima visita. — Moncie Esthetique`;
 
-      await supabaseAdmin.from("whatsapp_logs").insert({
-        paciente_id: p.id,
-        tipo: "aniversario",
-        mensagem,
-        status: "enviado",
-      }).catch(() => {});
+      try {
+        await supabaseAdmin.from("whatsapp_logs").insert({
+          paciente_id: p.id,
+          tipo: "aniversario",
+          mensagem,
+          status: "enviado",
+        });
+      } catch {}
 
       enviados++;
     }
 
     return NextResponse.json({ ok: true, aniversariantes: enviados, data: `${dia}/${mes}` });
 
-  } catch (err: any) {
-    return NextResponse.json({ erro: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Erro desconhecido";
+    return NextResponse.json({ erro: msg }, { status: 500 });
   }
 }
