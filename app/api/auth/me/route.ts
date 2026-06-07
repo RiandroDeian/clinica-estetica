@@ -1,4 +1,5 @@
-﻿import { NextResponse } from "next/server";
+﻿export const dynamic = "force-dynamic";
+import { NextResponse } from "next/server";
 import { getSessao } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
