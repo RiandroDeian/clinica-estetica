@@ -36,7 +36,6 @@ const todosLinks: LinkItem[] = [
   { href: "/admin/procedimentos", label: "Procedimentos", icon: "procedimentos" },
   { href: "/admin/estoque",       label: "Estoque",       icon: "estoque"       },
   { href: "/admin/chat",          label: "Chat Interno",  icon: "chat"          },
-  { href: "/admin/orcamentos",     label: "Orçamentos",    icon: "faturamento" },
   { href: "/admin/orcamentos",     label: "Orçamentos",    icon: "orcamentos"  },
   { href: "/admin/faturamento",   label: "Faturamento",   icon: "faturamento" },
   { href: "/admin/relatorios",    label: "Relatórios",    icon: "relatorios"    },
@@ -129,6 +128,7 @@ export default function AdminSidebar({ role }: { role: string }) {
     </aside>
   );
 }
+
 
 
 
