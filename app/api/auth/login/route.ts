@@ -10,6 +10,12 @@ function getIp(request: NextRequest) {
     ?? "unknown";
 }
 
+async function logAudit(dados: object) {
+  try {
+    await supabaseAdmin.from("audit_logs").insert(dados);
+  } catch {}
+}
+
 export async function POST(request: NextRequest) {
   const ip = getIp(request);
   const agora = Date.now();
@@ -40,12 +46,12 @@ export async function POST(request: NextRequest) {
         tentativas.set(ip, { count: novoCount });
       }
 
-      supabaseAdmin.from("audit_logs").insert({
+      void logAudit({
         funcionario_nome: email,
         acao: "login",
         tabela: "funcionarios",
-        descricao: `Tentativa de login falha para ${email} — IP: ${ip} (tentativa ${novoCount}/5)`,
-      }).then(() => {}).catch((_e: unknown) => {});
+        descricao: `Tentativa de login falha para ${email} - IP: ${ip} (tentativa ${novoCount}/5)`,
+      });
 
       await new Promise(r => setTimeout(r, 800));
       return NextResponse.json(
@@ -57,13 +63,13 @@ export async function POST(request: NextRequest) {
     tentativas.delete(ip);
     await criarSessao(user);
 
-    supabaseAdmin.from("audit_logs").insert({
+    void logAudit({
       funcionario_id:   user.id,
       funcionario_nome: user.nome,
       acao: "login",
       tabela: "funcionarios",
-      descricao: `Login de ${user.nome} (${user.email}) — IP: ${ip}`,
-    }).then(() => {}).catch((_e: unknown) => {});
+      descricao: `Login de ${user.nome} (${user.email}) - IP: ${ip}`,
+    });
 
     return NextResponse.json({ ok: true, user: { nome: user.nome, role: user.role, cargo: user.cargo } });
 
@@ -72,4 +78,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ erro: "Erro interno" }, { status: 500 });
   }
 }
-
