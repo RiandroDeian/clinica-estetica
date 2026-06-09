@@ -32,6 +32,13 @@ export async function POST(request: NextRequest) {
       contraindicacoes: body.contraindicacoes || null,
       observacoes: body.observacoes || null,
       assinou_termo: body.assinou_termo ?? false,
+      endereco: body.endereco || null,
+      bairro: body.bairro || null,
+      cidade: body.cidade || null,
+      cep: body.cep || null,
+      contato_emergencia_nome: body.contato_emergencia_nome || null,
+      contato_emergencia_telefone: body.contato_emergencia_telefone || null,
+      contato_emergencia_parentesco: body.contato_emergencia_parentesco || null,
     };
     const { data, error } = await supabaseAdmin.from("pacientes").insert(paciente).select().single();
     if (error) return NextResponse.json({ erro: error.message, detalhes: error }, { status: 500 });
@@ -41,3 +48,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ erro: err?.message ?? "Erro interno" }, { status: 500 });
   }
 }
+

@@ -15,6 +15,13 @@ type Paciente = {
   observacoes?: string;
   assinou_termo: boolean;
   criado_em: string;
+  endereco?: string;
+  bairro?: string;
+  cidade?: string;
+  cep?: string;
+  contato_emergencia_nome?: string;
+  contato_emergencia_telefone?: string;
+  contato_emergencia_parentesco?: string;
 };
 
 const filtrosOpcoes = [
@@ -38,6 +45,8 @@ export default function PacientesPage() {
     nome: "", telefone: "", email: "", cpf: "", sexo: "",
     data_nascimento: "", alergias: "", contraindicacoes: "",
     observacoes: "", assinou_termo: false,
+    endereco: "", bairro: "", cidade: "", cep: "",
+    contato_emergencia_nome: "", contato_emergencia_telefone: "", contato_emergencia_parentesco: "",
   });
 
   const buscarPacientes = useCallback(async () => {
@@ -83,7 +92,7 @@ export default function PacientesPage() {
 
   function abrirNovo() {
     setEditando(null);
-    setForm({ nome:"", telefone:"", email:"", cpf:"", sexo:"", data_nascimento:"", alergias:"", contraindicacoes:"", observacoes:"", assinou_termo: false });
+    setForm({ nome:"", telefone:"", email:"", cpf:"", sexo:"", data_nascimento:"", alergias:"", contraindicacoes:"", observacoes:"", assinou_termo: false, endereco:"", bairro:"", cidade:"", cep:"", contato_emergencia_nome:"", contato_emergencia_telefone:"", contato_emergencia_parentesco:"" });
     setModalAberto(true);
   }
 
@@ -95,6 +104,11 @@ export default function PacientesPage() {
       cpf: p.cpf ?? "", sexo: p.sexo ?? "", data_nascimento: p.data_nascimento ?? "",
       alergias: p.alergias ?? "", contraindicacoes: p.contraindicacoes ?? "",
       observacoes: p.observacoes ?? "", assinou_termo: p.assinou_termo,
+      endereco: (p as any).endereco ?? "", bairro: (p as any).bairro ?? "",
+      cidade: (p as any).cidade ?? "", cep: (p as any).cep ?? "",
+      contato_emergencia_nome: (p as any).contato_emergencia_nome ?? "",
+      contato_emergencia_telefone: (p as any).contato_emergencia_telefone ?? "",
+      contato_emergencia_parentesco: (p as any).contato_emergencia_parentesco ?? "",
     });
     setModalAberto(true);
   }
@@ -326,6 +340,21 @@ export default function PacientesPage() {
               </div>
             )}
 
+            {(painelPaciente as any).endereco && (
+              <div className="pt-2" style={{ borderTop: "1px solid var(--border-subtle)" }}>
+                <p className="text-xs uppercase tracking-widest mb-2" style={{ color: "var(--gold)" }}>Endereço</p>
+                <p className="text-sm" style={{ color: "var(--text-primary)" }}>{(painelPaciente as any).endereco}</p>
+                {(painelPaciente as any).bairro && <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>{(painelPaciente as any).bairro}{(painelPaciente as any).cidade ? ` — ${(painelPaciente as any).cidade}` : ""}</p>}
+                {(painelPaciente as any).cep && <p className="text-xs" style={{ color: "var(--text-muted)" }}>CEP: {(painelPaciente as any).cep}</p>}
+              </div>
+            )}
+            {(painelPaciente as any).contato_emergencia_nome && (
+              <div className="px-4 py-3 rounded-2xl" style={{ background: "var(--gold-bg)", border: "1px solid var(--border-color)" }}>
+                <p className="text-xs uppercase tracking-widest mb-1" style={{ color: "var(--gold)" }}>Contato de Emergência</p>
+                <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>{(painelPaciente as any).contato_emergencia_nome}</p>
+                <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>{(painelPaciente as any).contato_emergencia_parentesco} · {(painelPaciente as any).contato_emergencia_telefone}</p>
+              </div>
+            )}
             <div className="flex items-center justify-between py-2" style={{ borderBottom: "1px solid var(--border-subtle)" }}>
               <span className="text-xs uppercase tracking-widest" style={{ color: "var(--text-muted)" }}>Termo</span>
               <span className="text-xs px-2 py-1 rounded-full"
@@ -379,13 +408,50 @@ export default function PacientesPage() {
                 { label: "Contraindicações", key: "contraindicacoes", type: "text", col: 2 },
                 { label: "Observações", key: "observacoes", type: "text", col: 2 },
               ].map(field => (
-                <div key={field.key} className={field.col === 2 ? "sm:col-span-2" : ""}>
+                <div key={field.key} className={field.col === 2 ? "col-span-2" : ""}>
                   <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>{field.label}</label>
                   <input type={field.type} value={(form as any)[field.key]}
                     onChange={e => setForm(f => ({ ...f, [field.key]: e.target.value }))}
-                    className={inp} style={{ ...inpStyle, colorScheme: field.type === "date" ? "dark" : undefined }} />
+                    className={inp} style={{ ...inpStyle, colorScheme: "dark" }} />
                 </div>
               ))}
+
+              {/* ENDEREÇO */}
+              <div className="col-span-2 pt-2" style={{ borderTop: "1px solid var(--border-subtle)" }}>
+                <p className="text-xs uppercase tracking-widest mb-3" style={{ color: "var(--gold)" }}>Endereço</p>
+              </div>
+              {[
+                { label: "Endereço", key: "endereco", type: "text", col: 2 },
+                { label: "Bairro", key: "bairro", type: "text", col: 1 },
+                { label: "Cidade", key: "cidade", type: "text", col: 1 },
+                { label: "CEP", key: "cep", type: "text", col: 1 },
+              ].map(field => (
+                <div key={field.key} className={field.col === 2 ? "col-span-2" : ""}>
+                  <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>{field.label}</label>
+                  <input type={field.type} value={(form as any)[field.key]}
+                    onChange={e => setForm(f => ({ ...f, [field.key]: e.target.value }))}
+                    className={inp} style={inpStyle} />
+                </div>
+              ))}
+
+              {/* CONTATO DE EMERGÊNCIA */}
+              <div className="col-span-2 pt-2" style={{ borderTop: "1px solid var(--border-subtle)" }}>
+                <p className="text-xs uppercase tracking-widest mb-3" style={{ color: "var(--gold)" }}>Contato de Emergência</p>
+              </div>
+              {[
+                { label: "Nome do parente/responsável", key: "contato_emergencia_nome", type: "text", col: 2 },
+                { label: "Telefone", key: "contato_emergencia_telefone", type: "tel", col: 1 },
+                { label: "Parentesco", key: "contato_emergencia_parentesco", type: "text", col: 1 },
+              ].map(field => (
+                <div key={field.key} className={field.col === 2 ? "col-span-2" : ""}>
+                  <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>{field.label}</label>
+                  <input type={field.type} value={(form as any)[field.key]}
+                    onChange={e => setForm(f => ({ ...f, [field.key]: e.target.value }))}
+                    className={inp} style={inpStyle} />
+                </div>
+              ))}
+
+
               <div className="sm:col-span-2">
                 <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>Sexo</label>
                 <div className="flex gap-2">
@@ -424,4 +490,9 @@ export default function PacientesPage() {
     </div>
   );
 }
+
+
+
+
+
 
