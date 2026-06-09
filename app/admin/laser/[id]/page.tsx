@@ -30,6 +30,8 @@ type Pacote = {
   sessoes: Sessao[];
 };
 
+const AREAS = ["Axila","Buco","Virilha","Meia Perna","Perna Completa","Braco Completo","Antebraco","Rosto","Pescoco","Abdomen","Costas","Peitoral","Gluteos","Full Body"];
+
 const statusCfg: Record<string, { label: string; color: string; bg: string }> = {
   em_tratamento: { label: "Em tratamento", color: "#7ae8a0", bg: "rgba(122,232,160,0.1)" },
   finalizado:    { label: "Finalizado",    color: "#a89080", bg: "rgba(168,144,128,0.1)" },
@@ -74,6 +76,14 @@ export default function LaserProntuarioPage() {
     setFormSessao({ observacoes: "", intercorrencias: "" });
     buscar();
     setSalvando(false);
+  }
+
+  function toggleAreaEdit(area: string) {
+    setFormEdit((f: any) => {
+      const areas = Array.isArray(f.procedimento) ? f.procedimento : (f.procedimento ?? "").split(", ").filter(Boolean);
+      const novas = areas.includes(area) ? areas.filter((a: string) => a !== area) : [...areas, area];
+      return { ...f, procedimento: novas };
+    });
   }
 
   async function salvarEdicao() {
@@ -297,14 +307,29 @@ export default function LaserProntuarioPage() {
             </div>
             <div className="flex flex-col gap-4">
               {[
-                { label: "Status", key: "status", type: "select", opts: ["em_tratamento","finalizado","pausado","cancelado"] },
+                { label: "___AREAS___", key: "procedimento", type: "areas" },
+              { label: "Status", key: "status", type: "select", opts: ["em_tratamento","finalizado","pausado","cancelado"] },
                 { label: "Status Pagamento", key: "status_pagamento", type: "select", opts: ["pendente","pago","parcial"] },
                 { label: "Valor (R$)", key: "valor", type: "number" },
                 { label: "Observacoes", key: "observacoes", type: "textarea" },
               ].map(field => (
                 <div key={field.key}>
                   <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "#a89080" }}>{field.label}</label>
-                  {field.type === "select" ? (
+                  {field.type === "areas" ? (
+                    <div className="flex flex-wrap gap-2">
+                      {AREAS.map(area => {
+                        const areas = Array.isArray(formEdit.procedimento) ? formEdit.procedimento : (formEdit.procedimento ?? "").split(", ").filter(Boolean);
+                        const sel = areas.includes(area);
+                        return (
+                          <button key={area} type="button" onClick={() => toggleAreaEdit(area)}
+                            className="px-3 py-1.5 rounded-xl text-xs transition hover:scale-105"
+                            style={{ background: sel ? "rgba(200,160,120,0.2)" : "rgba(200,160,120,0.05)", color: sel ? "#c8a078" : "#6b5a4e", border: sel ? "1px solid rgba(200,160,120,0.4)" : "1px solid rgba(200,160,120,0.1)" }}>
+                            {sel ? "✓ " : ""}{area}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : field.type === "select" ? (
                     <select value={formEdit[field.key] ?? ""} onChange={e => setFormEdit((f: any) => ({ ...f, [field.key]: e.target.value }))}
                       className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
                       style={{ background: "#0e0a0a", border: "1px solid rgba(200,160,120,0.15)", color: "#e8d5c0" }}>
