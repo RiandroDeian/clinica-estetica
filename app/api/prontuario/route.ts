@@ -21,6 +21,7 @@ export async function GET(request: NextRequest) {
     supabaseAdmin.from("prontuario_anamneses").select("*, funcionarios(nome)").eq("paciente_id", paciente_id).order("criado_em", { ascending: false }),
     supabaseAdmin.from("prontuario_prescricoes").select("*, funcionarios(nome)").eq("paciente_id", paciente_id).order("criado_em", { ascending: false }),
     supabaseAdmin.from("prontuario_exames").select("*, funcionarios(nome)").eq("paciente_id", paciente_id).order("criado_em", { ascending: false }),
+    supabaseAdmin.from("prontuario_fotos").select("*, funcionarios(nome)").eq("paciente_id", paciente_id).order("criado_em", { ascending: false }),
   ]);
 
   if (paciente.error) return NextResponse.json({ erro: "Paciente nao encontrado" }, { status: 404 });
@@ -36,6 +37,7 @@ export async function GET(request: NextRequest) {
     anamneses: anamneses.data ?? [],
     prescricoes: prescricoes.data ?? [],
     exames: exames.data ?? [],
+    fotos: (await supabaseAdmin.from("prontuario_fotos").select("*, funcionarios(nome)").eq("paciente_id", paciente_id).order("criado_em", { ascending: false })).data ?? [],
   });
 }
 
@@ -85,6 +87,17 @@ export async function POST(request: NextRequest) {
       frequencia: body.frequencia || null,
       duracao: body.duracao || null,
       observacoes: body.observacoes || null,
+    }).select("*, funcionarios(nome)").single();
+    if (error) return NextResponse.json({ erro: error.message }, { status: 500 });
+    return NextResponse.json(data);
+  }
+
+  if (acao === "foto") {
+    const { data, error } = await supabaseAdmin.from("prontuario_fotos").insert({
+      paciente_id, funcionario_id: sessao.id,
+      tipo: body.tipo ?? "antes",
+      descricao: body.descricao || null,
+      url: body.url,
     }).select("*, funcionarios(nome)").single();
     if (error) return NextResponse.json({ erro: error.message }, { status: 500 });
     return NextResponse.json(data);

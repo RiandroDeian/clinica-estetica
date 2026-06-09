@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -47,6 +47,10 @@ export default function ProntuarioPage() {
   const [formExame, setFormExame] = useState({ tipo_exame: "", resultado: "", observacoes: "" });
   const [formAnotacao, setFormAnotacao] = useState({ titulo: "", conteudo: "", tipo: "geral" });
   const [formSaude, setFormSaude] = useState<any>({});
+  const [fotos, setFotos] = useState<any[]>([]);
+  const [uploadando, setUploadando] = useState(false);
+  const [formFoto, setFormFoto] = useState({ tipo: "antes", descricao: "" });
+  const [modalFoto, setModalFoto] = useState(false);
   const tiposAnotacao = [
     { key: "geral", label: "Geral", cor: "var(--text-muted)" },
     { key: "clinica", label: "Clinica", cor: "var(--info)" },
@@ -184,6 +188,7 @@ export default function ProntuarioPage() {
     { key: "anotacoes",  label: "Anotacoes (" + anotacoes.length + ")" },
     { key: "historico",  label: "Historico (" + agendamentos.length + ")" },
     { key: "financeiro", label: "Financeiro (" + faturamentos.length + ")" },
+    { key: "fotos", label: "Fotos (" + fotos.length + ")" },
   ];
 
   return (
@@ -446,6 +451,87 @@ export default function ProntuarioPage() {
               ))}
             </div>
           )}
+        </div>
+      )}
+      {abaAtiva === "fotos" && (
+        <div className="flex flex-col gap-4">
+          <button onClick={() => setModalFoto(true)} className="self-end px-5 py-2.5 rounded-2xl text-sm font-semibold"
+            style={{ background: "var(--gold)", color: "#0a0707" }}>+ Adicionar Foto</button>
+          {fotos.length === 0 ? (
+            <div className="text-center py-16 rounded-3xl" style={{ background: "var(--bg-card)", border: "1px solid var(--border-subtle)" }}>
+              <p className="text-4xl mb-3">📷</p><p style={{ color: "var(--text-muted)" }}>Nenhuma foto registrada</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              {fotos.map((f: any) => (
+                <div key={f.id} className="rounded-2xl overflow-hidden" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+                  <img src={f.url} alt={f.descricao ?? f.tipo} className="w-full h-48 object-cover" />
+                  <div className="p-3">
+                    <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: f.tipo === "antes" ? "rgba(232,122,122,0.1)" : "rgba(122,232,160,0.1)", color: f.tipo === "antes" ? "var(--danger)" : "var(--success)" }}>{f.tipo}</span>
+                    {f.descricao && <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>{f.descricao}</p>}
+                    <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>{new Date(f.criado_em).toLocaleDateString("pt-BR")}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {modalFoto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}>
+          <div className="w-full max-w-md rounded-3xl p-6" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-bold" style={{ color: "var(--gold)" }}>Adicionar Foto</h2>
+              <button onClick={() => setModalFoto(false)} style={{ color: "var(--text-muted)" }}>✕</button>
+            </div>
+            <div className="flex flex-col gap-4">
+              <div>
+                <label className="block text-xs uppercase tracking-widest mb-2" style={{ color: "var(--text-muted)" }}>Tipo</label>
+                <div className="flex gap-2">
+                  {["antes", "depois", "evolucao"].map(t => (
+                    <button key={t} onClick={() => setFormFoto(f => ({ ...f, tipo: t }))}
+                      className="flex-1 py-2 rounded-xl text-xs capitalize transition"
+                      style={{ background: formFoto.tipo === t ? "var(--gold-bg)" : "var(--bg-input)", color: formFoto.tipo === t ? "var(--gold)" : "var(--text-muted)", border: "1px solid var(--border-subtle)" }}>
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs uppercase tracking-widest mb-2" style={{ color: "var(--text-muted)" }}>Descrição</label>
+                <input value={formFoto.descricao} onChange={e => setFormFoto(f => ({ ...f, descricao: e.target.value }))}
+                  className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
+                  style={{ background: "var(--bg-input)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
+                  placeholder="Ex: Antes do botox..." />
+              </div>
+              <div>
+                <label className="block text-xs uppercase tracking-widest mb-2" style={{ color: "var(--text-muted)" }}>Arquivo</label>
+                <input type="file" accept="image/*"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file || !paciente_id) return;
+                    setUploadando(true);
+                    const fd = new FormData();
+                    fd.append("file", file);
+                    fd.append("paciente_id", paciente_id);
+                    const res = await fetch("/api/prontuario/upload", { method: "POST", body: fd });
+                    const data = await res.json();
+                    if (data.url) {
+                      await salvarDados("foto", { url: data.url, tipo: formFoto.tipo, descricao: formFoto.descricao });
+                      setModalFoto(false);
+                      setFormFoto({ tipo: "antes", descricao: "" });
+                    }
+                    setUploadando(false);
+                  }}
+                  className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
+                  style={{ background: "var(--bg-input)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
+              </div>
+              {uploadando && <p className="text-xs text-center" style={{ color: "var(--gold)" }}>Enviando foto...</p>}
+            </div>
+            <div className="flex gap-3 mt-5">
+              <button onClick={() => setModalFoto(false)} className="flex-1 py-3 rounded-2xl text-sm" style={{ border: "1px solid var(--border-color)", color: "var(--text-muted)" }}>Cancelar</button>
+            </div>
+          </div>
         </div>
       )}
 
