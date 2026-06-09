@@ -48,6 +48,10 @@ function toggleId(ids: string[], id: string) {
 export default function PacotesPage() {
   const [pacotes, setPacotes] = useState<Pacote[]>([]);
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
+  const [historicoPacote, setHistoricoPacote] = useState<any[]>([]);
+  const [registrandoAtend, setRegistrandoAtend] = useState(false);
+  const [formAtend, setFormAtend] = useState({ procedimento_realizado: "", observacoes: "" });
+  const [salvandoAtend, setSalvandoAtend] = useState(false);
   const [procedimentos, setProcedimentos] = useState<Procedimento[]>([]);
   const [modalAberto, setModalAberto] = useState(false);
   const [modalGestao, setModalGestao] = useState<Pacote | null>(null);
@@ -122,6 +126,34 @@ export default function PacotesPage() {
     const res = await fetch(`/api/pacotes/${id}`, { method: "DELETE" });
     if (res.ok) { carregar(); toast.success("Pacote excluído!"); }
     else toast.error("Erro ao excluir");
+  }
+
+  async function buscarHistorico(pacoteId: string) {
+    const res = await fetch(`/api/pacotes/${pacoteId}/sessoes`);
+    const data = await res.json();
+    setHistoricoPacote(Array.isArray(data) ? data : []);
+  }
+
+  async function registrarAtendimento() {
+    if (!modalGestao || !formAtend.procedimento_realizado.trim()) return;
+    setSalvandoAtend(true);
+    const res = await fetch(`/api/pacotes/${modalGestao.id}/sessoes`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        paciente_id: modalGestao.pacientes ? pacientes.find(p => p.nome === modalGestao.pacientes?.nome)?.id : null,
+        procedimento_realizado: formAtend.procedimento_realizado,
+        observacoes: formAtend.observacoes,
+      }),
+    });
+    if (res.ok) {
+      toast.success("Atendimento registrado!");
+      setFormAtend({ procedimento_realizado: "", observacoes: "" });
+      setRegistrandoAtend(false);
+      await salvarGestao({ sessoes_usadas: Math.min(modalGestao.total_sessoes + (modalGestao.sessoes_bonus ?? 0), modalGestao.sessoes_usadas + 1) });
+      buscarHistorico(modalGestao.id);
+    } else toast.error("Erro ao registrar");
+    setSalvandoAtend(false);
   }
 
   async function salvarGestao(campos: Partial<Pacote>) {
@@ -291,11 +323,11 @@ export default function PacotesPage() {
 
             {/* Abas */}
             <div className="flex" style={{ borderBottom: "1px solid var(--gold-bg)" }}>
-              {(["resumo","sessoes","financeiro"] as const).map(aba => (
-                <button key={aba} onClick={() => setAbaGestao(aba)}
+              {(["resumo","sessoes","atendimentos","financeiro"] as const).map(aba => (
+                <button key={aba} onClick={() => { setAbaGestao(aba as any); if (aba === "atendimentos" && modalGestao) buscarHistorico(modalGestao.id); }}
                   className="flex-1 py-3 text-xs uppercase tracking-widest transition"
                   style={{ background: abaGestao === aba ? "var(--gold-bg)" : "transparent", color: abaGestao === aba ? "var(--gold)" : "var(--text-muted)", borderBottom: abaGestao === aba ? "2px solid #c8a078" : "2px solid transparent" }}>
-                  {aba === "resumo" ? "Resumo" : aba === "sessoes" ? "Sessões" : "Financeiro"}
+                  {aba === "resumo" ? "Resumo" : aba === "sessoes" ? "Sessões" : aba === "atendimentos" ? "Atendimentos" : "Financeiro"}
                 </button>
               ))}
             </div>
@@ -374,6 +406,80 @@ export default function PacotesPage() {
                       onBlur={e => salvarGestao({ validade: e.target.value || null })}
                       className={inp} style={{ ...inpStyle, colorScheme: "dark" }} />
                   </div>
+                </div>
+              )}
+
+              {/* ABA ATENDIMENTOS */}
+              {(abaGestao as string) === "atendimentos" && (
+                <div className="flex flex-col gap-4">
+                  <div className="flex items-center justify-between">
+                    <div className="rounded-2xl px-4 py-2 text-sm" style={{ background: "var(--gold-bg)", border: "1px solid var(--border-color)", color: "var(--gold)" }}>
+                      {modalGestao.sessoes_usadas}/{modalGestao.total_sessoes + (modalGestao.sessoes_bonus ?? 0)} sessões usadas
+                    </div>
+                    <button onClick={() => setRegistrandoAtend(!registrandoAtend)}
+                      className="px-4 py-2 rounded-xl text-sm font-semibold transition hover:scale-105"
+                      style={{ background: "var(--gold)", color: "#0a0707" }}>
+                      + Registrar Atendimento
+                    </button>
+                  </div>
+
+                  {registrandoAtend && (
+                    <div className="rounded-2xl p-4 flex flex-col gap-3" style={{ background: "var(--bg-input)", border: "1px solid var(--border-color)" }}>
+                      <div>
+                        <label className="block text-xs uppercase tracking-widest mb-2" style={{ color: "var(--text-muted)" }}>Procedimento realizado</label>
+                        <select value={formAtend.procedimento_realizado} onChange={e => setFormAtend(f => ({ ...f, procedimento_realizado: e.target.value }))}
+                          className={inp} style={{ ...inpStyle, color: formAtend.procedimento_realizado ? "var(--text-primary)" : "var(--text-muted)" }}>
+                          <option value="">Selecionar procedimento...</option>
+                          {modalGestao.procedimentos?.map(p => <option key={p.id} value={p.nome}>{p.nome}</option>)}
+                          <option value="Depilação a Laser">Depilação a Laser</option>
+                          <option value="Consulta">Consulta</option>
+                          <option value="Procedimento Estético">Procedimento Estético</option>
+                          <option value="Outro">Outro</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs uppercase tracking-widest mb-2" style={{ color: "var(--text-muted)" }}>Observações</label>
+                        <textarea value={formAtend.observacoes} onChange={e => setFormAtend(f => ({ ...f, observacoes: e.target.value }))}
+                          rows={2} placeholder="Ex: áreas tratadas, reações, observações..."
+                          className="w-full rounded-2xl px-4 py-3 text-sm outline-none resize-none" style={inpStyle} />
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={() => setRegistrandoAtend(false)}
+                          className="flex-1 py-2 rounded-xl text-sm transition hover:opacity-70"
+                          style={{ border: "1px solid var(--border-color)", color: "var(--text-muted)" }}>Cancelar</button>
+                        <button onClick={registrarAtendimento} disabled={salvandoAtend || !formAtend.procedimento_realizado}
+                          className="flex-1 py-2 rounded-xl text-sm font-semibold transition hover:scale-105"
+                          style={{ background: formAtend.procedimento_realizado ? "var(--gold)" : "var(--gold-bg)", color: "#0a0707" }}>
+                          {salvandoAtend ? "Salvando..." : "Confirmar"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {historicoPacote.length === 0 ? (
+                    <div className="text-center py-8 rounded-2xl" style={{ background: "var(--bg-input)", border: "1px solid var(--border-subtle)" }}>
+                      <p className="text-2xl mb-2">📋</p>
+                      <p className="text-sm" style={{ color: "var(--text-muted)" }}>Nenhum atendimento registrado ainda</p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      {historicoPacote.map((h, i) => (
+                        <div key={h.id} className="flex items-center gap-3 px-4 py-3 rounded-2xl" style={{ background: "var(--bg-input)", border: "1px solid var(--border-subtle)" }}>
+                          <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+                            style={{ background: "var(--gold-bg)", color: "var(--gold)" }}>
+                            {historicoPacote.length - i}
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>{h.procedimento_realizado}</p>
+                            {h.observacoes && <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>{h.observacoes}</p>}
+                          </div>
+                          <p className="text-xs flex-shrink-0" style={{ color: "var(--text-muted)" }}>
+                            {new Date(h.criado_em).toLocaleDateString("pt-BR")}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -526,5 +632,10 @@ export default function PacotesPage() {
     </div>
   );
 }
+
+
+
+
+
 
 
