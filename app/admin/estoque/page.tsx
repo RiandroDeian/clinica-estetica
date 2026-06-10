@@ -223,7 +223,7 @@ export default function EstoquePage() {
       </div>
 
       <div className="flex gap-1 mb-6 p-1 rounded-2xl" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-        {[{ key: "itens", label: "Itens (" + itensPorAmbiente.length + ")" }, { key: "historico", label: "Histórico (" + historico.length + ")" }].map(a => (
+        {[{ key: "itens", label: "Itens (" + itensPorAmbiente.length + ")" }, { key: "historico", label: "Histórico (" + (ambienteAtivo === "geral" ? historico : historico.filter(m => (m.ambiente || "geral") === ambienteAtivo)).length + ")" }].map(a => (
           <button key={a.key} onClick={() => setAbaAtiva(a.key as any)}
             className="flex-1 py-2.5 rounded-xl text-xs uppercase tracking-widest font-medium transition"
             style={{ background: abaAtiva === a.key ? "var(--gold-bg)" : "transparent", color: abaAtiva === a.key ? "var(--gold)" : "var(--text-muted)" }}>
