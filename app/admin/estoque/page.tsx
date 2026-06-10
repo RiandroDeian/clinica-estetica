@@ -361,8 +361,8 @@ export default function EstoquePage() {
               ))}
             </div>
           </div>
-        )}
-
+        )
+      )}
       {modalAberto && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}>
           <div className="w-full max-w-lg rounded-3xl p-8 max-h-[90vh] overflow-y-auto" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
