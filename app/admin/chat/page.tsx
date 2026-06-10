@@ -499,10 +499,10 @@ export default function ChatPage() {
         </div>
       </div>
     </div>
-
+  </>
   );
 }
-}
+
 
 function MsgCard({ msg, me, menuMsgId, setMenuMsgId, emojiPickerId, setEmojiPickerId, onReply, onEditar, onDeletar, onReagir, onFixar, reacoesPorEmoji, formatarHora, statusLeitura, renderTexto }: any) {
   const isMe = msg.funcionario_id === me?.id;
