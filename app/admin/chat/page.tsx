@@ -37,6 +37,9 @@ export default function ChatPage() {
   const [nomeCanal, setNomeCanal] = useState("");
   const [msgFixadas, setMsgFixadas] = useState<Mensagem[]>([]);
   const [mostrarFixadas, setMostrarFixadas] = useState(false);
+  const [funcionarios, setFuncionarios] = useState<{id:string;nome:string;cor:string}[]>([]);
+  const [notificacao, setNotificacao] = useState<{nome:string;texto:string}|null>(null);
+  const [abaLateral, setAbaLateral] = useState<"canais"|"direto">("canais");
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -55,6 +58,8 @@ export default function ChatPage() {
         const ultima = data[data.length - 1];
         if (ultima.id !== ultimaMsgRef.current && ultima.funcionario_id !== me?.id) {
           try { audioRef.current?.play(); } catch {}
+          setNotificacao({ nome: ultima.funcionarios?.nome ?? "Alguem", texto: ultima.conteudo });
+          setTimeout(() => setNotificacao(null), 5000);
         }
       }
       if (data.length > 0) ultimaMsgRef.current = data[data.length - 1].id;
@@ -73,6 +78,7 @@ export default function ChatPage() {
     audioRef.current = new Audio("data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAA...");
 
     fetch("/api/auth/me").then(r => r.json()).then(d => setMe(d));
+    fetch("/api/funcionarios").then(r => r.json()).then(d => { if (Array.isArray(d)) setFuncionarios(d); });
     fetch("/api/chat/canais").then(r => r.json()).then((d: Canal[]) => {
       if (Array.isArray(d) && d.length > 0) {
         setCanais(d);
@@ -245,15 +251,39 @@ export default function ChatPage() {
   };
 
   return (
+    <>
+    {notificacao && (
+      <div className="fixed top-5 right-5 z-[9999] rounded-2xl px-5 py-4 shadow-2xl flex items-start gap-3 animate-pulse"
+        style={{ background: "var(--bg-card)", border: "1px solid var(--gold)", maxWidth: 320 }}>
+        <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold"
+          style={{ background: "var(--gold-bg)", color: "var(--gold)" }}>
+          {notificacao.nome.charAt(0).toUpperCase()}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-semibold" style={{ color: "var(--gold)" }}>{notificacao.nome}</p>
+          <p className="text-sm truncate" style={{ color: "var(--text-primary)" }}>{notificacao.texto}</p>
+        </div>
+        <button onClick={() => setNotificacao(null)} style={{ color: "var(--text-muted)" }} className="flex-shrink-0">✕</button>
+      </div>
+    )}
     <div className="flex h-[calc(100vh-140px)] gap-4">
       {/* Sidebar canais */}
       <div className="hidden lg:flex flex-col w-56 flex-shrink-0 rounded-3xl overflow-hidden"
         style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-        <div className="px-4 py-4 flex items-center justify-between" style={{ borderBottom: "1px solid var(--border-subtle)" }}>
-          <p className="text-xs uppercase tracking-widest" style={{ color: "var(--gold)" }}>Canais</p>
-          <button onClick={() => setNovoCanal(true)}
-            className="w-6 h-6 rounded-lg flex items-center justify-center transition hover:opacity-70"
-            style={{ background: "var(--gold-bg)", color: "var(--gold)" }}>+</button>
+        <div className="px-3 py-3 flex gap-1" style={{ borderBottom: "1px solid var(--border-subtle)" }}>
+          <button onClick={() => setAbaLateral("canais")}
+            className="flex-1 py-1.5 rounded-lg text-xs uppercase tracking-widest transition"
+            style={{ background: abaLateral === "canais" ? "var(--gold-bg)" : "transparent", color: abaLateral === "canais" ? "var(--gold)" : "var(--text-muted)" }}>
+            Canais
+          </button>
+          <button onClick={() => setAbaLateral("direto")}
+            className="flex-1 py-1.5 rounded-lg text-xs uppercase tracking-widest transition"
+            style={{ background: abaLateral === "direto" ? "var(--gold-bg)" : "transparent", color: abaLateral === "direto" ? "var(--gold)" : "var(--text-muted)" }}>
+            Direto
+          </button>
+          {abaLateral === "canais" && <button onClick={() => setNovoCanal(true)}
+            className="w-7 h-7 rounded-lg flex items-center justify-center transition hover:opacity-70"
+            style={{ background: "var(--gold-bg)", color: "var(--gold)" }}>+</button>}
         </div>
 
         {novoCanal && (
@@ -270,7 +300,7 @@ export default function ChatPage() {
         )}
 
         <div className="flex-1 overflow-y-auto p-2">
-          {canais.map(c => (
+          {abaLateral === "canais" ? canais.map(c => (
             <button key={c.id} onClick={() => mudarCanal(c)}
               className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-left transition mb-0.5"
               style={{
@@ -281,7 +311,23 @@ export default function ChatPage() {
               <span className="text-sm">#</span>
               <span className="text-sm font-medium">{c.nome}</span>
             </button>
-          ))}
+          )) : funcionarios.filter(f => f.id !== me?.id).map(f => {
+            const isOnline = online.some(o => o.funcionario_id === f.id);
+            return (
+              <button key={f.id}
+                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-left transition mb-0.5 hover:bg-[var(--bg-hover)]"
+                style={{ color: "var(--text-secondary)" }}>
+                <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+                  style={{ background: f.cor + "22", color: f.cor }}>
+                  {f.nome.charAt(0).toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate" style={{ color: "var(--text-primary)" }}>{f.nome.split(" ")[0]}</p>
+                </div>
+                <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: isOnline ? "var(--success)" : "var(--border-color)" }} />
+              </button>
+            );
+          })}
         </div>
 
         <div className="p-3" style={{ borderTop: "1px solid var(--border-subtle)" }}>
@@ -453,6 +499,8 @@ export default function ChatPage() {
         </div>
       </div>
     </div>
+  </div>
+    </>
   );
 }
 
@@ -585,5 +633,7 @@ function MsgCard({ msg, me, menuMsgId, setMenuMsgId, emojiPickerId, setEmojiPick
         )}
       </div>
     </div>
+  </div>
+    </>
   );
 }
