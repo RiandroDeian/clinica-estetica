@@ -288,7 +288,7 @@ const antesDepois = [
   },
 ];
 
-  { nome: "Ana Luiza", texto: "Fiz harmonização facial e o resultado foi incrível. Atendimento super cuidadoso e ambiente aconchegante. Recomendo demais!", procedimento: "Harmonização Facial", estrelas: 5 },
+const depoimentos = [
   { nome: "Camila Souza", texto: "A limpeza de pele mudou minha autoestima. Profissional atenciosa, explicou tudo direitinho. Já agendei a próxima sessão!", procedimento: "Limpeza de Pele", estrelas: 5 },
   { nome: "Fernanda Lima", texto: "Botox muito natural, exatamente o que eu queria. A clínica é sofisticada e o atendimento é impecável.", procedimento: "Botox", estrelas: 5 },
 ];
