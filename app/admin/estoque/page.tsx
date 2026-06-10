@@ -47,6 +47,7 @@ export default function EstoquePage() {
   const [qtdMov, setQtdMov] = useState("");
   const [motivoMov, setMotivoMov] = useState("");
   const [profissionalMov, setProfissionalMov] = useState("");
+  const [pacienteMov, setPacienteMov] = useState("");
   const [busca, setBusca] = useState("");
   const [editando, setEditando] = useState<Item | null>(null);
   const [form, setForm] = useState({
@@ -100,6 +101,7 @@ export default function EstoquePage() {
         quantidade: Number(qtdMov),
         motivo: motivoMov,
         profissional_nome: profissionalMov,
+        paciente_nome: pacienteMov,
         ambiente: modalMov.item.ambiente || ambienteAtivo,
       }),
     });
@@ -107,6 +109,7 @@ export default function EstoquePage() {
     setQtdMov("");
     setMotivoMov("");
     setProfissionalMov("");
+    setPacienteMov("");
     buscar();
     setSalvando(false);
   }
@@ -307,7 +310,11 @@ export default function EstoquePage() {
           </div>
         )
       ) : (
-        historico.length === 0 ? (
+        (() => {
+        const historicoFiltrado = ambienteAtivo === "geral"
+          ? historico
+          : historico.filter(m => (m.ambiente || "geral") === ambienteAtivo);
+        return historicoFiltrado.length === 0 ? (
           <div className="text-center py-20 rounded-3xl" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
             <p className="text-4xl mb-4">📋</p>
             <p className="text-sm" style={{ color: "var(--text-muted)" }}>Nenhuma movimentação ainda</p>
@@ -318,7 +325,7 @@ export default function EstoquePage() {
               <h2 className="text-xs uppercase tracking-widest" style={{ color: "var(--gold)" }}>Histórico de Movimentações</h2>
             </div>
             <div className="divide-y" style={{ borderColor: "var(--border-subtle)" }}>
-              {historico.map(mov => (
+              {historicoFiltrado.map(mov => (
                 <div key={mov.id} className="flex items-center gap-4 px-6 py-4">
                   <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
                     style={{ background: mov.tipo === "entrada" ? "rgba(122,232,160,0.1)" : "rgba(232,122,122,0.1)" }}>
@@ -341,7 +348,8 @@ export default function EstoquePage() {
                     </div>
                     <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
                       {mov.motivo ?? "Sem motivo"}
-                      {mov.profissional_nome && " · " + mov.profissional_nome}
+                      {mov.profissional_nome && " · Prof: " + mov.profissional_nome}
+                      {(mov as any).paciente_nome && " · Paciente: " + (mov as any).paciente_nome}
                       {" · "}{mov.funcionarios?.nome ?? "Sistema"}
                     </p>
                   </div>
@@ -357,8 +365,8 @@ export default function EstoquePage() {
               ))}
             </div>
           </div>
-        )
-      )}
+        );
+      })()}
 
       {modalAberto && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}>
@@ -441,6 +449,12 @@ export default function EstoquePage() {
               <div>
                 <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>Profissional que utilizou</label>
                 <input type="text" value={profissionalMov} onChange={e => setProfissionalMov(e.target.value)} placeholder="Nome do profissional..."
+                  className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
+                  style={{ background: "var(--bg-input)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
+              </div>
+              <div>
+                <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>Paciente (opcional)</label>
+                <input type="text" value={pacienteMov} onChange={e => setPacienteMov(e.target.value)} placeholder="Nome do paciente..."
                   className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
                   style={{ background: "var(--bg-input)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
               </div>
