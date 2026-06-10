@@ -292,8 +292,10 @@ export default function ProntuarioPage() {
         <div className="rounded-3xl p-6" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
           <div className="flex items-center justify-between mb-5">
             <h2 className="text-sm uppercase tracking-widest" style={{ color: "var(--gold)" }}>Dados de Saude</h2>
-            <button onClick={() => setModalSaude(true)} className="text-xs px-4 py-2 rounded-xl"
-              style={{ background: "var(--gold-bg)", color: "var(--gold)" }}>Editar</button>
+            <div className="flex gap-2">
+              <button onClick={() => setModalAtestado(true)} className="text-xs px-4 py-2 rounded-xl transition hover:scale-105" style={{ background: "rgba(122,232,160,0.1)", color: "var(--success)", border: "1px solid rgba(122,232,160,0.2)" }}>Atestado</button>
+              <button onClick={() => setModalSaude(true)} className="text-xs px-4 py-2 rounded-xl" style={{ background: "var(--gold-bg)", color: "var(--gold)" }}>Editar</button>
+            </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {[
@@ -758,6 +760,27 @@ export default function ProntuarioPage() {
         </div>
       )}
 
+      {modalAtestado && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}>
+          <div className="w-full max-w-lg rounded-3xl p-6 max-h-[90vh] overflow-y-auto" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-bold" style={{ color: "var(--gold)" }}>Emitir Atestado</h2>
+              <button onClick={() => setModalAtestado(false)} style={{ color: "var(--text-muted)" }}>✕</button>
+            </div>
+            <div className="flex flex-col gap-4">
+              <div><label className="block text-xs uppercase tracking-widest mb-2" style={{ color: "var(--text-muted)" }}>Paciente</label><p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>{dados?.paciente?.nome}</p></div>
+              <div><label className="block text-xs uppercase tracking-widest mb-2" style={{ color: "var(--text-muted)" }}>Finalidade</label><div className="flex gap-2 flex-wrap">{[{ key: "repouso", label: "Repouso" }, { key: "comparecimento", label: "Comparecimento" }, { key: "livre", label: "Texto Livre" }].map(f => (<button key={f.key} onClick={() => setFormAtestado(fa => ({ ...fa, finalidade: f.key }))} className="px-3 py-1.5 rounded-xl text-xs transition" style={{ background: formAtestado.finalidade === f.key ? "var(--gold)" : "var(--bg-input)", color: formAtestado.finalidade === f.key ? "#0a0707" : "var(--text-muted)", border: "1px solid var(--border-subtle)" }}>{f.label}</button>))}</div></div>
+              {formAtestado.finalidade === "repouso" && <div><label className="block text-xs uppercase tracking-widest mb-2" style={{ color: "var(--text-muted)" }}>Dias de Repouso</label><input type="number" min="1" value={formAtestado.dias} onChange={e => setFormAtestado(f => ({ ...f, dias: e.target.value }))} className="w-full rounded-2xl px-4 py-3 text-sm outline-none" style={{ background: "var(--bg-input)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} /></div>}
+              <div><label className="block text-xs uppercase tracking-widest mb-2" style={{ color: "var(--text-muted)" }}>CID (opcional)</label><input type="text" value={formAtestado.cid} onChange={e => setFormAtestado(f => ({ ...f, cid: e.target.value }))} placeholder="Ex: Z41.1" className="w-full rounded-2xl px-4 py-3 text-sm outline-none" style={{ background: "var(--bg-input)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} /></div>
+              <div><label className="block text-xs uppercase tracking-widest mb-2" style={{ color: "var(--text-muted)" }}>{formAtestado.finalidade === "livre" ? "Texto do Atestado" : "Observacoes (opcional)"}</label><textarea value={formAtestado.observacoes} onChange={e => setFormAtestado(f => ({ ...f, observacoes: e.target.value }))} rows={4} placeholder={formAtestado.finalidade === "livre" ? "Digite o texto completo..." : "Informacoes adicionais..."} className="w-full rounded-2xl px-4 py-3 text-sm outline-none resize-none" style={{ background: "var(--bg-input)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} /></div>
+            </div>
+            <div className="flex gap-3 mt-5">
+              <button onClick={() => setModalAtestado(false)} className="flex-1 py-3 rounded-2xl text-sm" style={{ border: "1px solid var(--border-color)", color: "var(--text-muted)" }}>Cancelar</button>
+              <button onClick={gerarAtestado} className="flex-1 py-3 rounded-2xl text-sm font-semibold transition hover:scale-105" style={{ background: "var(--success)", color: "white" }}>Gerar e Imprimir</button>
+            </div>
+          </div>
+        </div>
+      )}
       {modalSaude && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}>
           <div className="w-full max-w-lg rounded-3xl p-6 max-h-[90vh] overflow-y-auto" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
