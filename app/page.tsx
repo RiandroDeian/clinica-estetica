@@ -341,6 +341,13 @@ export default function Home() {
           <p className="text-base md:text-xl max-w-2xl mx-auto leading-8 mb-12" style={{ color: "#a89080", animation: "fadeUp 0.8s ease 0.15s both" }}>
             Tratamentos modernos, atendimento personalizado e resultados naturais para elevar sua autoestima.
           </p>
+          <div className="flex justify-center mb-4" style={{ animation: "fadeUp 0.8s ease 0.25s both" }}>
+            <span className="inline-flex items-center gap-2 px-5 py-2 rounded-full text-sm font-semibold"
+              style={{ background: "rgba(200,160,120,0.12)", border: "1px solid rgba(200,160,120,0.35)", color: "#c8a078" }}>
+              <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: "#c8a078" }} />
+              Agendamento gratuito
+            </span>
+          </div>
           <div className="flex flex-col sm:flex-row gap-3 justify-center flex-wrap" style={{ animation: "fadeUp 0.8s ease 0.3s both" }}>
             <a href="/agendar" className="w-full sm:w-auto px-8 py-4 rounded-full font-semibold uppercase tracking-widest text-sm transition hover:scale-105 active:scale-95 text-center" style={{ background: "#c8a078", color: "#0a0707" }}>Agendar Horário</a>
             <a href="#antes-depois" className="w-full sm:w-auto px-8 py-4 rounded-full font-semibold uppercase tracking-widest text-sm transition hover:scale-105 active:scale-95 text-center" style={{ border: "1px solid rgba(200,160,120,0.4)", color: "#c8a078" }}>Antes & Depois</a>
