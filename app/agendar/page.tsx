@@ -30,7 +30,7 @@ export default function AgendarPage() {
   useEffect(() => {
     fetch("/api/site/procedimentos")
       .then(r => r.json())
-      .then(d => setProcedimentos(Array.isArray(d) ? d.filter((p: any) => p.ativo) : []));
+      .then(d => setProcedimentos(Array.isArray(d) ? d : []));
   }, []);
 
   async function buscarHorarios(data: string) {
