@@ -28,7 +28,7 @@ export default function AgendarPage() {
   const hoje = new Date().toISOString().split("T")[0];
 
   useEffect(() => {
-    fetch("/api/public/procedimentos")
+    fetch("/api/aberto/procedimentos")
       .then(r => r.json())
       .then(d => setProcedimentos(Array.isArray(d) ? d.filter((p: any) => p.ativo) : []));
   }, []);
