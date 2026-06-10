@@ -47,6 +47,8 @@ export default function ProntuarioPage() {
   const [formExame, setFormExame] = useState({ tipo_exame: "", resultado: "", observacoes: "" });
   const [formAnotacao, setFormAnotacao] = useState({ titulo: "", conteudo: "", tipo: "geral" });
   const [formSaude, setFormSaude] = useState<any>({});
+  const [modalAtestado, setModalAtestado] = useState(false);
+  const [formAtestado, setFormAtestado] = useState({ finalidade: "repouso", dias: "1", cid: "", observacoes: "" });
   const [fotos, setFotos] = useState<any[]>([]);
   const [uploadando, setUploadando] = useState(false);
   const [formFoto, setFormFoto] = useState({ tipo: "antes", descricao: "" });
@@ -107,6 +109,46 @@ export default function ProntuarioPage() {
       setModalAnotacao(false); setModalSaude(false);
     } else toast.error("Erro ao salvar");
     setSalvando(false);
+  }
+
+  function gerarAtestado() {
+    const p2: any = dados?.paciente ?? {};
+    const hoje = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
+    const finalidades: any = {
+      repouso: `Atestamos que o(a) paciente ${p2.nome} necessita de repouso pelo periodo de ${formAtestado.dias} dia(s).`,
+      comparecimento: `Atestamos que o(a) paciente ${p2.nome} compareceu a esta clinica na data de ${hoje}.`,
+      livre: formAtestado.observacoes,
+    };
+    const texto = finalidades[formAtestado.finalidade] ?? "";
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Atestado</title><style>
+      body { font-family: Georgia, serif; max-width: 700px; margin: 60px auto; color: #1a1a1a; }
+      .logo { text-align: center; margin-bottom: 40px; }
+      .logo h1 { font-size: 28px; letter-spacing: 8px; margin: 0; color: #c8a078; }
+      .logo p { font-size: 11px; letter-spacing: 4px; color: #888; margin: 4px 0 0; }
+      h2 { text-align: center; font-size: 16px; letter-spacing: 6px; text-transform: uppercase; margin: 40px 0; border-top: 1px solid #ddd; border-bottom: 1px solid #ddd; padding: 12px 0; }
+      .corpo { font-size: 15px; line-height: 2; text-align: justify; margin: 30px 0; }
+      .dados { margin: 20px 0; font-size: 14px; }
+      .dados span { font-weight: bold; }
+      .rodape { margin-top: 80px; text-align: center; }
+      .assinatura { border-top: 1px solid #333; width: 250px; margin: 0 auto 8px; }
+      .cidade { margin-top: 40px; text-align: right; font-size: 13px; color: #666; }
+      ${formAtestado.cid ? `.cid { font-size: 12px; color: #888; margin-top: 20px; }` : ""}
+    </style></head><body>
+      <div class="logo"><h1>MONCIE</h1><p>ESTHETIQUE</p></div>
+      <h2>Atestado</h2>
+      <div class="corpo">${texto}</div>
+      ${formAtestado.cid ? `<p class="cid">CID: ${formAtestado.cid}</p>` : ""}
+      ${formAtestado.finalidade !== "livre" && formAtestado.observacoes ? `<div class="dados"><span>Observacoes:</span> ${formAtestado.observacoes}</div>` : ""}
+      <div class="cidade">Planaltina, Brasilia — ${hoje}</div>
+      <div class="rodape">
+        <div class="assinatura"></div>
+        <p style="font-size:13px;margin:0">Moncié Esthetique</p>
+        <p style="font-size:11px;color:#888;margin:4px 0 0">Clinica de Estetica Avancada</p>
+      </div>
+    </body></html>`;
+    const win = window.open("", "_blank");
+    if (win) { win.document.write(html); win.document.close(); win.print(); }
+    setModalAtestado(false);
   }
 
   if (!paciente_id) {
