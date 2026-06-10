@@ -310,7 +310,7 @@ export default function EstoquePage() {
           </div>
         )
       ) : (
-        {(ambienteAtivo === "geral" ? historico : historico.filter(m => (m.ambiente || "geral") === ambienteAtivo)).length === 0 ? (
+        (ambienteAtivo === "geral" ? historico : historico.filter(m => (m.ambiente || "geral") === ambienteAtivo)).length === 0 ? (
           <div className="text-center py-20 rounded-3xl" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
             <p className="text-4xl mb-4">📋</p>
             <p className="text-sm" style={{ color: "var(--text-muted)" }}>Nenhuma movimentação ainda</p>
