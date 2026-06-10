@@ -500,8 +500,8 @@ export default function ChatPage() {
       </div>
     </div>
 
-    </>
   );
+}
 }
 
 function MsgCard({ msg, me, menuMsgId, setMenuMsgId, emojiPickerId, setEmojiPickerId, onReply, onEditar, onDeletar, onReagir, onFixar, reacoesPorEmoji, formatarHora, statusLeitura, renderTexto }: any) {
@@ -634,6 +634,6 @@ function MsgCard({ msg, me, menuMsgId, setMenuMsgId, emojiPickerId, setEmojiPick
       </div>
     </div>
 
-    </>
   );
+}
 }
