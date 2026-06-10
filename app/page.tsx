@@ -242,8 +242,8 @@ const antesDepois = [
     thumb: "/protocolo-capilar.webp",
     descricao: "Recuperação capilar com redução da queda e fortalecimento dos fios em 6 sessões.",
   },
+  {
     id: "laser",
-    label: "Laser — Perna",
     tipo: "composta" as const,
     orientacao: "horizontal" as const,
     imagem: "/laser-antes-depois-1.jpg",
