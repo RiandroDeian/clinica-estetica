@@ -66,6 +66,10 @@ const AREAS = [
   "Peitoral",
   "Glúteos",
   "Full Body",
+  "Virilha Completa",
+  "Dedos das Maos",
+  "Dedos dos Pes",
+  "Faixa da Barba",
 ];
 
 const formInicial = {
