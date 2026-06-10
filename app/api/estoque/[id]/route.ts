@@ -16,7 +16,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       : Number(item?.quantidade ?? 0) - Number(quantidade);
     await supabaseAdmin.from("estoque").update({ quantidade: novaQtd }).eq("id", id);
     await supabaseAdmin.from("estoque_movimentacoes").insert({
-      estoque_id: id, tipo, quantidade, motivo, funcionario_id: sessao.id
+      estoque_id: id, tipo, quantidade, motivo,
+      funcionario_id: sessao.id,
+      profissional_nome: body.profissional_nome ?? null,
+      paciente_nome: body.paciente_nome ?? null,
+      ambiente: body.ambiente ?? "geral",
     });
     return NextResponse.json({ ok: true, quantidade: novaQtd });
   }
@@ -40,6 +44,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       custo_medio: body.custo_medio ? Number(body.custo_medio) : null,
       fornecedor: body.fornecedor || null,
       validade: body.validade || null,
+      ambiente: body.ambiente || "geral",
     })
     .eq("id", id)
     .select()
