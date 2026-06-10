@@ -310,7 +310,7 @@ export default function EstoquePage() {
           </div>
         )
       ) : (
-        (() => {
+        {(() => {
         const historicoFiltrado = ambienteAtivo === "geral"
           ? historico
           : historico.filter(m => (m.ambiente || "geral") === ambienteAtivo);
