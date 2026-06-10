@@ -286,8 +286,8 @@ const antesDepois = [
     thumb: "/laser-antes-depois-5.jpg",
     descricao: "Resultado de depilacao a laser nas costas.",
   },
+];
 
-const depoimentos = [
   { nome: "Ana Luiza", texto: "Fiz harmonização facial e o resultado foi incrível. Atendimento super cuidadoso e ambiente aconchegante. Recomendo demais!", procedimento: "Harmonização Facial", estrelas: 5 },
   { nome: "Camila Souza", texto: "A limpeza de pele mudou minha autoestima. Profissional atenciosa, explicou tudo direitinho. Já agendei a próxima sessão!", procedimento: "Limpeza de Pele", estrelas: 5 },
   { nome: "Fernanda Lima", texto: "Botox muito natural, exatamente o que eu queria. A clínica é sofisticada e o atendimento é impecável.", procedimento: "Botox", estrelas: 5 },
