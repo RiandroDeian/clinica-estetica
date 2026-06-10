@@ -310,11 +310,7 @@ export default function EstoquePage() {
           </div>
         )
       ) : (
-        {(() => {
-        const historicoFiltrado = ambienteAtivo === "geral"
-          ? historico
-          : historico.filter(m => (m.ambiente || "geral") === ambienteAtivo);
-        return historicoFiltrado.length === 0 ? (
+        {(ambienteAtivo === "geral" ? historico : historico.filter(m => (m.ambiente || "geral") === ambienteAtivo)).length === 0 ? (
           <div className="text-center py-20 rounded-3xl" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
             <p className="text-4xl mb-4">📋</p>
             <p className="text-sm" style={{ color: "var(--text-muted)" }}>Nenhuma movimentação ainda</p>
@@ -325,7 +321,7 @@ export default function EstoquePage() {
               <h2 className="text-xs uppercase tracking-widest" style={{ color: "var(--gold)" }}>Histórico de Movimentações</h2>
             </div>
             <div className="divide-y" style={{ borderColor: "var(--border-subtle)" }}>
-              {historicoFiltrado.map(mov => (
+              {(ambienteAtivo === "geral" ? historico : historico.filter(m => (m.ambiente || "geral") === ambienteAtivo)).map(mov => (
                 <div key={mov.id} className="flex items-center gap-4 px-6 py-4">
                   <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
                     style={{ background: mov.tipo === "entrada" ? "rgba(122,232,160,0.1)" : "rgba(232,122,122,0.1)" }}>
@@ -365,8 +361,7 @@ export default function EstoquePage() {
               ))}
             </div>
           </div>
-        );
-      })()}
+        )}
 
       {modalAberto && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}>
