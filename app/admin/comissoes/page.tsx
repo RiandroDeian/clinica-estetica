@@ -84,7 +84,7 @@ export default function ComissoesPage() {
       <tr><th>Total a Receber</th><td class="total">R$ ${(Number(f.total_a_pagar) || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</td></tr>
       ${f.status_pagamento === "pago" ? `<tr><th>Status</th><td style="color:green;font-weight:bold">PAGO</td></tr>` : ""}
     </table>
-    ${f.atendimentos_detalhe.length > 0 ? `<hr><h2 style="font-size:11px">Detalhamento</h2><table><tr><th>Procedimento</th><th>Data</th><th>Valor</th></tr>${f.atendimentos_detalhe.map(a => `<tr><td>${a.procedimento}</td><td>${new Date(a.data).toLocaleDateString("pt-BR")}</td><td>R$ ${(Number(a.valor) || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</td></tr>`).join("")}</table>` : ""}
+    ${(f.atendimentos_detalhe ?? []).length > 0 ? `<hr><h2 style="font-size:11px">Detalhamento</h2><table><tr><th>Procedimento</th><th>Data</th><th>Valor</th></tr>${(f.atendimentos_detalhe ?? []).map(a => `<tr><td>${a.procedimento}</td><td>${new Date(a.data).toLocaleDateString("pt-BR")}</td><td>R$ ${(Number(a.valor) || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</td></tr>`).join("")}</table>` : ""}
     <div class="cidade">Planaltina, Brasilia — ${new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}</div>
     <div class="assinatura"><div>Moncié Esthetique</div></div>
     </body></html>`;
@@ -252,11 +252,11 @@ export default function ComissoesPage() {
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <div>
                       <p className="text-xs uppercase tracking-widest mb-3" style={{ color: "var(--gold)" }}>Atendimentos do Mes</p>
-                      {f.atendimentos_detalhe.length === 0 ? (
+                      {(f.atendimentos_detalhe ?? []).length === 0 ? (
                         <p className="text-sm" style={{ color: "var(--text-muted)" }}>Nenhum atendimento</p>
                       ) : (
                         <div className="flex flex-col gap-2 max-h-64 overflow-y-auto">
-                          {f.atendimentos_detalhe.map((a, i) => (
+                          {(f.atendimentos_detalhe ?? []).map((a, i) => (
                             <div key={i} className="flex items-center justify-between px-4 py-2 rounded-xl" style={{ background: "var(--bg-input)" }}>
                               <div>
                                 <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>{a.procedimento}</p>
@@ -271,8 +271,8 @@ export default function ComissoesPage() {
                     <div>
                       <p className="text-xs uppercase tracking-widest mb-3" style={{ color: "var(--gold)" }}>Evolucao 6 Meses</p>
                       <div className="flex items-end gap-2 h-32">
-                        {f.evolucao.map((e, i) => {
-                          const maxFat = Math.max(...f.evolucao.map(x => x.faturamento), 1);
+                        {(f.evolucao ?? []).map((e, i) => {
+                          const maxFat = Math.max(...(f.evolucao ?? []).map(x => x.faturamento), 1);
                           const h = Math.round((e.faturamento / maxFat) * 100);
                           return (
                             <div key={i} className="flex-1 flex flex-col items-center gap-1">
