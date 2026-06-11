@@ -77,14 +77,14 @@ export default function ComissoesPage() {
     </table>
     <hr>
     <table>
-      <tr><th>Faturamento Bruto</th><td>R$ ${f.total_bruto.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</td></tr>
+      <tr><th>Faturamento Bruto</th><td>R$ ${(Number(f.total_bruto) || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</td></tr>
       <tr><th>Percentual de Comissao</th><td>${f.comissao_percentual}%</td></tr>
-      <tr><th>Valor da Comissao</th><td>R$ ${f.comissao_valor.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</td></tr>
-      ${f.bonificacao > 0 ? `<tr><th>Bonificacao Extra</th><td>R$ ${f.bonificacao.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</td></tr>` : ""}
-      <tr><th>Total a Receber</th><td class="total">R$ ${f.total_a_pagar.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</td></tr>
+      <tr><th>Valor da Comissao</th><td>R$ ${(Number(f.comissao_valor) || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</td></tr>
+      ${f.bonificacao > 0 ? `<tr><th>Bonificacao Extra</th><td>R$ ${(Number(f.bonificacao) || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</td></tr>` : ""}
+      <tr><th>Total a Receber</th><td class="total">R$ ${(Number(f.total_a_pagar) || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</td></tr>
       ${f.status_pagamento === "pago" ? `<tr><th>Status</th><td style="color:green;font-weight:bold">PAGO</td></tr>` : ""}
     </table>
-    ${f.atendimentos_detalhe.length > 0 ? `<hr><h2 style="font-size:11px">Detalhamento</h2><table><tr><th>Procedimento</th><th>Data</th><th>Valor</th></tr>${f.atendimentos_detalhe.map(a => `<tr><td>${a.procedimento}</td><td>${new Date(a.data).toLocaleDateString("pt-BR")}</td><td>R$ ${a.valor.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</td></tr>`).join("")}</table>` : ""}
+    ${f.atendimentos_detalhe.length > 0 ? `<hr><h2 style="font-size:11px">Detalhamento</h2><table><tr><th>Procedimento</th><th>Data</th><th>Valor</th></tr>${f.atendimentos_detalhe.map(a => `<tr><td>${a.procedimento}</td><td>${new Date(a.data).toLocaleDateString("pt-BR")}</td><td>R$ ${(Number(a.valor) || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</td></tr>`).join("")}</table>` : ""}
     <div class="cidade">Planaltina, Brasilia — ${new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}</div>
     <div class="assinatura"><div>Moncié Esthetique</div></div>
     </body></html>`;
@@ -122,9 +122,9 @@ export default function ComissoesPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {[
           { label: "Total Atendimentos", valor: totalAtendimentos, cor: "var(--gold)" },
-          { label: "Faturamento Bruto", valor: "R$ " + totalBruto.toLocaleString("pt-BR", { minimumFractionDigits: 2 }), cor: "var(--success)" },
-          { label: "Total Comissoes", valor: "R$ " + totalComissoes.toLocaleString("pt-BR", { minimumFractionDigits: 2 }), cor: "var(--warning)" },
-          { label: "Pendente Pagar", valor: "R$ " + totalPendente.toLocaleString("pt-BR", { minimumFractionDigits: 2 }), cor: "var(--danger)" },
+          { label: "Faturamento Bruto", valor: "R$ " + (Number(totalBruto) || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 }), cor: "var(--success)" },
+          { label: "Total Comissoes", valor: "R$ " + (Number(totalComissoes) || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 }), cor: "var(--warning)" },
+          { label: "Pendente Pagar", valor: "R$ " + (Number(totalPendente) || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 }), cor: "var(--danger)" },
         ].map(k => (
           <div key={k.label} className="rounded-3xl p-6" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
             <p className="text-2xl font-bold" style={{ color: k.cor }}>{k.valor}</p>
@@ -168,9 +168,9 @@ export default function ComissoesPage() {
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
                     {[
                       { label: "Atendimentos", valor: f.atendimentos, cor: "var(--gold)" },
-                      { label: "Faturamento", valor: "R$ " + f.total_bruto.toLocaleString("pt-BR", { minimumFractionDigits: 2 }), cor: "var(--success)" },
-                      { label: "Comissao", valor: "R$ " + f.comissao_valor.toLocaleString("pt-BR", { minimumFractionDigits: 2 }), cor: "var(--warning)" },
-                      { label: "Total a Pagar", valor: "R$ " + f.total_a_pagar.toLocaleString("pt-BR", { minimumFractionDigits: 2 }), cor: "var(--danger)" },
+                      { label: "Faturamento", valor: "R$ " + (Number(f.total_bruto) || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 }), cor: "var(--success)" },
+                      { label: "Comissao", valor: "R$ " + (Number(f.comissao_valor) || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 }), cor: "var(--warning)" },
+                      { label: "Total a Pagar", valor: "R$ " + (Number(f.total_a_pagar) || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 }), cor: "var(--danger)" },
                     ].map(k => (
                       <div key={k.label} className="p-3 rounded-2xl" style={{ background: "var(--bg-input)" }}>
                         <p className="text-sm font-bold" style={{ color: k.cor }}>{k.valor}</p>
@@ -219,7 +219,7 @@ export default function ComissoesPage() {
                         </div>
                       ) : (
                         <button onClick={() => { setEditandoBonus(f.id); setNovoValor(String(f.bonificacao)); }} className="text-xs px-2 py-1 rounded-lg" style={{ background: "rgba(122,232,160,0.1)", color: "var(--success)" }}>
-                          {f.bonificacao > 0 ? "+ R$ " + f.bonificacao.toLocaleString("pt-BR") : "+ Bonus"} ✏
+                          {f.bonificacao > 0 ? "+ R$ " + (Number(f.bonificacao) || 0).toLocaleString("pt-BR") : "+ Bonus"} ✏
                         </button>
                       )}
                     </div>
@@ -262,7 +262,7 @@ export default function ComissoesPage() {
                                 <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>{a.procedimento}</p>
                                 <p className="text-xs" style={{ color: "var(--text-muted)" }}>{new Date(a.data).toLocaleDateString("pt-BR")}</p>
                               </div>
-                              <p className="text-sm font-bold" style={{ color: "var(--success)" }}>R$ {a.valor.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
+                              <p className="text-sm font-bold" style={{ color: "var(--success)" }}>R$ {(Number(a.valor) || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
                             </div>
                           ))}
                         </div>
@@ -304,7 +304,7 @@ export default function ComissoesPage() {
                 <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>{modalPagar.nome}</p>
                 <p className="text-xs" style={{ color: "var(--text-muted)" }}>{modalPagar.cargo}</p>
                 <p className="text-lg font-bold mt-2" style={{ color: "var(--success)" }}>
-                  R$ {modalPagar.total_a_pagar.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                  R$ {(Number(modalPagar.total_a_pagar) || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                 </p>
                 <p className="text-xs" style={{ color: "var(--text-muted)" }}>Comissao + Bonus</p>
               </div>
