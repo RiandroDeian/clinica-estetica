@@ -27,7 +27,7 @@ const ETIQUETAS = [
   { key: "frio", label: "Frio", cor: "#a89080" },
 ];
 
-function LeadCard({ lead, onClick, tarefas }: { lead: Lead; onClick: () => void; tarefas: Tarefa[] }) {
+function LeadCard({ lead, onClick, tarefas, onNotaRapida }: { lead: Lead; onClick: () => void; tarefas: Tarefa[]; onNotaRapida?: () => void }) {
   const diasSemInteracao = Math.floor((Date.now() - new Date(lead.ultima_interacao).getTime()) / 86400000);
   const diasNaColuna = Math.floor((Date.now() - new Date(lead.criado_em).getTime()) / 86400000);
   const tarefasPendentes = tarefas.filter(t => !t.concluida);
@@ -110,10 +110,11 @@ function LeadCard({ lead, onClick, tarefas }: { lead: Lead; onClick: () => void;
   );
 }
 
-function ColunaKanban({ coluna, leads, tarefas, onAddLead, onEditLead, onDeleteColuna, onEditColuna }: {
+function ColunaKanban({ coluna, leads, tarefas, onAddLead, onEditLead, onDeleteColuna, onEditColuna, onNotaRapida }: {
   coluna: Coluna; leads: Lead[]; tarefas: Tarefa[];
   onAddLead: () => void; onEditLead: (l: Lead) => void;
   onDeleteColuna: (id: string) => void; onEditColuna: (c: Coluna) => void;
+  onNotaRapida: (l: Lead) => void;
 }) {
   const [over, setOver] = useState(false);
   return (
@@ -141,6 +142,7 @@ function ColunaKanban({ coluna, leads, tarefas, onAddLead, onEditLead, onDeleteC
       <div className="flex flex-col gap-2 p-3 flex-1 overflow-y-auto" style={{ maxHeight: "calc(100vh - 300px)", minHeight: 100 }}>
         {leads.map(lead => (
           <LeadCard key={lead.id} lead={lead} onClick={() => onEditLead(lead)}
+            onNotaRapida={() => onNotaRapida(lead)}
             tarefas={tarefas.filter(t => t.lead_id === lead.id)} />
         ))}
       </div>
