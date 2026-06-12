@@ -114,7 +114,7 @@ function ColunaKanban({ coluna, leads, tarefas, onAddLead, onEditLead, onDeleteC
   coluna: Coluna; leads: Lead[]; tarefas: Tarefa[];
   onAddLead: () => void; onEditLead: (l: Lead) => void;
   onDeleteColuna: (id: string) => void; onEditColuna: (c: Coluna) => void;
-  onNotaRapida: (l: Lead) => void;
+  onNotaRapida?: (l: Lead) => void;
 }) {
   const [over, setOver] = useState(false);
   return (
