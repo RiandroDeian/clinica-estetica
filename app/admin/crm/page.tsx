@@ -179,6 +179,11 @@ export default function CRMPage() {
   const [tarefasLead, setTarefasLead] = useState<Tarefa[]>([]);
   const [novaTarefa, setNovaTarefa] = useState({ titulo: "", data_vencimento: "" });
   const [salvandoTarefa, setSalvandoTarefa] = useState(false);
+  const [modalIntegracao, setModalIntegracao] = useState<Lead | null>(null);
+  const [salvandoIntegracao, setSalvandoIntegracao] = useState(false);
+  const [ordenacao, setOrdenacao] = useState<"recente"|"nome"|"interacao">("recente");
+  const [notaRapida, setNotaRapida] = useState<{ lead: Lead; texto: string } | null>(null);
+  const [salvandoNota, setSalvandoNota] = useState(false);
 
   const buscar = useCallback(async () => {
     setCarregando(true);
@@ -279,6 +284,48 @@ export default function CRMPage() {
     }));
   }
 
+  function exportarCSV() {
+    const header = ["Nome","Telefone","Procedimento","Responsavel","Coluna","Etiquetas","Criado em"];
+    const rows = leads.map(l => [l.nome, l.telefone ?? "", l.procedimento_interesse ?? "", l.funcionarios?.nome ?? "", colunas.find(col => col.id === l.coluna_id)?.nome ?? "", (l.etiquetas ?? []).join(";"), new Date(l.criado_em).toLocaleDateString("pt-BR")]);
+    const csv = [header, ...rows].map(r => r.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "crm-leads.csv"; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function criarPacienteDoLead(lead: Lead) {
+    setSalvandoIntegracao(true);
+    const res = await fetch("/api/pacientes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nome: lead.nome, telefone: lead.telefone ?? "" }) });
+    if (res.ok) {
+      const colunaFechou = colunas.find(c => c.nome.toLowerCase().includes("fechou") || c.nome.toLowerCase().includes("tratamento"));
+      if (colunaFechou) await fetch("/api/crm/leads", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: lead.id, coluna_id: colunaFechou.id, coluna_origem_id: lead.coluna_id }) });
+      setModalIntegracao(null); buscar();
+    }
+    setSalvandoIntegracao(false);
+  }
+
+  async function salvarNotaRapida() {
+    if (!notaRapida) return;
+    setSalvandoNota(true);
+    await fetch("/api/crm/leads", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: notaRapida.lead.id, observacoes: notaRapida.texto }) });
+    setNotaRapida(null); buscar();
+    setSalvandoNota(false);
+  }
+
+  const leadsFiltradosOrdenados = (items: Lead[]) => {
+    const f = items.filter(l => {
+      const matchBusca = l.nome.toLowerCase().includes(busca.toLowerCase()) || (l.telefone ?? "").includes(busca);
+      const matchResp = !filtroResp || l.responsavel_id === filtroResp;
+      const matchEtiqueta = !filtroEtiqueta || (l.etiquetas ?? []).includes(filtroEtiqueta);
+      return matchBusca && matchResp && matchEtiqueta;
+    });
+    if (ordenacao === "nome") return f.sort((a, b) => a.nome.localeCompare(b.nome));
+    if (ordenacao === "interacao") return f.sort((a, b) => new Date(b.ultima_interacao).getTime() - new Date(a.ultima_interacao).getTime());
+    return f.sort((a, b) => new Date(b.criado_em).getTime() - new Date(a.criado_em).getTime());
+  };
+
   function handleDrop(e: React.DragEvent, colunaDestinoId: string) {
     const leadId = e.dataTransfer.getData("lead_id");
     const origemId = e.dataTransfer.getData("origem_id");
@@ -312,6 +359,7 @@ export default function CRMPage() {
           <h1 className="text-3xl font-bold" style={{ color: "var(--text-primary)" }}>CRM — Funil de Pacientes</h1>
         </div>
         <div className="flex gap-2">
+          <button onClick={exportarCSV} className="px-4 py-2.5 rounded-2xl text-xs uppercase tracking-widest transition hover:scale-105" style={{ border: "1px solid var(--border-color)", color: "var(--success)" }}>↓ CSV</button>
           <button onClick={() => { setNovaColuna(true); setModalColuna(null); setFormColuna({ nome: "", cor: "#c8a078" }); }}
             className="px-4 py-2.5 rounded-2xl text-xs uppercase tracking-widest transition hover:scale-105"
             style={{ border: "1px solid var(--border-color)", color: "var(--text-muted)" }}>
@@ -359,6 +407,11 @@ export default function CRMPage() {
               <option value="">Todas etiquetas</option>
               {ETIQUETAS.map(e => <option key={e.key} value={e.key}>{e.label}</option>)}
             </select>
+            <select value={ordenacao} onChange={e => setOrdenacao(e.target.value as any)} className="rounded-2xl px-4 py-2.5 text-sm outline-none" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
+              <option value="recente">Mais recentes</option>
+              <option value="nome">Nome A-Z</option>
+              <option value="interacao">Ultima interacao</option>
+            </select>
           </div>
           {carregando ? (
             <div className="flex items-center justify-center h-64">
@@ -370,7 +423,7 @@ export default function CRMPage() {
                 <div key={coluna.id} onDrop={e => handleDrop(e, coluna.id)} onDragOver={e => e.preventDefault()}>
                   <ColunaKanban
                     coluna={coluna}
-                    leads={leadsFiltrados.filter(l => l.coluna_id === coluna.id)}
+                    leads={leadsFiltradosOrdenados(leads).filter(l => l.coluna_id === coluna.id)}
                     tarefas={tarefas}
                     onAddLead={() => {
                       setModalLead({ coluna_id: coluna.id });
@@ -384,6 +437,7 @@ export default function CRMPage() {
                       buscarTarefasLead(lead.id);
                     }}
                     onDeleteColuna={deletarColuna}
+                    onNotaRapida={(lead) => setNotaRapida({ lead, texto: lead.observacoes ?? "" })}
                     onEditColuna={c => { setModalColuna(c); setFormColuna({ nome: c.nome, cor: c.cor }); }}
                   />
                 </div>
@@ -634,11 +688,14 @@ export default function CRMPage() {
                 </div>
                 <div className="flex gap-3">
                   {modalLead.lead && (
+                    <>
+                    <button onClick={() => setModalIntegracao(modalLead.lead!)} className="px-4 py-3 rounded-2xl text-sm transition hover:scale-105" style={{ background: "rgba(122,232,160,0.1)", color: "var(--success)" }}>+ Paciente</button>
                     <button onClick={() => deletarLead(modalLead.lead!.id)}
                       className="px-4 py-3 rounded-2xl text-sm transition hover:scale-105"
                       style={{ background: "rgba(232,122,122,0.1)", color: "var(--danger)" }}>
                       Excluir
                     </button>
+                    </>
                   )}
                   <button onClick={() => setModalLead(null)} className="flex-1 py-3 rounded-2xl text-sm" style={{ border: "1px solid var(--border-color)", color: "var(--text-muted)" }}>Cancelar</button>
                   <button onClick={salvarLead} disabled={salvando || !formLead.nome.trim()}
@@ -685,6 +742,40 @@ export default function CRMPage() {
                 style={{ background: "var(--gold)", color: "#0a0707" }}>
                 {salvando ? "..." : "Salvar"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {modalIntegracao && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}>
+          <div className="w-full max-w-md rounded-3xl p-6" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-bold" style={{ color: "var(--gold)" }}>Criar Paciente</h2>
+              <button onClick={() => setModalIntegracao(null)} style={{ color: "var(--text-muted)" }}>✕</button>
+            </div>
+            <div className="p-4 rounded-2xl mb-5" style={{ background: "var(--bg-input)" }}>
+              <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>{modalIntegracao.nome}</p>
+              {modalIntegracao.telefone && <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>{modalIntegracao.telefone}</p>}
+            </div>
+            <p className="text-sm mb-5" style={{ color: "var(--text-muted)" }}>Isso vai criar este lead como paciente no sistema e mover para Em Tratamento.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setModalIntegracao(null)} className="flex-1 py-3 rounded-2xl text-sm" style={{ border: "1px solid var(--border-color)", color: "var(--text-muted)" }}>Cancelar</button>
+              <button onClick={() => criarPacienteDoLead(modalIntegracao)} disabled={salvandoIntegracao} className="flex-1 py-3 rounded-2xl text-sm font-semibold transition hover:scale-105" style={{ background: "var(--success)", color: "white" }}>{salvandoIntegracao ? "Criando..." : "Confirmar"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {notaRapida && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}>
+          <div className="w-full max-w-md rounded-3xl p-6" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold" style={{ color: "var(--gold)" }}>Nota — {notaRapida.lead.nome}</h2>
+              <button onClick={() => setNotaRapida(null)} style={{ color: "var(--text-muted)" }}>✕</button>
+            </div>
+            <textarea value={notaRapida.texto} onChange={e => setNotaRapida(n => n ? { ...n, texto: e.target.value } : null)} rows={5} placeholder="Digite uma nota..." autoFocus className="w-full rounded-2xl px-4 py-3 text-sm outline-none resize-none mb-4" style={{ background: "var(--bg-input)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
+            <div className="flex gap-3">
+              <button onClick={() => setNotaRapida(null)} className="flex-1 py-3 rounded-2xl text-sm" style={{ border: "1px solid var(--border-color)", color: "var(--text-muted)" }}>Cancelar</button>
+              <button onClick={salvarNotaRapida} disabled={salvandoNota} className="flex-1 py-3 rounded-2xl text-sm font-semibold transition hover:scale-105" style={{ background: "var(--gold)", color: "#0a0707" }}>{salvandoNota ? "Salvando..." : "Salvar"}</button>
             </div>
           </div>
         </div>
