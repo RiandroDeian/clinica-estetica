@@ -1,14 +1,13 @@
 ﻿"use client";
 import { useEffect, useState, useCallback } from "react";
-import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, DragStartEvent, DragEndEvent } from "@dnd-kit/core";
-import { SortableContext, horizontalListSortingStrategy } from "@dnd-kit/sortable";
 import { toast } from "sonner";
 
 type Coluna = { id: string; nome: string; cor: string; ordem: number };
+type Tarefa = { id: string; lead_id: string; titulo: string; data_vencimento?: string; concluida: boolean };
 type Lead = {
   id: string; nome: string; telefone?: string; procedimento_interesse?: string;
   observacoes?: string; coluna_id: string; responsavel_id?: string;
-  ultima_interacao: string; criado_em: string;
+  ultima_interacao: string; criado_em: string; etiquetas?: string[];
   funcionarios?: { nome: string; cor: string };
   crm_colunas?: { nome: string; cor: string };
 };
@@ -20,54 +19,109 @@ type Historico = {
   funcionarios?: { nome: string };
 };
 
-function LeadCard({ lead, onClick, isDragging }: { lead: Lead; onClick: () => void; isDragging?: boolean }) {
+const ETIQUETAS = [
+  { key: "vip", label: "VIP", cor: "#e8c97a" },
+  { key: "urgente", label: "Urgente", cor: "#e87a7a" },
+  { key: "retorno", label: "Retorno", cor: "#7aa6e8" },
+  { key: "novo", label: "Novo", cor: "#7ae8b4" },
+  { key: "frio", label: "Frio", cor: "#a89080" },
+];
+
+function LeadCard({ lead, onClick, tarefas }: { lead: Lead; onClick: () => void; tarefas: Tarefa[] }) {
   const diasSemInteracao = Math.floor((Date.now() - new Date(lead.ultima_interacao).getTime()) / 86400000);
+  const diasNaColuna = Math.floor((Date.now() - new Date(lead.criado_em).getTime()) / 86400000);
+  const tarefasPendentes = tarefas.filter(t => !t.concluida);
+  const tarefasVencidas = tarefasPendentes.filter(t => t.data_vencimento && new Date(t.data_vencimento) < new Date());
+  const etiquetas = lead.etiquetas ?? [];
+
   return (
-    <div onClick={onClick} className="rounded-2xl p-4 cursor-pointer transition hover:scale-[1.02] select-none"
-      style={{ background: isDragging ? "var(--gold-bg)" : "var(--bg-card)", border: "1px solid var(--border-color)", opacity: isDragging ? 0.5 : 1, boxShadow: isDragging ? "0 8px 24px rgba(0,0,0,0.3)" : "none" }}>
-      <div className="flex items-start justify-between gap-2 mb-2">
+    <div onClick={onClick} draggable
+      onDragStart={e => { e.dataTransfer.setData("lead_id", lead.id); e.dataTransfer.setData("origem_id", lead.coluna_id); }}
+      className="rounded-2xl p-4 cursor-pointer transition hover:scale-[1.02] select-none"
+      style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+      
+      {etiquetas.length > 0 && (
+        <div className="flex gap-1 flex-wrap mb-2">
+          {etiquetas.map(e => {
+            const et = ETIQUETAS.find(x => x.key === e);
+            return et ? (
+              <span key={e} className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold"
+                style={{ background: et.cor + "22", color: et.cor }}>
+                {et.label}
+              </span>
+            ) : null;
+          })}
+        </div>
+      )}
+
+      <div className="flex items-start justify-between gap-2 mb-1">
         <p className="text-sm font-semibold leading-5" style={{ color: "var(--text-primary)" }}>{lead.nome}</p>
-        {diasSemInteracao > 2 && (
-          <span className="text-xs px-1.5 py-0.5 rounded-full flex-shrink-0" style={{ background: "rgba(232,122,122,0.1)", color: "var(--danger)" }}>
-            {diasSemInteracao}d
-          </span>
-        )}
+        <div className="flex flex-col items-end gap-1">
+          {diasSemInteracao > 2 && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0"
+              style={{ background: "rgba(232,122,122,0.1)", color: "var(--danger)" }}>
+              {diasSemInteracao}d sem contato
+            </span>
+          )}
+        </div>
       </div>
-      {lead.telefone && <p className="text-xs mb-1" style={{ color: "var(--text-muted)" }}>📞 {lead.telefone}</p>}
+
+      {lead.telefone && (
+        <div className="flex items-center gap-2 mb-1">
+          <p className="text-xs" style={{ color: "var(--text-muted)" }}>📞 {lead.telefone}</p>
+          <a href={"https://wa.me/55" + lead.telefone.replace(/\D/g, "")} target="_blank" rel="noopener noreferrer"
+            onClick={e => e.stopPropagation()}
+            className="text-[10px] px-1.5 py-0.5 rounded-full transition hover:scale-105"
+            style={{ background: "rgba(37,211,102,0.1)", color: "#25D366" }}>
+            WhatsApp
+          </a>
+        </div>
+      )}
+
       {lead.procedimento_interesse && (
-        <span className="text-xs px-2 py-0.5 rounded-full inline-block mb-2" style={{ background: "var(--gold-bg)", color: "var(--gold)" }}>
+        <span className="text-xs px-2 py-0.5 rounded-full inline-block mb-2"
+          style={{ background: "var(--gold-bg)", color: "var(--gold)" }}>
           {lead.procedimento_interesse}
         </span>
       )}
-      {lead.funcionarios && (
-        <div className="flex items-center gap-1 mt-2">
-          <div className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold"
-            style={{ background: (lead.funcionarios.cor ?? "#c8a078") + "33", color: lead.funcionarios.cor ?? "#c8a078" }}>
-            {lead.funcionarios.nome.charAt(0)}
-          </div>
-          <span className="text-xs" style={{ color: "var(--text-muted)" }}>{lead.funcionarios.nome.split(" ")[0]}</span>
+
+      {tarefasPendentes.length > 0 && (
+        <div className="flex items-center gap-1 mb-2">
+          <span className="text-[10px] px-2 py-0.5 rounded-full"
+            style={{ background: tarefasVencidas.length > 0 ? "rgba(232,122,122,0.1)" : "rgba(122,232,160,0.1)", color: tarefasVencidas.length > 0 ? "var(--danger)" : "var(--success)" }}>
+            {tarefasVencidas.length > 0 ? "⚠" : "✓"} {tarefasPendentes.length} tarefa{tarefasPendentes.length > 1 ? "s" : ""}
+          </span>
         </div>
       )}
-      <p className="text-xs mt-2" style={{ color: "var(--text-muted)" }}>
-        {new Date(lead.criado_em).toLocaleDateString("pt-BR")}
-      </p>
+
+      <div className="flex items-center justify-between mt-2">
+        {lead.funcionarios ? (
+          <div className="flex items-center gap-1">
+            <div className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold"
+              style={{ background: (lead.funcionarios.cor ?? "#c8a078") + "33", color: lead.funcionarios.cor ?? "#c8a078" }}>
+              {lead.funcionarios.nome.charAt(0)}
+            </div>
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>{lead.funcionarios.nome.split(" ")[0]}</span>
+          </div>
+        ) : <div />}
+        <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>{diasNaColuna}d</span>
+      </div>
     </div>
   );
 }
 
-function ColunaKanban({ coluna, leads, onAddLead, onEditLead, onDeleteColuna, onEditColuna, activeLead }: {
-  coluna: Coluna; leads: Lead[]; onAddLead: () => void; onEditLead: (l: Lead) => void;
-  onDeleteColuna: (id: string) => void; onEditColuna: (c: Coluna) => void; activeLead: Lead | null;
+function ColunaKanban({ coluna, leads, tarefas, onAddLead, onEditLead, onDeleteColuna, onEditColuna }: {
+  coluna: Coluna; leads: Lead[]; tarefas: Tarefa[];
+  onAddLead: () => void; onEditLead: (l: Lead) => void;
+  onDeleteColuna: (id: string) => void; onEditColuna: (c: Coluna) => void;
 }) {
   const [over, setOver] = useState(false);
   return (
-    <div
-      className="flex flex-col flex-shrink-0 rounded-3xl"
-      style={{ width: 280, background: "var(--bg-card)", border: "1px solid var(--border-color)" }}
+    <div className="flex flex-col flex-shrink-0 rounded-3xl"
+      style={{ width: 280, background: "var(--bg-card)", border: over ? "1px solid " + coluna.cor : "1px solid var(--border-color)", transition: "border 0.2s" }}
       onDragOver={e => { e.preventDefault(); setOver(true); }}
       onDragLeave={() => setOver(false)}
-      onDrop={() => setOver(false)}
-      data-coluna-id={coluna.id}>
+      onDrop={e => { setOver(false); }}>
       <div className="px-4 py-3 flex items-center justify-between rounded-t-3xl"
         style={{ background: coluna.cor + "22", borderBottom: "1px solid " + coluna.cor + "44" }}>
         <div className="flex items-center gap-2">
@@ -84,11 +138,10 @@ function ColunaKanban({ coluna, leads, onAddLead, onEditLead, onDeleteColuna, on
           </button>
         </div>
       </div>
-      <div className="flex flex-col gap-2 p-3 flex-1 overflow-y-auto" style={{ maxHeight: "calc(100vh - 280px)", minHeight: 100, background: over && activeLead ? "rgba(200,160,120,0.05)" : "transparent", transition: "background 0.2s" }}>
+      <div className="flex flex-col gap-2 p-3 flex-1 overflow-y-auto" style={{ maxHeight: "calc(100vh - 300px)", minHeight: 100 }}>
         {leads.map(lead => (
-          <div key={lead.id} draggable onDragStart={e => { e.dataTransfer.setData("lead_id", lead.id); e.dataTransfer.setData("origem_id", coluna.id); }}>
-            <LeadCard lead={lead} onClick={() => onEditLead(lead)} />
-          </div>
+          <LeadCard key={lead.id} lead={lead} onClick={() => onEditLead(lead)}
+            tarefas={tarefas.filter(t => t.lead_id === lead.id)} />
         ))}
       </div>
       <div className="p-3" style={{ borderTop: "1px solid var(--border-subtle)" }}>
@@ -105,40 +158,52 @@ export default function CRMPage() {
   const [colunas, setColunas] = useState<Coluna[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [historico, setHistorico] = useState<Historico[]>([]);
+  const [tarefas, setTarefas] = useState<Tarefa[]>([]);
   const [funcionarios, setFuncionarios] = useState<any[]>([]);
   const [procedimentos, setProcedimentos] = useState<any[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [busca, setBusca] = useState("");
   const [filtroResp, setFiltroResp] = useState("");
   const [filtroProc, setFiltroProc] = useState("");
+  const [filtroEtiqueta, setFiltroEtiqueta] = useState("");
   const [abaAtiva, setAbaAtiva] = useState<"kanban"|"historico"|"dashboard">("kanban");
-  const [activeLead, setActiveLead] = useState<Lead | null>(null);
   const [modalLead, setModalLead] = useState<{ lead?: Lead; coluna_id?: string } | null>(null);
   const [modalColuna, setModalColuna] = useState<Coluna | null>(null);
   const [novaColuna, setNovaColuna] = useState(false);
-  const [formLead, setFormLead] = useState({ nome: "", telefone: "", procedimento_interesse: "", responsavel_id: "", coluna_id: "", observacoes: "" });
+  const [formLead, setFormLead] = useState({ nome: "", telefone: "", procedimento_interesse: "", responsavel_id: "", coluna_id: "", observacoes: "", etiquetas: [] as string[] });
   const [formColuna, setFormColuna] = useState({ nome: "", cor: "#c8a078" });
   const [salvando, setSalvando] = useState(false);
-  const [abaModal, setAbaModal] = useState<"dados"|"historico">("dados");
+  const [abaModal, setAbaModal] = useState<"dados"|"tarefas"|"historico">("dados");
+  const [tarefasLead, setTarefasLead] = useState<Tarefa[]>([]);
+  const [novaTarefa, setNovaTarefa] = useState({ titulo: "", data_vencimento: "" });
+  const [salvandoTarefa, setSalvandoTarefa] = useState(false);
 
   const buscar = useCallback(async () => {
     setCarregando(true);
-    const [c, l, h, f, p] = await Promise.all([
+    const [c, l, h, f, p, t] = await Promise.all([
       fetch("/api/crm/colunas").then(r => r.json()),
       fetch("/api/crm/leads").then(r => r.json()),
       fetch("/api/crm/historico").then(r => r.json()),
       fetch("/api/funcionarios").then(r => r.json()),
       fetch("/api/procedimentos").then(r => r.json()),
+      fetch("/api/crm/tarefas").then(r => r.json()),
     ]);
     setColunas(Array.isArray(c) ? c : []);
     setLeads(Array.isArray(l) ? l : []);
     setHistorico(Array.isArray(h) ? h : []);
     setFuncionarios(Array.isArray(f) ? f : []);
     setProcedimentos(Array.isArray(p) ? p : []);
+    setTarefas(Array.isArray(t) ? t : []);
     setCarregando(false);
   }, []);
 
   useEffect(() => { buscar(); }, [buscar]);
+
+  async function buscarTarefasLead(lead_id: string) {
+    const res = await fetch("/api/crm/tarefas?lead_id=" + lead_id);
+    const data = await res.json();
+    setTarefasLead(Array.isArray(data) ? data : []);
+  }
 
   async function salvarLead() {
     if (!formLead.nome.trim()) return;
@@ -175,10 +240,41 @@ export default function CRMPage() {
   }
 
   async function deletarColuna(id: string) {
-    if (!confirm("Remover esta coluna? Os leads serao mantidos.")) return;
+    if (!confirm("Remover esta coluna?")) return;
     await fetch("/api/crm/colunas?id=" + id, { method: "DELETE" });
     toast.success("Coluna removida");
     buscar();
+  }
+
+  async function adicionarTarefa(lead_id: string) {
+    if (!novaTarefa.titulo.trim()) return;
+    setSalvandoTarefa(true);
+    await fetch("/api/crm/tarefas", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lead_id, ...novaTarefa }) });
+    setNovaTarefa({ titulo: "", data_vencimento: "" });
+    buscarTarefasLead(lead_id);
+    buscar();
+    setSalvandoTarefa(false);
+  }
+
+  async function toggleTarefa(tarefa: Tarefa) {
+    await fetch("/api/crm/tarefas", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: tarefa.id, concluida: !tarefa.concluida }) });
+    if (modalLead?.lead) buscarTarefasLead(modalLead.lead.id);
+    buscar();
+  }
+
+  async function deletarTarefa(id: string, lead_id: string) {
+    await fetch("/api/crm/tarefas?id=" + id, { method: "DELETE" });
+    buscarTarefasLead(lead_id);
+    buscar();
+  }
+
+  function toggleEtiqueta(key: string) {
+    setFormLead(f => ({
+      ...f,
+      etiquetas: (f.etiquetas ?? []).includes(key)
+        ? (f.etiquetas ?? []).filter(e => e !== key)
+        : [...(f.etiquetas ?? []), key],
+    }));
   }
 
   function handleDrop(e: React.DragEvent, colunaDestinoId: string) {
@@ -194,11 +290,12 @@ export default function CRMPage() {
     const matchBusca = l.nome.toLowerCase().includes(busca.toLowerCase()) || (l.telefone ?? "").includes(busca);
     const matchResp = !filtroResp || l.responsavel_id === filtroResp;
     const matchProc = !filtroProc || (l.procedimento_interesse ?? "").toLowerCase().includes(filtroProc.toLowerCase());
-    return matchBusca && matchResp && matchProc;
+    const matchEtiqueta = !filtroEtiqueta || (l.etiquetas ?? []).includes(filtroEtiqueta);
+    return matchBusca && matchResp && matchProc && matchEtiqueta;
   });
 
   const totalLeads = leads.length;
-  const totalAvaliacao = leads.filter(l => colunas.find(c => c.id === l.coluna_id)?.nome?.toLowerCase().includes("avaliacao")).length;
+  const totalAvaliacao = leads.filter(l => colunas.find(c => c.id === l.coluna_id)?.nome?.toLowerCase().includes("avalia")).length;
   const totalCompareceu = leads.filter(l => colunas.find(c => c.id === l.coluna_id)?.nome?.toLowerCase().includes("compareceu")).length;
   const totalFechou = leads.filter(l => colunas.find(c => c.id === l.coluna_id)?.nome?.toLowerCase().includes("fechou")).length;
   const taxaConversao = totalLeads > 0 ? Math.round((totalFechou / totalLeads) * 100) : 0;
@@ -222,7 +319,7 @@ export default function CRMPage() {
             const primeiraColuna = colunas[0];
             if (!primeiraColuna) return;
             setModalLead({ coluna_id: primeiraColuna.id });
-            setFormLead({ nome: "", telefone: "", procedimento_interesse: "", responsavel_id: "", coluna_id: primeiraColuna.id, observacoes: "" });
+            setFormLead({ nome: "", telefone: "", procedimento_interesse: "", responsavel_id: "", coluna_id: primeiraColuna.id, observacoes: "", etiquetas: [] });
             setAbaModal("dados");
           }}
             className="px-4 py-2.5 rounded-2xl text-xs uppercase tracking-widest font-semibold transition hover:scale-105"
@@ -254,32 +351,35 @@ export default function CRMPage() {
               <option value="">Todos responsaveis</option>
               {funcionarios.map(f => <option key={f.id} value={f.id}>{f.nome}</option>)}
             </select>
-            <input type="text" placeholder="Filtrar procedimento..." value={filtroProc} onChange={e => setFiltroProc(e.target.value)}
+            <select value={filtroEtiqueta} onChange={e => setFiltroEtiqueta(e.target.value)}
               className="rounded-2xl px-4 py-2.5 text-sm outline-none"
-              style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
+              style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
+              <option value="">Todas etiquetas</option>
+              {ETIQUETAS.map(e => <option key={e.key} value={e.key}>{e.label}</option>)}
+            </select>
           </div>
           {carregando ? (
             <div className="flex items-center justify-center h-64">
               <div className="w-8 h-8 rounded-full border-2 animate-spin" style={{ borderColor: "var(--border-color)", borderTopColor: "var(--gold)" }} />
             </div>
           ) : (
-            <div className="flex gap-4 overflow-x-auto pb-4" style={{ minHeight: 400 }}
-              onDragOver={e => e.preventDefault()}>
+            <div className="flex gap-4 overflow-x-auto pb-4" style={{ minHeight: 400 }}>
               {colunas.map(coluna => (
                 <div key={coluna.id} onDrop={e => handleDrop(e, coluna.id)} onDragOver={e => e.preventDefault()}>
                   <ColunaKanban
                     coluna={coluna}
                     leads={leadsFiltrados.filter(l => l.coluna_id === coluna.id)}
-                    activeLead={activeLead}
+                    tarefas={tarefas}
                     onAddLead={() => {
                       setModalLead({ coluna_id: coluna.id });
-                      setFormLead({ nome: "", telefone: "", procedimento_interesse: "", responsavel_id: "", coluna_id: coluna.id, observacoes: "" });
+                      setFormLead({ nome: "", telefone: "", procedimento_interesse: "", responsavel_id: "", coluna_id: coluna.id, observacoes: "", etiquetas: [] });
                       setAbaModal("dados");
                     }}
                     onEditLead={lead => {
                       setModalLead({ lead, coluna_id: lead.coluna_id });
-                      setFormLead({ nome: lead.nome, telefone: lead.telefone ?? "", procedimento_interesse: lead.procedimento_interesse ?? "", responsavel_id: lead.responsavel_id ?? "", coluna_id: lead.coluna_id, observacoes: lead.observacoes ?? "" });
+                      setFormLead({ nome: lead.nome, telefone: lead.telefone ?? "", procedimento_interesse: lead.procedimento_interesse ?? "", responsavel_id: lead.responsavel_id ?? "", coluna_id: lead.coluna_id, observacoes: lead.observacoes ?? "", etiquetas: lead.etiquetas ?? [] });
                       setAbaModal("dados");
+                      buscarTarefasLead(lead.id);
                     }}
                     onDeleteColuna={deletarColuna}
                     onEditColuna={c => { setModalColuna(c); setFormColuna({ nome: c.nome, cor: c.cor }); }}
@@ -326,6 +426,27 @@ export default function CRMPage() {
               })}
             </div>
           </div>
+          <div className="rounded-3xl p-6" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+            <h2 className="text-xs uppercase tracking-widest mb-5" style={{ color: "var(--gold)" }}>Tarefas Vencidas</h2>
+            {tarefas.filter(t => !t.concluida && t.data_vencimento && new Date(t.data_vencimento) < new Date()).length === 0 ? (
+              <p className="text-sm" style={{ color: "var(--text-muted)" }}>Nenhuma tarefa vencida</p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {tarefas.filter(t => !t.concluida && t.data_vencimento && new Date(t.data_vencimento) < new Date()).map(t => {
+                  const lead = leads.find(l => l.id === t.lead_id);
+                  return (
+                    <div key={t.id} className="flex items-center gap-3 px-4 py-3 rounded-2xl" style={{ background: "rgba(232,122,122,0.05)", border: "1px solid rgba(232,122,122,0.2)" }}>
+                      <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: "var(--danger)" }} />
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>{t.titulo}</p>
+                        <p className="text-xs" style={{ color: "var(--text-muted)" }}>{lead?.nome} · Venceu {new Date(t.data_vencimento!).toLocaleDateString("pt-BR")}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -358,7 +479,7 @@ export default function CRMPage() {
         </div>
       )}
 
-      {(modalLead !== null) && (
+      {modalLead !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}>
           <div className="w-full max-w-lg rounded-3xl p-6 max-h-[90vh] overflow-y-auto" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
             <div className="flex items-center justify-between mb-5">
@@ -367,7 +488,7 @@ export default function CRMPage() {
             </div>
             {modalLead.lead && (
               <div className="flex gap-1 mb-5 p-1 rounded-2xl" style={{ background: "var(--bg-input)" }}>
-                {[{ key: "dados", label: "Dados" }, { key: "historico", label: "Historico" }].map(a => (
+                {[{ key: "dados", label: "Dados" }, { key: "tarefas", label: "Tarefas (" + tarefasLead.filter(t => !t.concluida).length + ")" }, { key: "historico", label: "Historico" }].map(a => (
                   <button key={a.key} onClick={() => setAbaModal(a.key as any)}
                     className="flex-1 py-1.5 rounded-xl text-xs transition"
                     style={{ background: abaModal === a.key ? "var(--gold-bg)" : "transparent", color: abaModal === a.key ? "var(--gold)" : "var(--text-muted)" }}>
@@ -376,7 +497,56 @@ export default function CRMPage() {
                 ))}
               </div>
             )}
-            {abaModal === "historico" && modalLead.lead ? (
+
+            {abaModal === "tarefas" && modalLead.lead && (
+              <div className="flex flex-col gap-3">
+                <div className="flex gap-2">
+                  <input value={novaTarefa.titulo} onChange={e => setNovaTarefa(f => ({ ...f, titulo: e.target.value }))}
+                    placeholder="Nova tarefa..." onKeyDown={e => e.key === "Enter" && adicionarTarefa(modalLead.lead!.id)}
+                    className="flex-1 rounded-2xl px-4 py-2.5 text-sm outline-none"
+                    style={{ background: "var(--bg-input)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
+                  <input type="datetime-local" value={novaTarefa.data_vencimento} onChange={e => setNovaTarefa(f => ({ ...f, data_vencimento: e.target.value }))}
+                    className="rounded-2xl px-3 py-2.5 text-sm outline-none"
+                    style={{ background: "var(--bg-input)", border: "1px solid var(--border-color)", color: "var(--text-primary)", colorScheme: "dark" }} />
+                  <button onClick={() => adicionarTarefa(modalLead.lead!.id)} disabled={salvandoTarefa || !novaTarefa.titulo.trim()}
+                    className="px-4 py-2.5 rounded-2xl text-sm font-semibold transition hover:scale-105"
+                    style={{ background: "var(--gold)", color: "#0a0707" }}>
+                    +
+                  </button>
+                </div>
+                {tarefasLead.length === 0 ? (
+                  <p className="text-sm text-center py-8" style={{ color: "var(--text-muted)" }}>Nenhuma tarefa</p>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {tarefasLead.map(t => {
+                      const vencida = !t.concluida && t.data_vencimento && new Date(t.data_vencimento) < new Date();
+                      return (
+                        <div key={t.id} className="flex items-center gap-3 px-4 py-3 rounded-2xl"
+                          style={{ background: "var(--bg-input)", border: vencida ? "1px solid rgba(232,122,122,0.3)" : "1px solid var(--border-subtle)" }}>
+                          <button onClick={() => toggleTarefa(t)} className="flex-shrink-0">
+                            <div className="w-5 h-5 rounded-full border-2 flex items-center justify-center transition"
+                              style={{ borderColor: t.concluida ? "var(--success)" : "var(--border-color)", background: t.concluida ? "var(--success)" : "transparent" }}>
+                              {t.concluida && <svg viewBox="0 0 24 24" fill="none" className="w-3 h-3" stroke="white" strokeWidth={3}><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                            </div>
+                          </button>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm" style={{ color: t.concluida ? "var(--text-muted)" : "var(--text-primary)", textDecoration: t.concluida ? "line-through" : "none" }}>{t.titulo}</p>
+                            {t.data_vencimento && (
+                              <p className="text-xs mt-0.5" style={{ color: vencida ? "var(--danger)" : "var(--text-muted)" }}>
+                                {vencida ? "⚠ Venceu" : "📅"} {new Date(t.data_vencimento).toLocaleDateString("pt-BR")} {new Date(t.data_vencimento).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                              </p>
+                            )}
+                          </div>
+                          <button onClick={() => deletarTarefa(t.id, modalLead.lead!.id)} className="flex-shrink-0 transition hover:opacity-70" style={{ color: "var(--danger)" }}>✕</button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {abaModal === "historico" && modalLead.lead && (
               <div className="flex flex-col gap-2">
                 {historico.filter(h => h.crm_leads?.nome === modalLead.lead?.nome).length === 0 ? (
                   <p className="text-sm text-center py-8" style={{ color: "var(--text-muted)" }}>Nenhuma movimentacao</p>
@@ -391,8 +561,22 @@ export default function CRMPage() {
                   </div>
                 ))}
               </div>
-            ) : (
+            )}
+
+            {abaModal === "dados" && (
               <div className="flex flex-col gap-4">
+                <div>
+                  <label className="block text-xs uppercase tracking-widest mb-2" style={{ color: "var(--text-muted)" }}>Etiquetas</label>
+                  <div className="flex gap-2 flex-wrap">
+                    {ETIQUETAS.map(e => (
+                      <button key={e.key} onClick={() => toggleEtiqueta(e.key)}
+                        className="text-xs px-3 py-1.5 rounded-full transition hover:scale-105"
+                        style={{ background: (formLead.etiquetas ?? []).includes(e.key) ? e.cor + "33" : "var(--bg-input)", color: (formLead.etiquetas ?? []).includes(e.key) ? e.cor : "var(--text-muted)", border: (formLead.etiquetas ?? []).includes(e.key) ? "1px solid " + e.cor : "1px solid var(--border-subtle)" }}>
+                        {e.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <div>
                   <label className="block text-xs uppercase tracking-widest mb-2" style={{ color: "var(--text-muted)" }}>Nome *</label>
                   <input value={formLead.nome} onChange={e => setFormLead(f => ({ ...f, nome: e.target.value }))}
@@ -401,9 +585,18 @@ export default function CRMPage() {
                 </div>
                 <div>
                   <label className="block text-xs uppercase tracking-widest mb-2" style={{ color: "var(--text-muted)" }}>Telefone</label>
-                  <input value={formLead.telefone} onChange={e => setFormLead(f => ({ ...f, telefone: e.target.value }))}
-                    className="w-full rounded-2xl px-4 py-3 text-sm outline-none" placeholder="(61) 9xxxx-xxxx"
-                    style={{ background: "var(--bg-input)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
+                  <div className="flex gap-2">
+                    <input value={formLead.telefone} onChange={e => setFormLead(f => ({ ...f, telefone: e.target.value }))}
+                      className="flex-1 rounded-2xl px-4 py-3 text-sm outline-none" placeholder="(61) 9xxxx-xxxx"
+                      style={{ background: "var(--bg-input)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
+                    {formLead.telefone && (
+                      <a href={"https://wa.me/55" + formLead.telefone.replace(/\D/g, "")} target="_blank" rel="noopener noreferrer"
+                        className="px-4 py-3 rounded-2xl text-sm font-semibold transition hover:scale-105 flex items-center gap-1"
+                        style={{ background: "rgba(37,211,102,0.1)", color: "#25D366" }}>
+                        💬
+                      </a>
+                    )}
+                  </div>
                 </div>
                 <div>
                   <label className="block text-xs uppercase tracking-widest mb-2" style={{ color: "var(--text-muted)" }}>Procedimento de Interesse</label>
