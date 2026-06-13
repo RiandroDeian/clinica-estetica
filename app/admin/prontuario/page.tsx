@@ -51,7 +51,9 @@ export default function ProntuarioPage() {
   const [formAtestado, setFormAtestado] = useState({ finalidade: "repouso", dias: "1", cid: "", observacoes: "" });
   const [fotos, setFotos] = useState<any[]>([]);
   const [uploadando, setUploadando] = useState(false);
-  const [formFoto, setFormFoto] = useState({ tipo: "antes", descricao: "" });
+  const [uploadando, setUploadando] = useState(false);
+  const [modalTermo, setModalTermo] = useState(false);
+  const [salvandoTermo, setSalvandoTermo] = useState(false);
   const [modalFoto, setModalFoto] = useState(false);
   const tiposAnotacao = [
     { key: "geral", label: "Geral", cor: "var(--text-muted)" },
@@ -151,6 +153,20 @@ export default function ProntuarioPage() {
     setModalAtestado(false);
   }
 
+  async function assinarTermo() {
+    setSalvandoTermo(true);
+    await fetch("/api/prontuario", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ acao: "atualizar_paciente", paciente_id, assinou_termo: true }) });
+    setSalvandoTermo(false); setModalTermo(false); buscarProntuario();
+  }
+
+  function gerarPDF() {
+    const p2: any = dados?.paciente ?? {};
+    const hoje = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Prontuario</title><style>body{font-family:Georgia,serif;max-width:700px;margin:40px auto;color:#1a1a1a}.logo{text-align:center;margin-bottom:30px}.logo h1{font-size:22px;letter-spacing:8px;color:#c8a078;margin:0}h2{font-size:13px;letter-spacing:5px;text-transform:uppercase;border-top:1px solid #ddd;border-bottom:1px solid #ddd;padding:8px 0;margin:20px 0}table{width:100%;border-collapse:collapse}td{padding:8px 10px;border-bottom:1px solid #f0f0f0;font-size:12px}td:first-child{color:#888;font-size:11px;text-transform:uppercase;width:35%}.alerta{background:rgba(232,122,122,0.08);border:1px solid rgba(232,122,122,0.3);padding:10px;border-radius:8px;margin:10px 0;font-size:12px;color:#c0392b}.cidade{text-align:right;font-size:11px;color:#888;margin-top:30px}</style></head><body><div class="logo"><h1>MONCIE</h1><p style="font-size:10px;letter-spacing:4px;color:#888;margin:4px 0 0">ESTHETIQUE</p></div><h2>Prontuario do Paciente</h2><table><tr><td>Nome</td><td><strong>${p2.nome}</strong></td></tr>${p2.data_nascimento ? `<tr><td>Nascimento</td><td>${new Date(p2.data_nascimento + "T12:00:00").toLocaleDateString("pt-BR")}</td></tr>` : ""}${p2.telefone ? `<tr><td>Telefone</td><td>${p2.telefone}</td></tr>` : ""}${p2.tipo_sanguineo ? `<tr><td>Tipo Sanguineo</td><td>${p2.tipo_sanguineo}</td></tr>` : ""}</table>${p2.alergias ? `<div class="alerta">Alergias: ${p2.alergias}</div>` : ""}${p2.medicamentos ? `<div class="alerta">Medicamentos: ${p2.medicamentos}</div>` : ""}${consultas.length > 0 ? `<h2>Consultas (${consultas.length})</h2>` + consultas.map((cc: any) => `<div style="border-left:3px solid #c8a078;padding:8px 12px;margin-bottom:8px;background:#f9f9f9"><p style="margin:0;font-size:13px;font-weight:bold">${cc.tipo}${cc.titulo ? " — " + cc.titulo : ""}</p>${cc.descricao ? `<p style="margin:4px 0 0;font-size:12px;color:#555">${cc.descricao}</p>` : ""}<p style="margin:4px 0 0;font-size:11px;color:#999">${new Date(cc.criado_em).toLocaleDateString("pt-BR")}</p></div>`).join("") : ""}${prescricoes.length > 0 ? `<h2>Prescricoes (${prescricoes.length})</h2>` + prescricoes.map((pr: any) => `<div style="border-left:3px solid #7ae8a0;padding:8px 12px;margin-bottom:8px;background:#f9f9f9"><p style="margin:0;font-size:13px;font-weight:bold">${pr.medicamento}</p><p style="margin:4px 0 0;font-size:12px;color:#666">${[pr.dosagem && "Dose: " + pr.dosagem, pr.frequencia && "Freq: " + pr.frequencia].filter(Boolean).join(" · ")}</p></div>`).join("") : ""}<div class="cidade">Planaltina, Brasilia — ${hoje}</div></body></html>`;
+    const win = window.open("", "_blank");
+    if (win) { win.document.write(html); win.document.close(); win.print(); }
+  }
+
   if (!paciente_id) {
     return (
       <div>
@@ -231,7 +247,8 @@ export default function ProntuarioPage() {
     { key: "historico",  label: "Historico (" + agendamentos.length + ")" },
     { key: "financeiro", label: "Financeiro (" + faturamentos.length + ")" },
     { key: "fotos", label: "Fotos (" + fotos.length + ")" },
-  ];
+    { key: "fotos", label: "Fotos (" + fotos.length + ")" },
+    { key: "timeline", label: "Linha do Tempo" },
 
   return (
     <div className="pb-10">
@@ -240,6 +257,15 @@ export default function ProntuarioPage() {
         style={{ color: "var(--text-muted)" }}>
         ← Prontuarios
       </button>
+      {dados?.paciente && (
+        <div className="flex gap-2 flex-wrap">
+          <button onClick={gerarPDF} className="text-xs px-3 py-1.5 rounded-xl transition hover:scale-105" style={{ background: "var(--gold-bg)", color: "var(--gold)", border: "1px solid var(--border-color)" }}>📄 Exportar PDF</button>
+          {!dados?.paciente?.assinou_termo
+            ? <button onClick={() => setModalTermo(true)} className="text-xs px-3 py-1.5 rounded-xl transition hover:scale-105" style={{ background: "rgba(122,232,160,0.1)", color: "var(--success)", border: "1px solid rgba(122,232,160,0.2)" }}>✍ Assinar Termo</button>
+            : <span className="text-xs px-3 py-1.5 rounded-xl" style={{ background: "rgba(122,232,160,0.1)", color: "var(--success)" }}>✓ Termo Assinado</span>
+          }
+        </div>
+      )}
 
       <div className="flex items-center gap-5 mb-5 p-5 rounded-3xl flex-wrap"
         style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
@@ -258,6 +284,18 @@ export default function ProntuarioPage() {
             <div className="mt-2 px-3 py-1.5 rounded-xl text-xs"
               style={{ background: "rgba(232,122,122,0.08)", border: "1px solid rgba(232,122,122,0.2)", color: "var(--danger)" }}>
               Alergias: {p.alergias}
+            </div>
+          )}
+          {p.medicamentos && p.medicamentos !== "Nenhum" && (
+            <div className="mt-1 px-3 py-1.5 rounded-xl text-xs"
+              style={{ background: "rgba(232,201,122,0.08)", border: "1px solid rgba(232,201,122,0.2)", color: "var(--warning)" }}>
+              💊 Medicamentos em uso: {p.medicamentos}
+            </div>
+          )}
+          {p.contraindicacoes && p.contraindicacoes !== "Nenhuma" && (
+            <div className="mt-1 px-3 py-1.5 rounded-xl text-xs"
+              style={{ background: "rgba(168,144,232,0.08)", border: "1px solid rgba(168,144,232,0.2)", color: "var(--info)" }}>
+              ⛔ Contraindicacoes: {p.contraindicacoes}
             </div>
           )}
         </div>
@@ -578,6 +616,61 @@ export default function ProntuarioPage() {
           </div>
         </div>
       )}
+
+      {abaAtiva === "timeline" && (() => {
+        const eventos: any[] = [
+          ...agendamentos.map((a: any) => ({ tipo: "agendamento", data: a.inicio, cor: "var(--gold)", icon: "📅", titulo: a.procedimentos?.nome ?? "Procedimento", sub: a.funcionarios?.nome + " · " + a.status })),
+          ...consultas.map((c: any) => ({ tipo: "consulta", data: c.criado_em, cor: "var(--info)", icon: "🩺", titulo: c.tipo + (c.titulo ? " — " + c.titulo : ""), sub: c.funcionarios?.nome })),
+          ...anamneses.map((a: any) => ({ tipo: "anamnese", data: a.criado_em, cor: "#a078c8", icon: "📝", titulo: "Anamnese", sub: a.funcionarios?.nome })),
+          ...prescricoes.map((pr: any) => ({ tipo: "prescricao", data: pr.criado_em, cor: "var(--success)", icon: "💊", titulo: pr.medicamento, sub: pr.dosagem })),
+          ...exames.map((ex: any) => ({ tipo: "exame", data: ex.criado_em, cor: "var(--warning)", icon: "🔬", titulo: ex.tipo_exame, sub: ex.resultado })),
+          ...anotacoes.map((an: any) => ({ tipo: "anotacao", data: an.criado_em, cor: "var(--text-muted)", icon: "📌", titulo: an.titulo ?? "Anotacao", sub: an.conteudo?.slice(0, 60) })),
+        ].sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
+        return eventos.length === 0 ? (
+          <div className="text-center py-16 rounded-3xl" style={{ background: "var(--bg-card)", border: "1px solid var(--border-subtle)" }}><p className="text-4xl mb-3">🕐</p><p style={{ color: "var(--text-muted)" }}>Nenhum evento registrado</p></div>
+        ) : (
+          <div className="flex flex-col gap-0">
+            {eventos.map((ev, i) => (
+              <div key={i} className="flex gap-4 relative">
+                <div className="flex flex-col items-center">
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm flex-shrink-0 z-10" style={{ background: ev.cor + "22", border: "2px solid " + ev.cor }}>{ev.icon}</div>
+                  {i < eventos.length - 1 && <div className="w-0.5 flex-1 my-1" style={{ background: "var(--border-subtle)" }} />}
+                </div>
+                <div className="pb-5 flex-1 min-w-0">
+                  <div className="rounded-2xl p-4" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <p className="text-sm font-semibold truncate" style={{ color: "var(--text-primary)" }}>{ev.titulo}</p>
+                      <p className="text-xs flex-shrink-0" style={{ color: "var(--text-muted)" }}>{new Date(ev.data).toLocaleDateString("pt-BR")}</p>
+                    </div>
+                    {ev.sub && <p className="text-xs" style={{ color: "var(--text-muted)" }}>{ev.sub}</p>}
+                    <span className="text-[10px] px-2 py-0.5 rounded-full mt-2 inline-block" style={{ background: ev.cor + "22", color: ev.cor }}>{ev.tipo}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
+
+      {modalTermo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}>
+          <div className="w-full max-w-md rounded-3xl p-6" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-bold" style={{ color: "var(--gold)" }}>Assinar Termo</h2>
+              <button onClick={() => setModalTermo(false)} style={{ color: "var(--text-muted)" }}>✕</button>
+            </div>
+            <p className="text-sm mb-2" style={{ color: "var(--text-primary)" }}>Paciente: <strong>{dados?.paciente?.nome}</strong></p>
+            <p className="text-sm mb-5" style={{ color: "var(--text-muted)" }}>Confirmar que o paciente assinou o termo de consentimento? Sera registrado data e hora.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setModalTermo(false)} className="flex-1 py-3 rounded-2xl text-sm" style={{ border: "1px solid var(--border-color)", color: "var(--text-muted)" }}>Cancelar</button>
+              <button onClick={assinarTermo} disabled={salvandoTermo} className="flex-1 py-3 rounded-2xl text-sm font-semibold transition hover:scale-105" style={{ background: "var(--success)", color: "white" }}>
+                {salvandoTermo ? "Salvando..." : "Confirmar Assinatura"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {modalConsulta && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}>
