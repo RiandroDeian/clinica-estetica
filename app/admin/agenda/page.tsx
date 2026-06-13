@@ -71,6 +71,11 @@ export default function AgendaPage() {
   const [filtroFuncionario, setFiltroFuncionario] = useState<string>("");
   const [usuarioLogado, setUsuarioLogado] = useState<{ id: string; role: string; cargo?: string } | null>(null);
   const [agendamentoParaCadastrar, setAgendamentoParaCadastrar] = useState<Agendamento | null>(null);
+  const [bloqueios, setBloqueios] = useState<any[]>([]);
+  const [modalBloqueio, setModalBloqueio] = useState(false);
+  const [salvandoBloqueio, setSalvandoBloqueio] = useState(false);
+  const [formBloqueio, setFormBloqueio] = useState({ funcionario_id: "", data_inicio: "", data_fim: "", motivo: "Bloqueado", tipo: "geral" });
+  const [abaBloqueios, setAbaBloqueios] = useState(false);
   const [form, setForm] = useState({
     paciente_id: "", procedimento_id: "", funcionario_id: "",
     inicio: "", fim: "", status: "pendente", observacoes: "",
@@ -94,7 +99,7 @@ export default function AgendaPage() {
     setAgendamentos(Array.isArray(data) ? data : []);
   }, [dataAtual, view]);
 
-  useEffect(() => { buscarDados(); }, [buscarDados]);
+  useEffect(() => { buscarDados(); fetch("/api/agenda/bloqueios").then(r => r.json()).then(d => setBloqueios(Array.isArray(d) ? d : [])); }, [buscarDados]);
 
   useEffect(() => {
     fetch("/api/auth/me").then(r => r.json()).then(d => {
@@ -235,6 +240,18 @@ export default function AgendaPage() {
   function EventoCard({ ag, compacto = false }: { ag: Agendamento; compacto?: boolean }) {
     const cor = ag.sem_cadastro ? "#fbbf24" : corProfissional(ag);
     const semCadastro = ag.sem_cadastro === true;
+
+  async function salvarBloqueio() {
+    setSalvandoBloqueio(true);
+    const res = await fetch("/api/agenda/bloqueios", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(formBloqueio) });
+    if (res.ok) { setModalBloqueio(false); setFormBloqueio({ funcionario_id: "", data_inicio: "", data_fim: "", motivo: "Bloqueado", tipo: "geral" }); fetch("/api/agenda/bloqueios").then(r => r.json()).then(d => setBloqueios(Array.isArray(d) ? d : [])); }
+    setSalvandoBloqueio(false);
+  }
+
+  async function deletarBloqueio(id: string) {
+    await fetch("/api/agenda/bloqueios?id=" + id, { method: "DELETE" });
+    fetch("/api/agenda/bloqueios").then(r => r.json()).then(d => setBloqueios(Array.isArray(d) ? d : []));
+  }
     return (
       <div onClick={(e) => { e.stopPropagation(); abrirEditar(ag); }}
         className="rounded-xl px-2 py-1.5 mb-1 cursor-pointer transition hover:scale-[1.02] text-left w-full"
@@ -300,6 +317,11 @@ export default function AgendaPage() {
             style={{ background: "var(--gold)", color: "var(--bg-input)" }}>
             <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth={2}><path d="M12 5v14M5 12h14" strokeLinecap="round"/></svg>
             Novo
+          </button>
+          <button onClick={() => setAbaBloqueios(!abaBloqueios)}
+            className="flex items-center gap-2 px-4 py-3 rounded-2xl text-sm font-semibold transition hover:scale-105"
+            style={{ background: abaBloqueios ? "rgba(232,122,122,0.15)" : "var(--bg-input)", color: "var(--danger)", border: "1px solid rgba(232,122,122,0.3)" }}>
+            ⛔ Bloqueios
           </button>
         </div>
       </div>
@@ -635,6 +657,65 @@ export default function AgendaPage() {
           onClose={() => setAgendamentoParaCadastrar(null)}
           onSuccess={buscarDados}
         />
+      )}
+      {abaBloqueios && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}>
+          <div className="w-full max-w-2xl rounded-3xl p-6 max-h-[90vh] overflow-y-auto" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-bold" style={{ color: "var(--danger)" }}>⛔ Bloqueios de Agenda</h2>
+              <button onClick={() => setAbaBloqueios(false)} style={{ color: "var(--text-muted)" }}>✕</button>
+            </div>
+            <button onClick={() => setModalBloqueio(true)} className="w-full py-3 rounded-2xl text-sm font-semibold mb-5 transition hover:scale-105" style={{ background: "rgba(232,122,122,0.1)", color: "var(--danger)", border: "1px dashed rgba(232,122,122,0.3)" }}>+ Novo Bloqueio</button>
+            {bloqueios.length === 0 ? (
+              <p className="text-center py-8 text-sm" style={{ color: "var(--text-muted)" }}>Nenhum bloqueio cadastrado</p>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {bloqueios.map(b => (
+                  <div key={b.id} className="flex items-center gap-4 px-4 py-3 rounded-2xl" style={{ background: "var(--bg-input)", border: "1px solid rgba(232,122,122,0.2)" }}>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>{b.motivo}</p>
+                      <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>{new Date(b.data_inicio).toLocaleDateString("pt-BR")} {new Date(b.data_inicio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} → {new Date(b.data_fim).toLocaleDateString("pt-BR")} {new Date(b.data_fim).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</p>
+                      {b.funcionarios && <p className="text-xs mt-0.5" style={{ color: b.funcionarios.cor ?? "var(--gold)" }}>{b.funcionarios.nome}</p>}
+                      {!b.funcionario_id && <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>Todos os profissionais</p>}
+                    </div>
+                    <button onClick={() => deletarBloqueio(b.id)} className="text-xs px-3 py-1.5 rounded-xl transition hover:scale-105" style={{ background: "rgba(232,122,122,0.1)", color: "var(--danger)" }}>Remover</button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      {modalBloqueio && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.9)", backdropFilter: "blur(8px)" }}>
+          <div className="w-full max-w-md rounded-3xl p-6" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-bold" style={{ color: "var(--danger)" }}>Novo Bloqueio</h2>
+              <button onClick={() => setModalBloqueio(false)} style={{ color: "var(--text-muted)" }}>✕</button>
+            </div>
+            <div className="flex flex-col gap-4">
+              <div><label className="block text-xs uppercase tracking-widest mb-2" style={{ color: "var(--text-muted)" }}>Profissional (vazio = todos)</label>
+              <select value={formBloqueio.funcionario_id} onChange={e => setFormBloqueio(f => ({ ...f, funcionario_id: e.target.value }))} className="w-full rounded-2xl px-4 py-3 text-sm outline-none" style={{ background: "var(--bg-input)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
+                <option value="">Todos os profissionais</option>
+                {funcionarios.map(f => <option key={f.id} value={f.id}>{f.nome}</option>)}
+              </select></div>
+              <div><label className="block text-xs uppercase tracking-widest mb-2" style={{ color: "var(--text-muted)" }}>Motivo</label>
+              <select value={formBloqueio.motivo} onChange={e => setFormBloqueio(f => ({ ...f, motivo: e.target.value }))} className="w-full rounded-2xl px-4 py-3 text-sm outline-none" style={{ background: "var(--bg-input)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
+                {["Bloqueado","Ferias","Folga","Almoco","Manutencao","Reuniao","Feriado"].map(m => <option key={m} value={m}>{m}</option>)}
+              </select></div>
+              <div><label className="block text-xs uppercase tracking-widest mb-2" style={{ color: "var(--text-muted)" }}>Data e Hora Inicio</label>
+              <input type="datetime-local" value={formBloqueio.data_inicio} onChange={e => setFormBloqueio(f => ({ ...f, data_inicio: e.target.value }))} className="w-full rounded-2xl px-4 py-3 text-sm outline-none" style={{ background: "var(--bg-input)", border: "1px solid var(--border-color)", color: "var(--text-primary)", colorScheme: "dark" }} /></div>
+              <div><label className="block text-xs uppercase tracking-widest mb-2" style={{ color: "var(--text-muted)" }}>Data e Hora Fim</label>
+              <input type="datetime-local" value={formBloqueio.data_fim} onChange={e => setFormBloqueio(f => ({ ...f, data_fim: e.target.value }))} className="w-full rounded-2xl px-4 py-3 text-sm outline-none" style={{ background: "var(--bg-input)", border: "1px solid var(--border-color)", color: "var(--text-primary)", colorScheme: "dark" }} /></div>
+            </div>
+            <div className="flex gap-3 mt-5">
+              <button onClick={() => setModalBloqueio(false)} className="flex-1 py-3 rounded-2xl text-sm" style={{ border: "1px solid var(--border-color)", color: "var(--text-muted)" }}>Cancelar</button>
+              <button onClick={salvarBloqueio} disabled={salvandoBloqueio || !formBloqueio.data_inicio || !formBloqueio.data_fim} className="flex-1 py-3 rounded-2xl text-sm font-semibold transition hover:scale-105" style={{ background: "var(--danger)", color: "white" }}>
+                {salvandoBloqueio ? "Salvando..." : "Confirmar Bloqueio"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       <style>{`select option { background: #120d0d; } textarea::placeholder { color: #3a2e28; }`}</style>
     </div>
