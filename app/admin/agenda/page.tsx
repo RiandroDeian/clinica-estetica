@@ -252,6 +252,12 @@ export default function AgendaPage() {
     fetch("/api/agenda/bloqueios").then(r => r.json()).then(d => setBloqueios(Array.isArray(d) ? d : []));
   }
 
+  async function salvarBloqueio() {
+    setSalvandoBloqueio(true);
+    const res = await fetch("/api/agenda/bloqueios", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(formBloqueio) });
+    if (res.ok) { setModalBloqueio(false); setFormBloqueio({ funcionario_id: "", data_inicio: "", data_fim: "", motivo: "Bloqueado", tipo: "geral" }); fetch("/api/agenda/bloqueios").then(r => r.json()).then(d => setBloqueios(Array.isArray(d) ? d : [])); }
+    setSalvandoBloqueio(false);
+  }
     return (
       <div onClick={(e) => { e.stopPropagation(); abrirEditar(ag); }}
         className="rounded-xl px-2 py-1.5 mb-1 cursor-pointer transition hover:scale-[1.02] text-left w-full"
