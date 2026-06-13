@@ -247,8 +247,8 @@ export default function ProntuarioPage() {
     { key: "historico",  label: "Historico (" + agendamentos.length + ")" },
     { key: "financeiro", label: "Financeiro (" + faturamentos.length + ")" },
     { key: "fotos", label: "Fotos (" + fotos.length + ")" },
-    { key: "fotos", label: "Fotos (" + fotos.length + ")" },
     { key: "timeline", label: "Linha do Tempo" },
+  ];
 
   return (
     <div className="pb-10">
