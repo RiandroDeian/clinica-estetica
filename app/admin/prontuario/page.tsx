@@ -54,6 +54,7 @@ export default function ProntuarioPage() {
   const [modalTermo, setModalTermo] = useState(false);
   const [salvandoTermo, setSalvandoTermo] = useState(false);
   const [modalFoto, setModalFoto] = useState(false);
+  const [formFoto, setFormFoto] = useState({ tipo: "antes", descricao: "" });
   const tiposAnotacao = [
     { key: "geral", label: "Geral", cor: "var(--text-muted)" },
     { key: "clinica", label: "Clinica", cor: "var(--info)" },
