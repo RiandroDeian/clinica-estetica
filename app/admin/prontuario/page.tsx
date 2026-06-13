@@ -51,7 +51,6 @@ export default function ProntuarioPage() {
   const [formAtestado, setFormAtestado] = useState({ finalidade: "repouso", dias: "1", cid: "", observacoes: "" });
   const [fotos, setFotos] = useState<any[]>([]);
   const [uploadando, setUploadando] = useState(false);
-  const [uploadando, setUploadando] = useState(false);
   const [modalTermo, setModalTermo] = useState(false);
   const [salvandoTermo, setSalvandoTermo] = useState(false);
   const [modalFoto, setModalFoto] = useState(false);
