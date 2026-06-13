@@ -240,7 +240,6 @@ export default function AgendaPage() {
   function EventoCard({ ag, compacto = false }: { ag: Agendamento; compacto?: boolean }) {
     const cor = ag.sem_cadastro ? "#fbbf24" : corProfissional(ag);
     const semCadastro = ag.sem_cadastro === true;
-
   async function salvarBloqueio() {
     setSalvandoBloqueio(true);
     const res = await fetch("/api/agenda/bloqueios", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(formBloqueio) });
@@ -252,6 +251,7 @@ export default function AgendaPage() {
     await fetch("/api/agenda/bloqueios?id=" + id, { method: "DELETE" });
     fetch("/api/agenda/bloqueios").then(r => r.json()).then(d => setBloqueios(Array.isArray(d) ? d : []));
   }
+
     return (
       <div onClick={(e) => { e.stopPropagation(); abrirEditar(ag); }}
         className="rounded-xl px-2 py-1.5 mb-1 cursor-pointer transition hover:scale-[1.02] text-left w-full"
