@@ -57,3 +57,13 @@ export async function PUT(request: NextRequest) {
   if (error) return NextResponse.json({ erro: error.message }, { status: 500 });
   return NextResponse.json(data);
 }
+
+export async function PATCH(request: NextRequest) {
+  const sessao = await getSessao();
+  if (!sessao) return NextResponse.json({ erro: "Nao autorizado" }, { status: 401 });
+  const body = await request.json();
+  const { id, ...updates } = body;
+  const { data, error } = await supabaseAdmin.from("funcionarios").update(updates).eq("id", id).select().single();
+  if (error) return NextResponse.json({ erro: error.message }, { status: 500 });
+  return NextResponse.json(data);
+}
