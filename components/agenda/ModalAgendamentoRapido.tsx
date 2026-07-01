@@ -9,15 +9,28 @@ interface Procedimento {
   duracao_minutos: number;
 }
 
+interface Funcionario {
+  id: string;
+  nome: string;
+  cor: string;
+}
+
 interface Props {
   inicioSugerido?: string;
   onClose: () => void;
   onSuccess: () => void;
 }
 
+// ✅ Corrige bug de fuso horário no input datetime-local
+function toLocalInput(iso: string) {
+  const d = new Date(iso);
+  const offset = d.getTimezoneOffset() * 60000;
+  return new Date(d.getTime() - offset).toISOString().slice(0, 16);
+}
+
 export function ModalAgendamentoRapido({ inicioSugerido, onClose, onSuccess }: Props) {
-  const agora = inicioSugerido ?? new Date().toISOString().slice(0, 16);
-  const fimPadrao = new Date(new Date(agora).getTime() + 60 * 60000).toISOString().slice(0, 16);
+  const agora = inicioSugerido ? toLocalInput(inicioSugerido) : toLocalInput(new Date().toISOString());
+  const fimPadrao = toLocalInput(new Date(new Date(agora).getTime() + 60 * 60000).toISOString());
 
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState("");
@@ -26,12 +39,22 @@ export function ModalAgendamentoRapido({ inicioSugerido, onClose, onSuccess }: P
   const [procedimentosSelecionados, setProcedimentosSelecionados] = useState<string[]>([]);
   const [inicio, setInicio] = useState(agora);
   const [fim, setFim] = useState(fimPadrao);
+  const [observacoes, setObservacoes] = useState(""); // ✅ campo novo
+  const [funcionarioId, setFuncionarioId] = useState(""); // ✅ campo novo
   const [procedimentos, setProcedimentos] = useState<Procedimento[]>([]);
+  const [funcionarios, setFuncionarios] = useState<Funcionario[]>([]); // ✅ novo
+
+  // ✅ Opções especiais além dos procedimentos cadastrados
+  const OPCOES_ESPECIAIS = ["Consulta", "Avaliação"];
 
   useEffect(() => {
     fetch("/api/procedimentos")
       .then(r => r.json())
       .then(d => setProcedimentos(Array.isArray(d) ? d : []));
+    // ✅ Busca funcionários
+    fetch("/api/funcionarios")
+      .then(r => r.json())
+      .then(d => setFuncionarios(Array.isArray(d) ? d : []));
   }, []);
 
   function formatarTelefone(valor: string) {
@@ -49,7 +72,7 @@ export function ModalAgendamentoRapido({ inicioSugerido, onClose, onSuccess }: P
       return acc + (p?.duracao_minutos ?? 60);
     }, 0);
     const novoFim = new Date(d.getTime() + Math.max(totalMin, 60) * 60000);
-    setFim(novoFim.toISOString().slice(0, 16));
+    setFim(toLocalInput(novoFim.toISOString()));
   }
 
   function toggleProcedimento(nomep: string) {
@@ -71,6 +94,7 @@ export function ModalAgendamentoRapido({ inicioSugerido, onClose, onSuccess }: P
       setErro("Preencha todos os campos e selecione ao menos um procedimento.");
       return;
     }
+    // ✅ Converte o valor local do input para ISO corretamente
     const inicioDate = new Date(inicio);
     const fimDate = new Date(fim);
     if (isNaN(inicioDate.getTime()) || isNaN(fimDate.getTime())) {
@@ -83,18 +107,21 @@ export function ModalAgendamentoRapido({ inicioSugerido, onClose, onSuccess }: P
     }
     setLoading(true);
 
-    const inicioISO = inicioDate.toISOString();
-    const fimISO = fimDate.toISOString();
-    const offset = inicioDate.getTimezoneOffset() * 60000;
-    const localInicio = new Date(inicioDate.getTime() - offset);
-    const data = localInicio.toISOString().split("T")[0];
-    const horario = localInicio.toISOString().split("T")[1].slice(0, 5);
+    // ✅ Envia como ISO sem dupla conversão
     const procedimento = procedimentosSelecionados.join(", ");
 
     const res = await fetch("/api/agendamentos/rapido", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nome: nome.trim(), telefone: telefone.trim(), procedimento, inicio: inicioISO, fim: fimISO, data, horario }),
+      body: JSON.stringify({
+        nome: nome.trim(),
+        telefone: telefone.trim(),
+        procedimento,
+        inicio: inicioDate.toISOString(),
+        fim: fimDate.toISOString(),
+        funcionario_id: funcionarioId || null, // ✅
+        observacoes: observacoes.trim() || null, // ✅
+      }),
     });
 
     setLoading(false);
@@ -107,12 +134,6 @@ export function ModalAgendamentoRapido({ inicioSugerido, onClose, onSuccess }: P
     const p = procedimentos.find(p => p.nome === n);
     return acc + (p?.duracao_minutos ?? 60);
   }, 0);
-
-  function formatarDataHora(iso: string) {
-    const d = new Date(iso);
-    if (isNaN(d.getTime())) return "";
-    return d.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
-  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -147,12 +168,14 @@ export function ModalAgendamentoRapido({ inicioSugerido, onClose, onSuccess }: P
             className="w-full px-4 py-3 rounded-2xl outline-none text-white placeholder:text-[#4a3a32] text-sm"
             style={{ background: "#0e0a0a", border: "1px solid rgba(200,160,120,0.15)" }} />
 
+          {/* ✅ Procedimentos + Consulta + Avaliação */}
           <div>
             <label className="block text-xs uppercase tracking-widest mb-3" style={{ color: "#a89080" }}>
               Procedimentos
               {procedimentosSelecionados.length > 0 && (
                 <span className="ml-2 normal-case" style={{ color: "#c8a078" }}>
-                  ({procedimentosSelecionados.length} selecionado{procedimentosSelecionados.length > 1 ? "s" : ""} · {duracaoTotal}min)
+                  ({procedimentosSelecionados.length} selecionado{procedimentosSelecionados.length > 1 ? "s" : ""}
+                  {duracaoTotal > 0 ? ` · ${duracaoTotal}min` : ""})
                 </span>
               )}
             </label>
@@ -160,6 +183,24 @@ export function ModalAgendamentoRapido({ inicioSugerido, onClose, onSuccess }: P
               <p className="text-xs" style={{ color: "#4a3a32" }}>Carregando...</p>
             ) : (
               <div className="flex flex-wrap gap-2">
+                {/* ✅ Opções especiais primeiro */}
+                {OPCOES_ESPECIAIS.map((opcao) => {
+                  const sel = procedimentosSelecionados.includes(opcao);
+                  return (
+                    <button key={opcao} type="button" onClick={() => toggleProcedimento(opcao)}
+                      className="px-3 py-1.5 rounded-xl text-xs transition hover:scale-105 font-medium"
+                      style={{
+                        background: sel ? "rgba(122,232,160,0.15)" : "#0e0a0a",
+                        color: sel ? "#7ae8a0" : "#6b5a4e",
+                        border: sel ? "1px solid #7ae8a0" : "1px solid rgba(122,232,160,0.25)",
+                      }}>
+                      {sel ? "✓ " : ""}{opcao}
+                    </button>
+                  );
+                })}
+                {/* Separador */}
+                <div className="w-full h-px my-1" style={{ background: "rgba(200,160,120,0.08)" }} />
+                {/* Procedimentos cadastrados */}
                 {procedimentos.map((p) => {
                   const sel = procedimentosSelecionados.includes(p.nome);
                   return (
@@ -178,24 +219,62 @@ export function ModalAgendamentoRapido({ inicioSugerido, onClose, onSuccess }: P
             )}
           </div>
 
+          {/* ✅ Seleção de profissional */}
+          <div>
+            <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "#a89080" }}>
+              Profissional <span style={{ color: "#4a3a32" }}>(opcional)</span>
+            </label>
+            <select value={funcionarioId} onChange={e => setFuncionarioId(e.target.value)}
+              className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
+              style={{ background: "#0e0a0a", border: "1px solid rgba(200,160,120,0.15)", color: funcionarioId ? "#e8d5c0" : "#4a3a32" }}>
+              <option value="">Selecionar profissional...</option>
+              {funcionarios.map(f => (
+                <option key={f.id} value={f.id}>{f.nome}</option>
+              ))}
+            </select>
+            {funcionarioId && (
+              <div className="flex items-center gap-2 mt-1.5">
+                <div className="w-2 h-2 rounded-full"
+                  style={{ background: funcionarios.find(f => f.id === funcionarioId)?.cor ?? "#c8a078" }} />
+                <span className="text-xs" style={{ color: "#6b5a4e" }}>
+                  {funcionarios.find(f => f.id === funcionarioId)?.nome}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Data/hora */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "#a89080" }}>Início</label>
               <input type="datetime-local" value={inicio} onChange={(e) => handleInicioChange(e.target.value)}
                 className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
                 style={{ background: "#0e0a0a", border: "1px solid rgba(200,160,120,0.15)", color: "#e8d5c0", colorScheme: "dark" }} />
-              {inicio && <p className="text-xs mt-1" style={{ color: "#6b5a4e" }}>{formatarDataHora(inicio)}</p>}
             </div>
             <div>
               <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "#a89080" }}>Fim</label>
               <input type="datetime-local" value={fim} onChange={(e) => setFim(e.target.value)}
                 className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
                 style={{ background: "#0e0a0a", border: "1px solid rgba(200,160,120,0.15)", color: "#e8d5c0", colorScheme: "dark" }} />
-              {fim && <p className="text-xs mt-1" style={{ color: "#6b5a4e" }}>{formatarDataHora(fim)}</p>}
             </div>
           </div>
 
-          {erro && <div className="px-4 py-3 rounded-2xl text-sm" style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444" }}>{erro}</div>}
+          {/* ✅ Observações */}
+          <div>
+            <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "#a89080" }}>
+              Observações <span style={{ color: "#4a3a32" }}>(opcional)</span>
+            </label>
+            <textarea value={observacoes} onChange={e => setObservacoes(e.target.value)}
+              rows={2} placeholder="Observações sobre o agendamento..."
+              className="w-full rounded-2xl px-4 py-3 text-sm outline-none resize-none"
+              style={{ background: "#0e0a0a", border: "1px solid rgba(200,160,120,0.15)", color: "#e8d5c0" }} />
+          </div>
+
+          {erro && (
+            <div className="px-4 py-3 rounded-2xl text-sm" style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444" }}>
+              {erro}
+            </div>
+          )}
         </div>
 
         <div className="flex gap-3 px-6 py-4" style={{ borderTop: "1px solid rgba(200,160,120,0.1)" }}>
@@ -208,6 +287,7 @@ export function ModalAgendamentoRapido({ inicioSugerido, onClose, onSuccess }: P
           </button>
         </div>
       </div>
+      <style>{`select option { background: #120d0d; } textarea::placeholder { color: #3a2e28; }`}</style>
     </div>
   );
 }

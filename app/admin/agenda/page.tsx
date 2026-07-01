@@ -45,6 +45,13 @@ function inicioSemana(data: Date) {
   return d;
 }
 
+// ✅ Corrige bug de fuso horário: converte ISO para valor correto do input datetime-local
+function toLocalInput(iso: string) {
+  const d = new Date(iso);
+  const offset = d.getTimezoneOffset() * 60000;
+  return new Date(d.getTime() - offset).toISOString().slice(0, 16);
+}
+
 const diasSemana = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sab", "Dom"];
 
 function nomePaciente(ag: Agendamento) {
@@ -99,12 +106,14 @@ export default function AgendaPage() {
     setAgendamentos(Array.isArray(data) ? data : []);
   }, [dataAtual, view]);
 
-  useEffect(() => { buscarDados(); fetch("/api/agenda/bloqueios").then(r => r.json()).then(d => setBloqueios(Array.isArray(d) ? d : [])); }, [buscarDados]);
+  useEffect(() => {
+    buscarDados();
+    fetch("/api/agenda/bloqueios").then(r => r.json()).then(d => setBloqueios(Array.isArray(d) ? d : []));
+  }, [buscarDados]);
 
   useEffect(() => {
     fetch("/api/auth/me").then(r => r.json()).then(d => {
       setUsuarioLogado(d);
-      // Se for funcionario comum, filtrar automaticamente pela propria agenda
       if (d?.role !== "admin" && d?.cargo !== "Recepcionista" && d?.cargo !== "Recepção") {
         setFiltroFuncionario(d?.id ?? "");
       }
@@ -135,20 +144,22 @@ export default function AgendaPage() {
   function abrirNovoAgendamento(dataStr?: string) {
     setAgendamentoSelecionado(null);
     setProcedimentosSelecionados([]);
-    const inicio = dataStr ?? new Date().toISOString().slice(0, 16);
-    const fim = new Date(new Date(inicio).getTime() + 60 * 60000).toISOString().slice(0, 16);
+    // ✅ usa toLocalInput para não deslocar o horário
+    const inicio = dataStr ? toLocalInput(new Date(dataStr).toISOString()) : toLocalInput(new Date().toISOString());
+    const fim = toLocalInput(new Date(new Date(inicio).getTime() + 60 * 60000).toISOString());
     setForm({ paciente_id: "", procedimento_id: "", funcionario_id: "", inicio, fim, status: "pendente", observacoes: "" });
     setModalAberto(true);
   }
 
   function abrirEditar(ag: Agendamento) {
     setAgendamentoSelecionado(ag);
+    // ✅ Fix fuso horário: usa toLocalInput em vez de .toISOString().slice(0,16)
     setForm({
       paciente_id: ag.paciente_id ?? "",
-      procedimento_id: "",
-      funcionario_id: "",
-      inicio: new Date(ag.inicio).toISOString().slice(0, 16),
-      fim: new Date(ag.fim).toISOString().slice(0, 16),
+      procedimento_id: ag.procedimentos ? (procedimentos.find(p => p.nome === ag.procedimentos?.nome)?.id ?? "") : "",
+      funcionario_id: ag.funcionario_id ?? "",
+      inicio: toLocalInput(ag.inicio),
+      fim: toLocalInput(ag.fim),
       status: ag.status,
       observacoes: ag.observacoes ?? "",
     });
@@ -165,7 +176,7 @@ export default function AgendaPage() {
         return acc + (p?.duracao_minutos ?? 60);
       }, 0);
       if (form.inicio) {
-        const novoFim = new Date(new Date(form.inicio).getTime() + Math.max(totalMin, 60) * 60000).toISOString().slice(0, 16);
+        const novoFim = toLocalInput(new Date(new Date(form.inicio).getTime() + Math.max(totalMin, 60) * 60000).toISOString());
         setForm(f => ({ ...f, procedimento_id: novos[0] ?? "", fim: novoFim }));
       }
       return novos;
@@ -175,14 +186,26 @@ export default function AgendaPage() {
   async function salvar() {
     setSalvando(true);
     if (agendamentoSelecionado) {
+      // ✅ Na edição, envia também procedimento_id e funcionario_id
       await fetch(`/api/agendamentos/${agendamentoSelecionado.id}`, {
         method: "PUT", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: form.status, observacoes: form.observacoes, inicio: new Date(form.inicio).toISOString(), fim: new Date(form.fim).toISOString() }),
+        body: JSON.stringify({
+          status: form.status,
+          observacoes: form.observacoes,
+          inicio: new Date(form.inicio).toISOString(),
+          fim: new Date(form.fim).toISOString(),
+          procedimento_id: form.procedimento_id || null,
+          funcionario_id: form.funcionario_id || null,
+        }),
       });
     } else {
       await fetch("/api/agendamentos", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, inicio: new Date(form.inicio).toISOString(), fim: new Date(form.fim).toISOString() }),
+        body: JSON.stringify({
+          ...form,
+          inicio: new Date(form.inicio).toISOString(),
+          fim: new Date(form.fim).toISOString(),
+        }),
       });
     }
     setModalAberto(false);
@@ -266,12 +289,18 @@ export default function AgendaPage() {
       </div>
     );
   }
+
   async function salvarBloqueio() {
     setSalvandoBloqueio(true);
     const res = await fetch("/api/agenda/bloqueios", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(formBloqueio) });
-    if (res.ok) { setModalBloqueio(false); setFormBloqueio({ funcionario_id: "", data_inicio: "", data_fim: "", motivo: "Bloqueado", tipo: "geral" }); fetch("/api/agenda/bloqueios").then(r => r.json()).then(d => setBloqueios(Array.isArray(d) ? d : [])); }
+    if (res.ok) {
+      setModalBloqueio(false);
+      setFormBloqueio({ funcionario_id: "", data_inicio: "", data_fim: "", motivo: "Bloqueado", tipo: "geral" });
+      fetch("/api/agenda/bloqueios").then(r => r.json()).then(d => setBloqueios(Array.isArray(d) ? d : []));
+    }
     setSalvandoBloqueio(false);
   }
+
   async function deletarBloqueio(id: string) {
     await fetch("/api/agenda/bloqueios?id=" + id, { method: "DELETE" });
     fetch("/api/agenda/bloqueios").then(r => r.json()).then(d => setBloqueios(Array.isArray(d) ? d : []));
@@ -502,7 +531,6 @@ export default function AgendaPage() {
               </button>
             </div>
 
-            {/* Badge sem cadastro + botão cadastrar paciente */}
             {agendamentoSelecionado?.sem_cadastro && (
               <div className="flex items-center justify-between mb-5 px-4 py-3 rounded-2xl"
                 style={{ background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.2)" }}>
@@ -510,8 +538,7 @@ export default function AgendaPage() {
                   <span className="text-xs font-medium" style={{ color: "#fbbf24" }}>⚠ Sem cadastro</span>
                   <span className="text-xs" style={{ color: "var(--text-muted)" }}>{agendamentoSelecionado.nome_temporario} · {agendamentoSelecionado.telefone_temporario}</span>
                 </div>
-                <button
-                  onClick={() => { setModalAberto(false); setAgendamentoParaCadastrar(agendamentoSelecionado); }}
+                <button onClick={() => { setModalAberto(false); setAgendamentoParaCadastrar(agendamentoSelecionado); }}
                   className="text-xs px-3 py-1.5 rounded-xl font-medium transition hover:scale-105"
                   style={{ background: "rgba(200,160,120,0.15)", color: "var(--gold)", border: "1px solid rgba(200,160,120,0.3)" }}>
                   Cadastrar Paciente
@@ -568,29 +595,49 @@ export default function AgendaPage() {
                       <option value="">Selecionar profissional...</option>
                       {funcionarios.map(f => <option key={f.id} value={f.id}>{f.nome}</option>)}
                     </select>
-                    {form.funcionario_id && (
-                      <div className="flex items-center gap-2 mt-2">
-                        <div className="w-3 h-3 rounded-full" style={{ background: funcionarios.find(f => f.id === form.funcionario_id)?.cor ?? "var(--gold)" }} />
-                        <span className="text-xs" style={{ color: "var(--text-muted)" }}>{funcionarios.find(f => f.id === form.funcionario_id)?.nome}</span>
-                      </div>
-                    )}
                   </div>
                 </>
               )}
+
+              {/* ✅ Na edição: permite trocar procedimento e profissional */}
+              {agendamentoSelecionado && (
+                <>
+                  <div>
+                    <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>Procedimento</label>
+                    <select value={form.procedimento_id} onChange={e => setForm(f => ({ ...f, procedimento_id: e.target.value }))}
+                      className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
+                      style={{ background: "var(--bg-input)", border: "1px solid rgba(200,160,120,0.15)", color: "var(--text-primary)" }}>
+                      <option value="">Manter atual ({agendamentoSelecionado.procedimentos?.nome ?? agendamentoSelecionado.procedimento ?? "—"})</option>
+                      {procedimentos.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>Profissional</label>
+                    <select value={form.funcionario_id} onChange={e => setForm(f => ({ ...f, funcionario_id: e.target.value }))}
+                      className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
+                      style={{ background: "var(--bg-input)", border: "1px solid rgba(200,160,120,0.15)", color: "var(--text-primary)" }}>
+                      <option value="">Manter atual ({agendamentoSelecionado.funcionarios?.nome ?? "—"})</option>
+                      {funcionarios.map(f => <option key={f.id} value={f.id}>{f.nome}</option>)}
+                    </select>
+                  </div>
+                </>
+              )}
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>Inicio</label>
                   <input type="datetime-local" value={form.inicio} onChange={e => setForm(f => ({ ...f, inicio: e.target.value }))}
                     className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
-                    style={{ background: "var(--bg-input)", border: "1px solid rgba(200,160,120,0.15)", color: "var(--text-primary)" }} />
+                    style={{ background: "var(--bg-input)", border: "1px solid rgba(200,160,120,0.15)", color: "var(--text-primary)", colorScheme: "dark" }} />
                 </div>
                 <div>
                   <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>Fim</label>
                   <input type="datetime-local" value={form.fim} onChange={e => setForm(f => ({ ...f, fim: e.target.value }))}
                     className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
-                    style={{ background: "var(--bg-input)", border: "1px solid rgba(200,160,120,0.15)", color: "var(--text-primary)" }} />
+                    style={{ background: "var(--bg-input)", border: "1px solid rgba(200,160,120,0.15)", color: "var(--text-primary)", colorScheme: "dark" }} />
                 </div>
               </div>
+
               <div>
                 <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>Status</label>
                 <div className="flex gap-2 flex-wrap">
@@ -603,6 +650,7 @@ export default function AgendaPage() {
                   ))}
                 </div>
               </div>
+
               <div>
                 <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>Observacoes</label>
                 <textarea value={form.observacoes} onChange={e => setForm(f => ({ ...f, observacoes: e.target.value }))}
@@ -719,13 +767,3 @@ export default function AgendaPage() {
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
