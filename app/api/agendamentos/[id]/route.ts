@@ -6,15 +6,16 @@ import { registrarLog } from "@/lib/audit";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   const sessao = await getSessao();
   if (!sessao) return NextResponse.json({ erro: "Não autorizado" }, { status: 401 });
 
   const { data, error } = await supabaseAdmin
     .from("agendamentos")
     .select("*, pacientes(nome, telefone), procedimentos(nome, cor, duracao_minutos), funcionarios(nome, cor)")
-    .eq("id", params.id)
+    .eq("id", id)
     .single();
 
   if (error) return NextResponse.json({ erro: error.message }, { status: 500 });
@@ -23,15 +24,15 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const sessao = await getSessao();
     if (!sessao) return NextResponse.json({ erro: "Não autorizado" }, { status: 401 });
 
     const body = await request.json();
 
-    // ✅ Permite editar procedimento, profissional, status, datas e observações
     const atualizacao: Record<string, any> = {};
     if (body.status      !== undefined) atualizacao.status       = body.status;
     if (body.observacoes !== undefined) atualizacao.observacoes  = body.observacoes;
@@ -41,22 +42,19 @@ export async function PUT(
     if (body.funcionario_id  !== undefined) atualizacao.funcionario_id  = body.funcionario_id  || null;
 
     const anterior = await supabaseAdmin
-      .from("agendamentos")
-      .select("*")
-      .eq("id", params.id)
-      .single();
+      .from("agendamentos").select("*").eq("id", id).single();
 
     const { data, error } = await supabaseAdmin
       .from("agendamentos")
       .update(atualizacao)
-      .eq("id", params.id)
+      .eq("id", id)
       .select("*, pacientes(nome, telefone), procedimentos(nome, cor), funcionarios(nome, cor)")
       .single();
 
     if (error) return NextResponse.json({ erro: error.message }, { status: 500 });
 
     await registrarLog(
-      sessao, "editar", "agendamentos", params.id,
+      sessao, "editar", "agendamentos", id,
       `Editou agendamento de ${data.pacientes?.nome ?? data.nome_temporario ?? "paciente"}`,
       anterior.data, data
     );
@@ -69,27 +67,23 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const sessao = await getSessao();
     if (!sessao) return NextResponse.json({ erro: "Não autorizado" }, { status: 401 });
 
     const anterior = await supabaseAdmin
-      .from("agendamentos")
-      .select("*, pacientes(nome)")
-      .eq("id", params.id)
-      .single();
+      .from("agendamentos").select("*, pacientes(nome)").eq("id", id).single();
 
     const { error } = await supabaseAdmin
-      .from("agendamentos")
-      .delete()
-      .eq("id", params.id);
+      .from("agendamentos").delete().eq("id", id);
 
     if (error) return NextResponse.json({ erro: error.message }, { status: 500 });
 
     await registrarLog(
-      sessao, "excluir", "agendamentos", params.id,
+      sessao, "excluir", "agendamentos", id,
       `Excluiu agendamento de ${anterior.data?.pacientes?.nome ?? "paciente"}`,
       anterior.data, null
     );
