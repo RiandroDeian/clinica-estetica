@@ -27,3 +27,18 @@ export async function POST(request: NextRequest) {
   if (error) return NextResponse.json({ erro: error.message }, { status: 500 });
   return NextResponse.json(data);
 }
+
+// ✅ DELETE canal
+export async function DELETE(request: NextRequest) {
+  const sessao = await getSessao();
+  if (!sessao) return NextResponse.json({ erro: "Nao autorizado" }, { status: 401 });
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get("id");
+  if (!id) return NextResponse.json({ erro: "ID obrigatorio" }, { status: 400 });
+  const { error } = await supabaseAdmin
+    .from("chat_canais")
+    .delete()
+    .eq("id", id);
+  if (error) return NextResponse.json({ erro: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
+}
