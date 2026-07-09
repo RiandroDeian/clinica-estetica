@@ -598,8 +598,11 @@ export default function ProntuarioPage() {
                     fd.append("paciente_id", paciente_id);
                     const res = await fetch("/api/prontuario/upload", { method: "POST", body: fd });
                     const data = await res.json();
-                    if (data.url) {
-                      await salvarDados("foto", { url: data.url, tipo: formFoto.tipo, descricao: formFoto.descricao });
+                   if (data.url) {
+                      const novaFoto = { url: data.url, tipo: formFoto.tipo, descricao: formFoto.descricao };
+                      await salvarDados("foto", novaFoto);
+                      // ✅ Atualiza a lista de fotos imediatamente
+                      setFotos(prev => [novaFoto, ...prev]);
                       setModalFoto(false);
                       setFormFoto({ tipo: "antes", descricao: "" });
                     }
