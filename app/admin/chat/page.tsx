@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type Canal = { id: string; nome: string; descricao?: string };
 type Mensagem = {
@@ -40,7 +40,6 @@ export default function ChatPage() {
   const [funcionarios, setFuncionarios] = useState<{id:string;nome:string;cor:string}[]>([]);
   const [notificacao, setNotificacao] = useState<{nome:string;texto:string}|null>(null);
   const [abaLateral, setAbaLateral] = useState<"canais"|"direto">("canais");
-  // ✅ Controla quando deve scrollar (só ao enviar ou mudar canal)
   const [deveScrollar, setDeveScrollar] = useState(false);
 
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -50,6 +49,7 @@ export default function ChatPage() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const ultimaMsgRef = useRef<string | null>(null);
   const meRef = useRef<Me | null>(null);
+  const funcionariosRef = useRef<{id:string;nome:string;cor:string}[]>([]);
 
   async function buscarMensagens(canalId: string) {
     const res = await fetch(`/api/chat/mensagens?canal_id=${canalId}`);
@@ -82,11 +82,17 @@ export default function ChatPage() {
       setMe(d);
       meRef.current = d;
     });
-    fetch("/api/funcionarios").then(r => r.json()).then(d => { if (Array.isArray(d)) setFuncionarios(d); });
+    fetch("/api/funcionarios").then(r => r.json()).then(d => {
+      if (Array.isArray(d)) {
+        setFuncionarios(d);
+        funcionariosRef.current = d;
+      }
+    });
     fetch("/api/chat/canais").then(r => r.json()).then((d: Canal[]) => {
       if (Array.isArray(d) && d.length > 0) {
         setCanais(d);
-        const primeiro = d[0];
+        // ✅ Abre o primeiro canal não-direto
+        const primeiro = d.find(c => !c.nome.startsWith("direto-")) ?? d[0];
         setCanalAtivo(primeiro);
         canalAtivoRef.current = primeiro;
         buscarMensagens(primeiro.id);
@@ -96,13 +102,11 @@ export default function ChatPage() {
     buscarOnline();
     const intervalMsg = setInterval(() => {
       if (canalAtivoRef.current) buscarMensagens(canalAtivoRef.current.id);
-      // ✅ Não seta deveScrollar aqui — polling não rola a tela
     }, 3000);
     const intervalOnline = setInterval(buscarOnline, 30000);
     return () => { clearInterval(intervalMsg); clearInterval(intervalOnline); };
   }, []);
 
-  // ✅ Só scrolla quando deveScrollar = true
   useEffect(() => {
     if (deveScrollar) {
       bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -116,19 +120,36 @@ export default function ChatPage() {
     setMensagens([]);
     setMsgFixadas([]);
     buscarMensagens(canal.id);
-    setDeveScrollar(true); // ✅ Scrolla ao mudar de canal
+    setDeveScrollar(true);
   }
 
-  // ✅ Abre ou cria canal de mensagem direta
+  // ✅ Label amigável — usa funcionariosRef para ter acesso sempre atualizado
+  function labelCanal(canal: Canal) {
+    if (canal.nome.startsWith("direto-")) {
+      const outro = funcionariosRef.current.find(f =>
+        canal.nome.includes(f.id) && f.id !== meRef.current?.id
+      );
+      if (outro) return `💬 ${outro.nome.split(" ")[0]}`;
+      // Fallback: tenta com state
+      const outroState = funcionarios.find(f =>
+        canal.nome.includes(f.id) && f.id !== me?.id
+      );
+      return outroState ? `💬 ${outroState.nome.split(" ")[0]}` : "💬 Direto";
+    }
+    return `# ${canal.nome}`;
+  }
+
+  // ✅ Abre ou cria canal direto
   async function abrirCanalDireto(funcionario: {id:string;nome:string;cor:string}) {
-    if (!meRef.current) return;
-    const nomeCanal = `direto-${[meRef.current.id, funcionario.id].sort().join("-")}`;
-    let canal = canais.find(c => c.nome === nomeCanal);
+    const meAtual = meRef.current;
+    if (!meAtual) return;
+    const nomeCanalDireto = `direto-${[meAtual.id, funcionario.id].sort().join("-")}`;
+    let canal = canais.find(c => c.nome === nomeCanalDireto);
     if (!canal) {
       const res = await fetch("/api/chat/canais", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nome: nomeCanal, descricao: `Conversa com ${funcionario.nome}` }),
+        body: JSON.stringify({ nome: nomeCanalDireto, descricao: `Conversa com ${funcionario.nome}` }),
       });
       const novo = await res.json();
       if (novo?.id) {
@@ -166,7 +187,7 @@ export default function ChatPage() {
       setTexto(""); setReplyMsg(null);
     }
     await buscarMensagens(canal.id);
-    setDeveScrollar(true); // ✅ Scrolla ao enviar mensagem
+    setDeveScrollar(true);
     setEnviando(false);
     inputRef.current?.focus();
   }
@@ -286,16 +307,8 @@ export default function ChatPage() {
     return "✓";
   };
 
-  // ✅ Label amigável para canais diretos
-  function labelCanal(canal: Canal) {
-    if (canal.nome.startsWith("direto-") && me) {
-      const ids = canal.nome.replace("direto-", "").split("-");
-      const outroId = ids.find(id => id !== me.id);
-      const outro = funcionarios.find(f => f.id === outroId);
-      return outro ? `💬 ${outro.nome.split(" ")[0]}` : canal.nome;
-    }
-    return `# ${canal.nome}`;
-  }
+  // ✅ Canais normais (sem direto)
+  const canaisNormais = canais.filter(c => !c.nome.startsWith("direto-"));
 
   return (
     <>
@@ -350,7 +363,8 @@ export default function ChatPage() {
 
         <div className="flex-1 overflow-y-auto p-2">
           {abaLateral === "canais" ? (
-            canais.map(c => (
+            // ✅ Só mostra canais normais, sem direto
+            canaisNormais.map(c => (
               <button key={c.id} onClick={() => mudarCanal(c)}
                 className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-left transition mb-0.5"
                 style={{
@@ -358,15 +372,15 @@ export default function ChatPage() {
                   color: canalAtivo?.id === c.id ? "var(--gold)" : "var(--text-muted)",
                   border: canalAtivo?.id === c.id ? "1px solid var(--border-color)" : "1px solid transparent",
                 }}>
-                <span className="text-sm truncate">{labelCanal(c)}</span>
+                <span className="text-sm truncate"># {c.nome}</span>
               </button>
             ))
           ) : (
-            // ✅ Aba Direto — clicável para abrir/criar canal direto
+            // ✅ Aba Direto — lista funcionários, clicável
             funcionarios.filter(f => f.id !== me?.id).map(f => {
               const isOnline = online.some(o => o.funcionario_id === f.id);
-              const nomeCanal = me ? `direto-${[me.id, f.id].sort().join("-")}` : "";
-              const canalDireto = canais.find(c => c.nome === nomeCanal);
+              const nomeCanalDireto = me ? `direto-${[me.id, f.id].sort().join("-")}` : "";
+              const canalDireto = canais.find(c => c.nome === nomeCanalDireto);
               const ativo = canalAtivo?.id === canalDireto?.id;
               return (
                 <button key={f.id}
@@ -375,14 +389,14 @@ export default function ChatPage() {
                   style={{
                     background: ativo ? "var(--gold-bg)" : "transparent",
                     border: ativo ? "1px solid var(--border-color)" : "1px solid transparent",
-                    color: "var(--text-secondary)",
                   }}>
                   <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
                     style={{ background: f.cor + "22", color: f.cor }}>
                     {f.nome.charAt(0).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate" style={{ color: ativo ? "var(--gold)" : "var(--text-primary)" }}>
+                    <p className="text-sm font-medium truncate"
+                      style={{ color: ativo ? "var(--gold)" : "var(--text-primary)" }}>
                       {f.nome.split(" ")[0]}
                     </p>
                   </div>
@@ -452,18 +466,20 @@ export default function ChatPage() {
         )}
 
         {mostrarFixadas && msgFixadas.length > 0 && (
-          <div className="px-4 py-3 flex-shrink-0 flex flex-col gap-2" style={{ borderBottom: "1px solid var(--border-subtle)", background: "var(--bg-input)" }}>
+          <div className="px-4 py-3 flex-shrink-0 flex flex-col gap-2"
+            style={{ borderBottom: "1px solid var(--border-subtle)", background: "var(--bg-input)" }}>
             <p className="text-xs uppercase tracking-widest mb-1" style={{ color: "var(--gold)" }}>📌 Mensagens Fixadas</p>
             {msgFixadas.map(m => (
               <div key={m.id} className="flex items-center gap-2 text-sm">
-                <span className="font-semibold" style={{ color: m.funcionarios?.cor ?? "var(--gold)" }}>{m.funcionarios?.nome?.split(" ")[0]}:</span>
+                <span className="font-semibold" style={{ color: m.funcionarios?.cor ?? "var(--gold)" }}>
+                  {m.funcionarios?.nome?.split(" ")[0]}:
+                </span>
                 <span className="truncate" style={{ color: "var(--text-secondary)" }}>{m.conteudo}</span>
               </div>
             ))}
           </div>
         )}
 
-        {/* Mensagens */}
         <div className="flex-1 overflow-y-auto px-4 py-3">
           {mensagens.length === 0 ? (
             <div className="flex items-center justify-center h-full">
@@ -501,7 +517,6 @@ export default function ChatPage() {
           <div ref={bottomRef} />
         </div>
 
-        {/* Input */}
         <div className="flex-shrink-0 px-4 py-3" style={{ borderTop: "1px solid var(--border-subtle)" }}>
           {replyMsg && (
             <div className="flex items-center gap-3 mb-2 px-3 py-2 rounded-xl"
@@ -536,7 +551,7 @@ export default function ChatPage() {
                 value={editandoMsg ? textoEdit : texto}
                 onChange={e => editandoMsg ? setTextoEdit(e.target.value) : setTexto(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={`Mensagem em ${canalAtivo ? labelCanal(canalAtivo) : "..."}... (use @nome para mencionar)`}
+                placeholder={`Mensagem em ${canalAtivo ? labelCanal(canalAtivo) : "..."}...`}
                 className="flex-1 bg-transparent outline-none text-sm"
                 style={{ color: "var(--text-primary)" }} />
               <button onClick={() => fileRef.current?.click()}
@@ -563,7 +578,6 @@ export default function ChatPage() {
   </>
   );
 }
-
 
 function MsgCard({ msg, me, menuMsgId, setMenuMsgId, emojiPickerId, setEmojiPickerId, onReply, onEditar, onDeletar, onReagir, onFixar, reacoesPorEmoji, formatarHora, statusLeitura, renderTexto }: any) {
   const isMe = msg.funcionario_id === me?.id;
