@@ -247,10 +247,9 @@ export default function AgendaPage() {
     return agsDoDia(data).filter(ag => new Date(ag.inicio).getHours() === hora);
   }
 
-  // ✅ Cores por profissional > procedimento > status
+  // ✅ Cores por profissional > status (sem fallback de procedimento)
   const corProfissional = (ag: Agendamento) => {
     if (ag.funcionarios?.cor) return ag.funcionarios.cor;
-    if (ag.procedimentos?.cor) return ag.procedimentos.cor;
     const coresPorStatus: Record<string, string> = {
       confirmado: "#7ae8a0",
       pendente:   "#a89bcc",
