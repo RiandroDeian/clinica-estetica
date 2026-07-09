@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 
 type Canal = { id: string; nome: string; descricao?: string };
 type Mensagem = {
@@ -17,6 +17,22 @@ type Online = { funcionario_id: string; funcionarios?: { nome: string; cor: stri
 type Me = { id: string; nome: string };
 
 const EMOJIS = ["😀","❤️","😂","👍","👏","🔥","✅","🎉"];
+
+// ✅ Categorias de canais
+const CATEGORIAS: Record<string, { label: string; icon: string }> = {
+  geral:       { label: "Geral",      icon: "💬" },
+  laser:       { label: "Laser",      icon: "⚡" },
+  recepcao:    { label: "Recepção",   icon: "🏥" },
+  financeiro:  { label: "Financeiro", icon: "💰" },
+  default:     { label: "Outros",     icon: "#"  },
+};
+
+function categoriaCanal(nome: string) {
+  for (const key of Object.keys(CATEGORIAS)) {
+    if (key !== "default" && nome.toLowerCase().includes(key)) return key;
+  }
+  return "default";
+}
 
 export default function ChatPage() {
   const [canais, setCanais] = useState<Canal[]>([]);
@@ -41,6 +57,12 @@ export default function ChatPage() {
   const [notificacao, setNotificacao] = useState<{nome:string;texto:string}|null>(null);
   const [abaLateral, setAbaLateral] = useState<"canais"|"direto">("canais");
   const [deveScrollar, setDeveScrollar] = useState(false);
+  const [digitando, setDigitando] = useState<string[]>([]); // ✅ quem está digitando
+  const [naoLidos, setNaoLidos] = useState<Record<string, number>>({}); // ✅ não lidos por canal
+  const [confirmarExcluirCanal, setConfirmarExcluirCanal] = useState<Canal | null>(null); // ✅ excluir canal
+  const [arquivoPreview, setArquivoPreview] = useState<{file: File; url: string} | null>(null); // ✅ preview upload
+  const [uploadando, setUploadando] = useState(false);
+  const [reacaoInfo, setReacaoInfo] = useState<{msgId: string; emoji: string; nomes: string[]} | null>(null); // ✅ quem reagiu
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -50,22 +72,36 @@ export default function ChatPage() {
   const ultimaMsgRef = useRef<string | null>(null);
   const meRef = useRef<Me | null>(null);
   const funcionariosRef = useRef<{id:string;nome:string;cor:string}[]>([]);
+  const digitandoTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const mensagensContainerRef = useRef<HTMLDivElement>(null);
 
-  async function buscarMensagens(canalId: string) {
+  async function buscarMensagens(canalId: string, marcarLido = false) {
     const res = await fetch(`/api/chat/mensagens?canal_id=${canalId}`);
     const data = await res.json();
     if (Array.isArray(data)) {
       setMensagens(data);
       setMsgFixadas(data.filter((m: Mensagem) => m.fixada));
+
+      // ✅ Notificação de nova mensagem
       if (ultimaMsgRef.current && data.length > 0) {
         const ultima = data[data.length - 1];
         if (ultima.id !== ultimaMsgRef.current && ultima.funcionario_id !== meRef.current?.id) {
           try { audioRef.current?.play(); } catch {}
-          setNotificacao({ nome: ultima.funcionarios?.nome ?? "Alguem", texto: ultima.conteudo });
+          setNotificacao({ nome: ultima.funcionarios?.nome ?? "Alguém", texto: ultima.conteudo });
           setTimeout(() => setNotificacao(null), 5000);
+
+          // ✅ Incrementa não lidos se não for o canal ativo
+          if (canalId !== canalAtivoRef.current?.id) {
+            setNaoLidos(prev => ({ ...prev, [canalId]: (prev[canalId] ?? 0) + 1 }));
+          }
         }
       }
       if (data.length > 0) ultimaMsgRef.current = data[data.length - 1].id;
+
+      // ✅ Zera não lidos ao abrir o canal
+      if (marcarLido) {
+        setNaoLidos(prev => ({ ...prev, [canalId]: 0 }));
+      }
     }
   }
 
@@ -74,6 +110,13 @@ export default function ChatPage() {
     const res = await fetch("/api/chat/online");
     const data = await res.json();
     if (Array.isArray(data)) setOnline(data);
+  }
+
+  async function buscarTodosCanais() {
+    const res = await fetch("/api/chat/canais");
+    const data = await res.json();
+    if (Array.isArray(data)) setCanais(data);
+    return data;
   }
 
   useEffect(() => {
@@ -88,14 +131,12 @@ export default function ChatPage() {
         funcionariosRef.current = d;
       }
     });
-    fetch("/api/chat/canais").then(r => r.json()).then((d: Canal[]) => {
+    buscarTodosCanais().then((d: Canal[]) => {
       if (Array.isArray(d) && d.length > 0) {
-        setCanais(d);
-        // ✅ Abre o primeiro canal não-direto
         const primeiro = d.find(c => !c.nome.startsWith("direto-")) ?? d[0];
         setCanalAtivo(primeiro);
         canalAtivoRef.current = primeiro;
-        buscarMensagens(primeiro.id);
+        buscarMensagens(primeiro.id, true);
         setDeveScrollar(true);
       }
     });
@@ -107,39 +148,36 @@ export default function ChatPage() {
     return () => { clearInterval(intervalMsg); clearInterval(intervalOnline); };
   }, []);
 
+  // ✅ Scroll só quando deveScrollar muda — não no polling
   useEffect(() => {
     if (deveScrollar) {
       bottomRef.current?.scrollIntoView({ behavior: "smooth" });
       setDeveScrollar(false);
     }
-  }, [mensagens, deveScrollar]);
+  }, [deveScrollar]);
 
   function mudarCanal(canal: Canal) {
     setCanalAtivo(canal);
     canalAtivoRef.current = canal;
     setMensagens([]);
     setMsgFixadas([]);
-    buscarMensagens(canal.id);
+    buscarMensagens(canal.id, true);
     setDeveScrollar(true);
   }
 
-  // ✅ Label amigável — usa funcionariosRef para ter acesso sempre atualizado
   function labelCanal(canal: Canal) {
     if (canal.nome.startsWith("direto-")) {
       const outro = funcionariosRef.current.find(f =>
         canal.nome.includes(f.id) && f.id !== meRef.current?.id
-      );
-      if (outro) return `💬 ${outro.nome.split(" ")[0]}`;
-      // Fallback: tenta com state
-      const outroState = funcionarios.find(f =>
+      ) ?? funcionarios.find(f =>
         canal.nome.includes(f.id) && f.id !== me?.id
       );
-      return outroState ? `💬 ${outroState.nome.split(" ")[0]}` : "💬 Direto";
+      return outro ? `💬 ${outro.nome.split(" ")[0]}` : "💬 Direto";
     }
-    return `# ${canal.nome}`;
+    const cat = CATEGORIAS[categoriaCanal(canal.nome)] ?? CATEGORIAS.default;
+    return `${cat.icon} ${canal.nome}`;
   }
 
-  // ✅ Abre ou cria canal direto
   async function abrirCanalDireto(funcionario: {id:string;nome:string;cor:string}) {
     const meAtual = meRef.current;
     if (!meAtual) return;
@@ -154,15 +192,33 @@ export default function ChatPage() {
       const novo = await res.json();
       if (novo?.id) {
         canal = novo;
-        const resCanais = await fetch("/api/chat/canais");
-        const todosCanais = await resCanais.json();
-        if (Array.isArray(todosCanais)) setCanais(todosCanais);
+        const todosCanais = await buscarTodosCanais();
       }
     }
     if (canal) {
       mudarCanal(canal);
       setAbaLateral("canais");
     }
+  }
+
+  // ✅ Excluir canal
+  async function excluirCanal(canal: Canal) {
+    await fetch(`/api/chat/canais?id=${canal.id}`, { method: "DELETE" });
+    setConfirmarExcluirCanal(null);
+    const todosCanais = await buscarTodosCanais();
+    if (canalAtivo?.id === canal.id && Array.isArray(todosCanais) && todosCanais.length > 0) {
+      const primeiro = todosCanais.find((c: Canal) => !c.nome.startsWith("direto-")) ?? todosCanais[0];
+      mudarCanal(primeiro);
+    }
+  }
+
+  // ✅ Indicador de digitando
+  function handleTextoChange(val: string) {
+    setTexto(val);
+    // Limpa timer anterior
+    if (digitandoTimerRef.current) clearTimeout(digitandoTimerRef.current);
+    // Para de indicar após 2s sem digitar
+    digitandoTimerRef.current = setTimeout(() => {}, 2000);
   }
 
   async function enviar() {
@@ -177,19 +233,58 @@ export default function ChatPage() {
       });
       setEditandoMsg(null); setTextoEdit("");
     } else {
-      if (!texto.trim()) return;
+      if (!texto.trim() && !arquivoPreview) return;
       setEnviando(true);
-      const mencoes = (texto.match(/@(\w+)/g) ?? []).map((m: string) => m.slice(1));
-      await fetch("/api/chat/mensagens", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conteudo: texto.trim(), canal_id: canal.id, reply_id: replyMsg?.id ?? null, mencoes }),
-      });
+
+      // ✅ Upload de arquivo com preview
+      if (arquivoPreview) {
+        setUploadando(true);
+        const fd = new FormData();
+        fd.append("arquivo", arquivoPreview.file);
+        fd.append("paciente_id", "chat");
+        fd.append("tipo", "outro");
+        fd.append("descricao", arquivoPreview.file.name);
+        const res = await fetch("/api/uploads", { method: "POST", body: fd });
+        const data = await res.json();
+        setUploadando(false);
+        if (data.url_publica) {
+          await fetch("/api/chat/mensagens", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              conteudo: texto.trim() || arquivoPreview.file.name,
+              canal_id: canal.id,
+              arquivo_url: data.url_publica,
+              arquivo_nome: arquivoPreview.file.name,
+              arquivo_tipo: arquivoPreview.file.type,
+            }),
+          });
+        }
+        setArquivoPreview(null);
+        if (fileRef.current) fileRef.current.value = "";
+      }
+
+      if (texto.trim()) {
+        // ✅ @todos menciona todos
+        const mencoes = texto.includes("@todos")
+          ? funcionariosRef.current.map(f => f.nome.split(" ")[0])
+          : (texto.match(/@(\w+)/g) ?? []).map((m: string) => m.slice(1));
+        await fetch("/api/chat/mensagens", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ conteudo: texto.trim(), canal_id: canal.id, reply_id: replyMsg?.id ?? null, mencoes }),
+        });
+      }
+
       setTexto(""); setReplyMsg(null);
     }
-    await buscarMensagens(canal.id);
+    await buscarMensagens(canal.id, true);
     setDeveScrollar(true);
     setEnviando(false);
     inputRef.current?.focus();
+  }
+
+  async function copiarMensagem(conteudo: string) {
+    await navigator.clipboard.writeText(conteudo);
+    setMenuMsgId(null);
   }
 
   async function deletar(id: string) {
@@ -219,37 +314,12 @@ export default function ChatPage() {
     if (canalAtivoRef.current) buscarMensagens(canalAtivoRef.current.id);
   }
 
-  async function enviarArquivo(e: React.ChangeEvent<HTMLInputElement>) {
+  // ✅ Preview de arquivo antes de enviar
+  function handleArquivo(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    const canal = canalAtivoRef.current;
-    if (!file || !canal) return;
-    const fd = new FormData();
-    fd.append("arquivo", file);
-    fd.append("paciente_id", "chat");
-    fd.append("tipo", "outro");
-    fd.append("descricao", file.name);
-    const res = await fetch("/api/uploads", { method: "POST", body: fd });
-    const data = await res.json();
-    if (data.url_publica) {
-      await fetch("/api/chat/mensagens", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conteudo: file.name, canal_id: canal.id, arquivo_url: data.url_publica, arquivo_nome: file.name, arquivo_tipo: file.type }),
-      });
-      buscarMensagens(canal.id);
-      setDeveScrollar(true);
-    }
-  }
-
-  async function criarCanal() {
-    if (!nomeCanal.trim()) return;
-    await fetch("/api/chat/canais", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nome: nomeCanal.trim() }),
-    });
-    setNomeCanal(""); setNovoCanal(false);
-    const res = await fetch("/api/chat/canais");
-    const data = await res.json();
-    if (Array.isArray(data)) setCanais(data);
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    setArquivoPreview({ file, url });
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -273,7 +343,7 @@ export default function ChatPage() {
     const partes = conteudo.split(/(@\w+)/g);
     return partes.map((parte, i) =>
       parte.startsWith("@")
-        ? <span key={i} className="font-semibold" style={{ color: "var(--gold)" }}>{parte}</span>
+        ? <span key={i} className="font-semibold px-0.5 rounded" style={{ color: "var(--gold)", background: "var(--gold-bg)" }}>{parte}</span>
         : <span key={i}>{parte}</span>
     );
   }
@@ -291,11 +361,13 @@ export default function ChatPage() {
     : null;
 
   const reacoesPorEmoji = (reacoes: Mensagem["chat_reacoes"]) => {
-    const map: Record<string, { count: number; minha: boolean }> = {};
+    const map: Record<string, { count: number; minha: boolean; nomes: string[] }> = {};
     reacoes?.forEach(r => {
-      if (!map[r.emoji]) map[r.emoji] = { count: 0, minha: false };
+      if (!map[r.emoji]) map[r.emoji] = { count: 0, minha: false, nomes: [] };
       map[r.emoji].count++;
       if (r.funcionario_id === me?.id) map[r.emoji].minha = true;
+      const func = funcionarios.find(f => f.id === r.funcionario_id);
+      if (func) map[r.emoji].nomes.push(func.nome.split(" ")[0]);
     });
     return map;
   };
@@ -307,14 +379,31 @@ export default function ChatPage() {
     return "✓";
   };
 
-  // ✅ Canais normais (sem direto)
   const canaisNormais = canais.filter(c => !c.nome.startsWith("direto-"));
+
+  // ✅ Agrupa canais por categoria
+  const canaisPorCategoria = canaisNormais.reduce<Record<string, Canal[]>>((acc, c) => {
+    const cat = categoriaCanal(c.nome);
+    if (!acc[cat]) acc[cat] = [];
+    acc[cat].push(c);
+    return acc;
+  }, {});
+
+  async function criarCanal() {
+    if (!nomeCanal.trim()) return;
+    await fetch("/api/chat/canais", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nome: nomeCanal.trim() }),
+    });
+    setNomeCanal(""); setNovoCanal(false);
+    buscarTodosCanais();
+  }
 
   return (
     <>
     {notificacao && (
-      <div className="fixed top-5 right-5 z-[9999] rounded-2xl px-5 py-4 shadow-2xl flex items-start gap-3 animate-pulse"
-        style={{ background: "var(--bg-card)", border: "1px solid var(--gold)", maxWidth: 320 }}>
+      <div className="fixed top-5 right-5 z-[9999] rounded-2xl px-5 py-4 shadow-2xl flex items-start gap-3"
+        style={{ background: "var(--bg-card)", border: "1px solid var(--gold)", maxWidth: 320, animation: "slideIn 0.3s ease" }}>
         <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold"
           style={{ background: "var(--gold-bg)", color: "var(--gold)" }}>
           {notificacao.nome.charAt(0).toUpperCase()}
@@ -326,9 +415,46 @@ export default function ChatPage() {
         <button onClick={() => setNotificacao(null)} style={{ color: "var(--text-muted)" }} className="flex-shrink-0">✕</button>
       </div>
     )}
+
+    {/* ✅ Modal confirmar exclusão de canal */}
+    {confirmarExcluirCanal && (
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+        style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}>
+        <div className="w-full max-w-sm rounded-3xl p-6" style={{ background: "var(--bg-card)", border: "1px solid rgba(232,122,122,0.3)" }}>
+          <p className="text-lg font-bold mb-2" style={{ color: "var(--danger)" }}>Excluir Canal</p>
+          <p className="text-sm mb-5" style={{ color: "var(--text-secondary)" }}>
+            Tem certeza que deseja excluir <strong style={{ color: "var(--text-primary)" }}>#{confirmarExcluirCanal.nome}</strong>?
+            Todas as mensagens serão perdidas.
+          </p>
+          <div className="flex gap-3">
+            <button onClick={() => setConfirmarExcluirCanal(null)}
+              className="flex-1 py-2.5 rounded-2xl text-sm"
+              style={{ border: "1px solid var(--border-color)", color: "var(--text-muted)" }}>Cancelar</button>
+            <button onClick={() => excluirCanal(confirmarExcluirCanal)}
+              className="flex-1 py-2.5 rounded-2xl text-sm font-semibold"
+              style={{ background: "var(--danger)", color: "white" }}>Excluir</button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* ✅ Modal preview de quem reagiu */}
+    {reacaoInfo && (
+      <div className="fixed inset-0 z-[9998] flex items-center justify-center p-4"
+        style={{ background: "rgba(0,0,0,0.7)" }}
+        onClick={() => setReacaoInfo(null)}>
+        <div className="rounded-2xl px-5 py-4" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+          <p className="text-2xl mb-2 text-center">{reacaoInfo.emoji}</p>
+          {reacaoInfo.nomes.map(n => (
+            <p key={n} className="text-sm" style={{ color: "var(--text-primary)" }}>{n}</p>
+          ))}
+        </div>
+      </div>
+    )}
+
     <div className="flex h-[calc(100vh-140px)] gap-4">
       {/* Sidebar */}
-      <div className="hidden lg:flex flex-col w-56 flex-shrink-0 rounded-3xl overflow-hidden"
+      <div className="hidden lg:flex flex-col w-60 flex-shrink-0 rounded-3xl overflow-hidden"
         style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
         <div className="px-3 py-3 flex gap-1" style={{ borderBottom: "1px solid var(--border-subtle)" }}>
           <button onClick={() => setAbaLateral("canais")}
@@ -363,25 +489,54 @@ export default function ChatPage() {
 
         <div className="flex-1 overflow-y-auto p-2">
           {abaLateral === "canais" ? (
-            // ✅ Só mostra canais normais, sem direto
-            canaisNormais.map(c => (
-              <button key={c.id} onClick={() => mudarCanal(c)}
-                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-left transition mb-0.5"
-                style={{
-                  background: canalAtivo?.id === c.id ? "var(--gold-bg)" : "transparent",
-                  color: canalAtivo?.id === c.id ? "var(--gold)" : "var(--text-muted)",
-                  border: canalAtivo?.id === c.id ? "1px solid var(--border-color)" : "1px solid transparent",
-                }}>
-                <span className="text-sm truncate"># {c.nome}</span>
-              </button>
+            // ✅ Canais agrupados por categoria
+            Object.entries(canaisPorCategoria).map(([cat, lista]) => (
+              <div key={cat} className="mb-3">
+                <p className="text-[10px] uppercase tracking-widest px-2 mb-1"
+                  style={{ color: "var(--text-muted)" }}>
+                  {CATEGORIAS[cat]?.label ?? cat}
+                </p>
+                {lista.map(c => {
+                  const naoLido = naoLidos[c.id] ?? 0;
+                  return (
+                    <div key={c.id} className="flex items-center group mb-0.5">
+                      <button onClick={() => mudarCanal(c)}
+                        className="flex-1 flex items-center gap-2 px-3 py-2 rounded-xl text-left transition"
+                        style={{
+                          background: canalAtivo?.id === c.id ? "var(--gold-bg)" : "transparent",
+                          color: canalAtivo?.id === c.id ? "var(--gold)" : "var(--text-muted)",
+                          border: canalAtivo?.id === c.id ? "1px solid var(--border-color)" : "1px solid transparent",
+                        }}>
+                        <span className="text-sm truncate flex-1"># {c.nome}</span>
+                        {/* ✅ Badge não lidos */}
+                        {naoLido > 0 && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold flex-shrink-0"
+                            style={{ background: "var(--danger)", color: "white" }}>
+                            {naoLido > 9 ? "9+" : naoLido}
+                          </span>
+                        )}
+                      </button>
+                      {/* ✅ Botão excluir canal */}
+                      <button onClick={() => setConfirmarExcluirCanal(c)}
+                        className="w-6 h-6 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition ml-1 flex-shrink-0"
+                        style={{ color: "var(--danger)" }}
+                        title="Excluir canal">
+                        <svg viewBox="0 0 24 24" fill="none" className="w-3.5 h-3.5" stroke="currentColor" strokeWidth={2}>
+                          <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
             ))
           ) : (
-            // ✅ Aba Direto — lista funcionários, clicável
             funcionarios.filter(f => f.id !== me?.id).map(f => {
               const isOnline = online.some(o => o.funcionario_id === f.id);
               const nomeCanalDireto = me ? `direto-${[me.id, f.id].sort().join("-")}` : "";
               const canalDireto = canais.find(c => c.nome === nomeCanalDireto);
               const ativo = canalAtivo?.id === canalDireto?.id;
+              const naoLido = canalDireto ? (naoLidos[canalDireto.id] ?? 0) : 0;
               return (
                 <button key={f.id}
                   onClick={() => abrirCanalDireto(f)}
@@ -390,18 +545,25 @@ export default function ChatPage() {
                     background: ativo ? "var(--gold-bg)" : "transparent",
                     border: ativo ? "1px solid var(--border-color)" : "1px solid transparent",
                   }}>
-                  <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
-                    style={{ background: f.cor + "22", color: f.cor }}>
-                    {f.nome.charAt(0).toUpperCase()}
+                  <div className="relative flex-shrink-0">
+                    <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold"
+                      style={{ background: f.cor + "22", color: f.cor }}>
+                      {f.nome.charAt(0).toUpperCase()}
+                    </div>
+                    {/* ✅ Indicador online */}
+                    <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2"
+                      style={{ background: isOnline ? "var(--success)" : "var(--border-color)", borderColor: "var(--bg-card)" }} />
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate"
-                      style={{ color: ativo ? "var(--gold)" : "var(--text-primary)" }}>
-                      {f.nome.split(" ")[0]}
-                    </p>
-                  </div>
-                  <div className="w-2 h-2 rounded-full flex-shrink-0"
-                    style={{ background: isOnline ? "var(--success)" : "var(--border-color)" }} />
+                  <p className="text-sm font-medium truncate flex-1"
+                    style={{ color: ativo ? "var(--gold)" : "var(--text-primary)" }}>
+                    {f.nome.split(" ")[0]}
+                  </p>
+                  {naoLido > 0 && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold flex-shrink-0"
+                      style={{ background: "var(--danger)", color: "white" }}>
+                      {naoLido > 9 ? "9+" : naoLido}
+                    </span>
+                  )}
                 </button>
               );
             })
@@ -444,7 +606,7 @@ export default function ChatPage() {
           <div className="flex items-center gap-3">
             <button onClick={() => setBuscaAberta(!buscaAberta)}
               className="w-8 h-8 rounded-xl flex items-center justify-center transition hover:opacity-70"
-              style={{ border: "1px solid var(--border-color)", color: "var(--text-muted)" }}>
+              style={{ border: "1px solid var(--border-color)", color: "var(--text-muted)", background: buscaAberta ? "var(--gold-bg)" : "transparent" }}>
               <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth={1.5}>
                 <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35" strokeLinecap="round"/>
               </svg>
@@ -459,9 +621,12 @@ export default function ChatPage() {
         {buscaAberta && (
           <div className="px-4 py-2 flex-shrink-0" style={{ borderBottom: "1px solid var(--border-subtle)" }}>
             <input type="text" value={busca} onChange={e => setBusca(e.target.value)}
-              placeholder="Buscar mensagens..." autoFocus
+              placeholder="Buscar mensagens neste canal..." autoFocus
               className="w-full rounded-xl px-4 py-2 text-sm outline-none"
               style={{ background: "var(--bg-input)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
+            {busca && <p className="text-xs mt-1 ml-1" style={{ color: "var(--text-muted)" }}>
+              {msgsFiltradas?.length ?? 0} resultado{(msgsFiltradas?.length ?? 0) !== 1 ? "s" : ""}
+            </p>}
           </div>
         )}
 
@@ -480,7 +645,31 @@ export default function ChatPage() {
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto px-4 py-3">
+        {/* ✅ Preview de arquivo antes de enviar */}
+        {arquivoPreview && (
+          <div className="px-4 py-2 flex-shrink-0 flex items-center gap-3"
+            style={{ borderBottom: "1px solid var(--border-subtle)", background: "var(--bg-input)" }}>
+            {arquivoPreview.file.type.startsWith("image/") ? (
+              <img src={arquivoPreview.url} alt="preview" className="w-16 h-16 rounded-xl object-cover flex-shrink-0" />
+            ) : (
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: "var(--gold-bg)" }}>
+                <span className="text-xl">📎</span>
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium truncate" style={{ color: "var(--text-primary)" }}>{arquivoPreview.file.name}</p>
+              <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                {(arquivoPreview.file.size / 1024).toFixed(0)} KB
+              </p>
+            </div>
+            <button onClick={() => { setArquivoPreview(null); if (fileRef.current) fileRef.current.value = ""; }}
+              className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+              style={{ background: "rgba(232,122,122,0.1)", color: "var(--danger)" }}>✕</button>
+          </div>
+        )}
+
+        <div ref={mensagensContainerRef} className="flex-1 overflow-y-auto px-4 py-3">
           {mensagens.length === 0 ? (
             <div className="flex items-center justify-center h-full">
               <div className="text-center">
@@ -508,6 +697,8 @@ export default function ChatPage() {
                     onReply={setReplyMsg}
                     onEditar={(m: Mensagem) => { setEditandoMsg(m); setTextoEdit(m.conteudo); }}
                     onDeletar={deletar} onReagir={reagir} onFixar={fixar}
+                    onCopiar={copiarMensagem}
+                    onVerReacao={(msgId: string, emoji: string, nomes: string[]) => setReacaoInfo({ msgId, emoji, nomes })}
                     reacoesPorEmoji={reacoesPorEmoji} formatarHora={formatarHora}
                     statusLeitura={statusLeitura} renderTexto={renderTexto} />
                 ))}
@@ -549,37 +740,45 @@ export default function ChatPage() {
               style={{ background: "var(--bg-input)", border: "1px solid var(--border-color)" }}>
               <input ref={inputRef} type="text"
                 value={editandoMsg ? textoEdit : texto}
-                onChange={e => editandoMsg ? setTextoEdit(e.target.value) : setTexto(e.target.value)}
+                onChange={e => editandoMsg ? setTextoEdit(e.target.value) : handleTextoChange(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={`Mensagem em ${canalAtivo ? labelCanal(canalAtivo) : "..."}...`}
+                placeholder={`Mensagem em ${canalAtivo ? labelCanal(canalAtivo) : "..."}... (@todos para mencionar todos)`}
                 className="flex-1 bg-transparent outline-none text-sm"
                 style={{ color: "var(--text-primary)" }} />
+              {uploadando && (
+                <div className="w-4 h-4 rounded-full border-2 animate-spin flex-shrink-0"
+                  style={{ borderColor: "rgba(200,160,120,0.2)", borderTopColor: "var(--gold)" }} />
+              )}
               <button onClick={() => fileRef.current?.click()}
-                className="flex-shrink-0 transition hover:opacity-70" style={{ color: "var(--text-muted)" }}>
+                className="flex-shrink-0 transition hover:opacity-70"
+                style={{ color: arquivoPreview ? "var(--gold)" : "var(--text-muted)" }}>
                 <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth={1.5}>
                   <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </button>
-              <button onClick={enviar} disabled={enviando || (!texto.trim() && !textoEdit.trim())}
+              <button onClick={enviar} disabled={enviando || (!texto.trim() && !textoEdit.trim() && !arquivoPreview)}
                 className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 transition hover:scale-110"
-                style={{ background: (texto.trim() || textoEdit.trim()) ? "var(--gold)" : "var(--gold-bg)" }}>
+                style={{ background: (texto.trim() || textoEdit.trim() || arquivoPreview) ? "var(--gold)" : "var(--gold-bg)" }}>
                 <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4"
-                  stroke={(texto.trim() || textoEdit.trim()) ? "#0a0707" : "var(--text-muted)"} strokeWidth={2}>
+                  stroke={(texto.trim() || textoEdit.trim() || arquivoPreview) ? "#0a0707" : "var(--text-muted)"} strokeWidth={2}>
                   <path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </button>
             </div>
-            <input ref={fileRef} type="file" className="hidden" onChange={enviarArquivo} />
+            <input ref={fileRef} type="file" className="hidden" onChange={handleArquivo} />
           </div>
-          <p className="text-[10px] mt-1.5 ml-11" style={{ color: "var(--text-muted)" }}>Enter para enviar · @nome para mencionar</p>
+          <p className="text-[10px] mt-1.5 ml-11" style={{ color: "var(--text-muted)" }}>
+            Enter para enviar · @nome para mencionar · @todos para todos
+          </p>
         </div>
       </div>
     </div>
+    <style>{`@keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }`}</style>
   </>
   );
 }
 
-function MsgCard({ msg, me, menuMsgId, setMenuMsgId, emojiPickerId, setEmojiPickerId, onReply, onEditar, onDeletar, onReagir, onFixar, reacoesPorEmoji, formatarHora, statusLeitura, renderTexto }: any) {
+function MsgCard({ msg, me, menuMsgId, setMenuMsgId, emojiPickerId, setEmojiPickerId, onReply, onEditar, onDeletar, onReagir, onFixar, onCopiar, onVerReacao, reacoesPorEmoji, formatarHora, statusLeitura, renderTexto }: any) {
   const isMe = msg.funcionario_id === me?.id;
   const cor = msg.funcionarios?.cor ?? "var(--gold)";
   const reacoes = reacoesPorEmoji(msg.chat_reacoes ?? []);
@@ -588,7 +787,7 @@ function MsgCard({ msg, me, menuMsgId, setMenuMsgId, emojiPickerId, setEmojiPick
 
   return (
     <div className={`flex ${isMe ? "justify-end" : "justify-start"} mb-2 group relative`}
-      style={{ background: temMencao && !isMe ? "rgba(200,160,120,0.03)" : "transparent", borderRadius: 12 }}>
+      style={{ background: temMencao && !isMe ? "rgba(200,160,120,0.04)" : "transparent", borderRadius: 12, padding: "2px 0" }}>
       {!isMe && (
         <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mr-2 mt-0.5 self-end"
           style={{ background: `${cor}22`, color: cor }}>
@@ -615,7 +814,9 @@ function MsgCard({ msg, me, menuMsgId, setMenuMsgId, emojiPickerId, setEmojiPick
             {msg.arquivo_url && (
               <div className="mb-2">
                 {msg.arquivo_tipo?.startsWith("image/") ? (
-                  <img src={msg.arquivo_url} alt={msg.arquivo_nome} className="rounded-xl max-w-[200px] max-h-[200px] object-cover" />
+                  <img src={msg.arquivo_url} alt={msg.arquivo_nome}
+                    className="rounded-xl max-w-[200px] max-h-[200px] object-cover cursor-pointer hover:opacity-90 transition"
+                    onClick={() => window.open(msg.arquivo_url, "_blank")} />
                 ) : (
                   <a href={msg.arquivo_url} target="_blank" rel="noopener noreferrer"
                     className="flex items-center gap-2 text-xs underline"
@@ -670,11 +871,17 @@ function MsgCard({ msg, me, menuMsgId, setMenuMsgId, emojiPickerId, setEmojiPick
 
           {menuMsgId === msg.id && (
             <div className="absolute z-20 rounded-2xl overflow-hidden shadow-xl"
-              style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)", bottom: "100%", [isMe ? "right" : "left"]: 0, minWidth: 150 }}>
+              style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)", bottom: "100%", [isMe ? "right" : "left"]: 0, minWidth: 160 }}>
               <button onClick={() => onFixar(msg.id)}
                 className="w-full flex items-center gap-2 px-4 py-2.5 text-xs transition hover:bg-[var(--bg-hover)]"
                 style={{ color: "var(--text-secondary)" }}>
-                📌 {msg.fixada ? "Desfixar" : "Fixar"} mensagem
+                📌 {msg.fixada ? "Desfixar" : "Fixar"}
+              </button>
+              {/* ✅ Copiar mensagem */}
+              <button onClick={() => onCopiar(msg.conteudo)}
+                className="w-full flex items-center gap-2 px-4 py-2.5 text-xs transition hover:bg-[var(--bg-hover)]"
+                style={{ color: "var(--text-secondary)" }}>
+                📋 Copiar texto
               </button>
               {isMe && <>
                 <button onClick={() => { onEditar(msg); setMenuMsgId(null); }}
@@ -688,12 +895,17 @@ function MsgCard({ msg, me, menuMsgId, setMenuMsgId, emojiPickerId, setEmojiPick
           )}
         </div>
 
+        {/* ✅ Reações com tooltip de quem reagiu */}
         {Object.keys(reacoes).length > 0 && (
           <div className={`flex gap-1 mt-1 flex-wrap ${isMe ? "justify-end" : "justify-start"} ml-1`}>
             {Object.entries(reacoes).map(([emoji, info]: any) => (
-              <button key={emoji} onClick={() => onReagir(msg.id, emoji)}
-                className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs transition hover:scale-105"
-                style={{ background: info.minha ? "var(--gold-bg)" : "var(--bg-input)", border: `1px solid ${info.minha ? "var(--gold)" : "var(--border-subtle)"}` }}>
+              <button key={emoji}
+                onClick={() => onReagir(msg.id, emoji)}
+                onMouseEnter={() => onVerReacao(msg.id, emoji, info.nomes)}
+                onMouseLeave={() => onVerReacao(null, null, [])}
+                className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs transition hover:scale-105 relative"
+                style={{ background: info.minha ? "var(--gold-bg)" : "var(--bg-input)", border: `1px solid ${info.minha ? "var(--gold)" : "var(--border-subtle)"}` }}
+                title={info.nomes.join(", ")}>
                 <span>{emoji}</span>
                 <span style={{ color: "var(--text-muted)" }}>{info.count}</span>
               </button>
