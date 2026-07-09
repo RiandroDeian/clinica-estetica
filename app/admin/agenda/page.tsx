@@ -153,7 +153,9 @@ export default function AgendaPage() {
     setAgendamentoSelecionado(ag);
     setForm({
       paciente_id: ag.paciente_id ?? "",
+      // ✅ Preenche procedimento_id com o ID atual para não perder ao salvar
       procedimento_id: ag.procedimentos ? (procedimentos.find(p => p.nome === ag.procedimentos?.nome)?.id ?? "") : "",
+      // ✅ Preenche funcionario_id com o ID atual — select não usa "Manter atual" mais
       funcionario_id: ag.funcionario_id ?? "",
       inicio: toLocalInput(ag.inicio),
       fim: toLocalInput(ag.fim),
@@ -190,7 +192,8 @@ export default function AgendaPage() {
           observacoes: form.observacoes,
           inicio: new Date(form.inicio).toISOString(),
           fim: new Date(form.fim).toISOString(),
-          procedimento_id: form.procedimento_id || null,
+          // ✅ Envia undefined quando vazio para não sobrescrever com null
+          procedimento_id: form.procedimento_id || undefined,
           funcionario_id: form.funcionario_id || null,
         }),
       });
@@ -267,7 +270,6 @@ export default function AgendaPage() {
     return dias;
   };
 
-  // ✅ Sem cadastro E sem profissional = amarelo tracejado; com profissional = cor do profissional
   function EventoCard({ ag, compacto = false }: { ag: Agendamento; compacto?: boolean }) {
     const semCadastro = ag.sem_cadastro === true && !ag.funcionario_id;
     const cor = semCadastro ? "#fbbf24" : corProfissional(ag);
@@ -477,7 +479,6 @@ export default function AgendaPage() {
                         abrirNovoAgendamento(d.toISOString().slice(0, 16));
                       }}>
                       {ags.map(ag => {
-                        // ✅ Sem cadastro E sem profissional = amarelo; com profissional = cor dele
                         const semCadastro = ag.sem_cadastro === true && !ag.funcionario_id;
                         const cor = semCadastro ? "#fbbf24" : corProfissional(ag);
                         return (
@@ -610,6 +611,7 @@ export default function AgendaPage() {
                 </>
               )}
 
+              {/* ✅ Na edição: selects sem "Manter atual" — sempre mostra o valor atual */}
               {agendamentoSelecionado && (
                 <>
                   <div>
@@ -617,16 +619,23 @@ export default function AgendaPage() {
                     <select value={form.procedimento_id} onChange={e => setForm(f => ({ ...f, procedimento_id: e.target.value }))}
                       className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
                       style={{ background: "var(--bg-input)", border: "1px solid rgba(200,160,120,0.15)", color: "var(--text-primary)" }}>
-                      <option value="">Manter atual ({agendamentoSelecionado.procedimentos?.nome ?? agendamentoSelecionado.procedimento ?? "—"})</option>
+                      <option value="">Nenhum procedimento</option>
                       {procedimentos.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
                     </select>
+                    {/* ✅ Mostra o procedimento atual como referência */}
+                    {(agendamentoSelecionado.procedimentos?.nome ?? agendamentoSelecionado.procedimento) && !form.procedimento_id && (
+                      <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+                        Atual: {agendamentoSelecionado.procedimentos?.nome ?? agendamentoSelecionado.procedimento}
+                      </p>
+                    )}
                   </div>
                   <div>
                     <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>Profissional</label>
+                    {/* ✅ value já vem preenchido com ag.funcionario_id — muda corretamente */}
                     <select value={form.funcionario_id} onChange={e => setForm(f => ({ ...f, funcionario_id: e.target.value }))}
                       className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
                       style={{ background: "var(--bg-input)", border: "1px solid rgba(200,160,120,0.15)", color: "var(--text-primary)" }}>
-                      <option value="">Manter atual ({agendamentoSelecionado.funcionarios?.nome ?? "—"})</option>
+                      <option value="">Nenhum profissional</option>
                       {funcionarios.map(f => <option key={f.id} value={f.id}>{f.nome}</option>)}
                     </select>
                   </div>
