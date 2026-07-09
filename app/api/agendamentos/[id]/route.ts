@@ -40,6 +40,10 @@ export async function PUT(
     if (body.fim         !== undefined) atualizacao.fim          = body.fim;
     if (body.procedimento_id !== undefined) atualizacao.procedimento_id = body.procedimento_id || null;
     if (body.funcionario_id  !== undefined) atualizacao.funcionario_id  = body.funcionario_id  || null;
+    if (body.paciente_id   !== undefined) atualizacao.paciente_id   = body.paciente_id;
+    if (body.sem_cadastro  !== undefined) atualizacao.sem_cadastro  = body.sem_cadastro;
+    if (body.nome          !== undefined) atualizacao.nome          = body.nome;
+    if (body.telefone      !== undefined) atualizacao.telefone      = body.telefone;
 
     const anterior = await supabaseAdmin
       .from("agendamentos").select("*").eq("id", id).single();
