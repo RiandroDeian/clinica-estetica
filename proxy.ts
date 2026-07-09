@@ -27,7 +27,7 @@ const ROTAS_PERMISSOES: Record<string, string> = {
   "/admin/auditoria":     "auditoria",
 };
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Deixa passar: login, public, api de auth, assets
