@@ -21,7 +21,6 @@ interface Props {
   onSuccess: () => void;
 }
 
-// ✅ Corrige bug de fuso horário no input datetime-local
 function toLocalInput(iso: string) {
   const d = new Date(iso);
   const offset = d.getTimezoneOffset() * 60000;
@@ -39,19 +38,17 @@ export function ModalAgendamentoRapido({ inicioSugerido, onClose, onSuccess }: P
   const [procedimentosSelecionados, setProcedimentosSelecionados] = useState<string[]>([]);
   const [inicio, setInicio] = useState(agora);
   const [fim, setFim] = useState(fimPadrao);
-  const [observacoes, setObservacoes] = useState(""); // ✅ campo novo
-  const [funcionarioId, setFuncionarioId] = useState(""); // ✅ campo novo
+  const [observacoes, setObservacoes] = useState("");
+  const [funcionarioId, setFuncionarioId] = useState("");
   const [procedimentos, setProcedimentos] = useState<Procedimento[]>([]);
-  const [funcionarios, setFuncionarios] = useState<Funcionario[]>([]); // ✅ novo
+  const [funcionarios, setFuncionarios] = useState<Funcionario[]>([]);
 
-  // ✅ Opções especiais além dos procedimentos cadastrados
   const OPCOES_ESPECIAIS = ["Consulta", "Avaliação"];
 
   useEffect(() => {
     fetch("/api/procedimentos")
       .then(r => r.json())
       .then(d => setProcedimentos(Array.isArray(d) ? d : []));
-    // ✅ Busca funcionários
     fetch("/api/funcionarios")
       .then(r => r.json())
       .then(d => setFuncionarios(Array.isArray(d) ? d : []));
@@ -94,7 +91,6 @@ export function ModalAgendamentoRapido({ inicioSugerido, onClose, onSuccess }: P
       setErro("Preencha todos os campos e selecione ao menos um procedimento.");
       return;
     }
-    // ✅ Converte o valor local do input para ISO corretamente
     const inicioDate = new Date(inicio);
     const fimDate = new Date(fim);
     if (isNaN(inicioDate.getTime()) || isNaN(fimDate.getTime())) {
@@ -106,10 +102,7 @@ export function ModalAgendamentoRapido({ inicioSugerido, onClose, onSuccess }: P
       return;
     }
     setLoading(true);
-
-    // ✅ Envia como ISO sem dupla conversão
     const procedimento = procedimentosSelecionados.join(", ");
-
     const res = await fetch("/api/agendamentos/rapido", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -119,11 +112,10 @@ export function ModalAgendamentoRapido({ inicioSugerido, onClose, onSuccess }: P
         procedimento,
         inicio: inicioDate.toISOString(),
         fim: fimDate.toISOString(),
-        funcionario_id: funcionarioId || null, // ✅
-        observacoes: observacoes.trim() || null, // ✅
+        funcionario_id: funcionarioId || null,
+        observacoes: observacoes.trim() || null,
       }),
     });
-
     setLoading(false);
     if (!res.ok) { const err = await res.json(); setErro(err.erro ?? "Erro ao criar agendamento."); return; }
     onSuccess();
@@ -134,6 +126,8 @@ export function ModalAgendamentoRapido({ inicioSugerido, onClose, onSuccess }: P
     const p = procedimentos.find(p => p.nome === n);
     return acc + (p?.duracao_minutos ?? 60);
   }, 0);
+
+  const funcionarioSelecionado = funcionarios.find(f => f.id === funcionarioId);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -168,7 +162,7 @@ export function ModalAgendamentoRapido({ inicioSugerido, onClose, onSuccess }: P
             className="w-full px-4 py-3 rounded-2xl outline-none text-white placeholder:text-[#4a3a32] text-sm"
             style={{ background: "#0e0a0a", border: "1px solid rgba(200,160,120,0.15)" }} />
 
-          {/* ✅ Procedimentos + Consulta + Avaliação */}
+          {/* Procedimentos */}
           <div>
             <label className="block text-xs uppercase tracking-widest mb-3" style={{ color: "#a89080" }}>
               Procedimentos
@@ -183,7 +177,6 @@ export function ModalAgendamentoRapido({ inicioSugerido, onClose, onSuccess }: P
               <p className="text-xs" style={{ color: "#4a3a32" }}>Carregando...</p>
             ) : (
               <div className="flex flex-wrap gap-2">
-                {/* ✅ Opções especiais primeiro */}
                 {OPCOES_ESPECIAIS.map((opcao) => {
                   const sel = procedimentosSelecionados.includes(opcao);
                   return (
@@ -198,9 +191,7 @@ export function ModalAgendamentoRapido({ inicioSugerido, onClose, onSuccess }: P
                     </button>
                   );
                 })}
-                {/* Separador */}
                 <div className="w-full h-px my-1" style={{ background: "rgba(200,160,120,0.08)" }} />
-                {/* Procedimentos cadastrados */}
                 {procedimentos.map((p) => {
                   const sel = procedimentosSelecionados.includes(p.nome);
                   return (
@@ -219,25 +210,52 @@ export function ModalAgendamentoRapido({ inicioSugerido, onClose, onSuccess }: P
             )}
           </div>
 
-          {/* ✅ Seleção de profissional */}
+          {/* ✅ Profissional com cores — botões visuais em vez de select */}
           <div>
-            <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "#a89080" }}>
+            <label className="text-xs uppercase tracking-widest block mb-3" style={{ color: "#a89080" }}>
               Profissional <span style={{ color: "#4a3a32" }}>(opcional)</span>
             </label>
-            <select value={funcionarioId} onChange={e => setFuncionarioId(e.target.value)}
-              className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
-              style={{ background: "#0e0a0a", border: "1px solid rgba(200,160,120,0.15)", color: funcionarioId ? "#e8d5c0" : "#4a3a32" }}>
-              <option value="">Selecionar profissional...</option>
-              {funcionarios.map(f => (
-                <option key={f.id} value={f.id}>{f.nome}</option>
-              ))}
-            </select>
-            {funcionarioId && (
-              <div className="flex items-center gap-2 mt-1.5">
-                <div className="w-2 h-2 rounded-full"
-                  style={{ background: funcionarios.find(f => f.id === funcionarioId)?.cor ?? "#c8a078" }} />
-                <span className="text-xs" style={{ color: "#6b5a4e" }}>
-                  {funcionarios.find(f => f.id === funcionarioId)?.nome}
+            <div className="flex flex-wrap gap-2">
+              {/* Botão "Nenhum" */}
+              <button type="button" onClick={() => setFuncionarioId("")}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs transition hover:scale-105"
+                style={{
+                  background: !funcionarioId ? "rgba(200,160,120,0.15)" : "#0e0a0a",
+                  color: !funcionarioId ? "#c8a078" : "#4a3a32",
+                  border: !funcionarioId ? "1px solid rgba(200,160,120,0.5)" : "1px solid rgba(200,160,120,0.1)",
+                }}>
+                <div className="w-3 h-3 rounded-full" style={{ background: "#4a3a32", border: "1px dashed #6b5a4e" }} />
+                Nenhum
+              </button>
+
+              {/* ✅ Um botão por profissional com a cor dele */}
+              {funcionarios.map(f => {
+                const sel = funcionarioId === f.id;
+                return (
+                  <button key={f.id} type="button" onClick={() => setFuncionarioId(sel ? "" : f.id)}
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs transition hover:scale-105"
+                    style={{
+                      background: sel ? `${f.cor}22` : "#0e0a0a",
+                      color: sel ? f.cor : "#6b5a4e",
+                      border: sel ? `1px solid ${f.cor}` : "1px solid rgba(200,160,120,0.12)",
+                    }}>
+                    {/* ✅ bolinha colorida com a cor do profissional */}
+                    <div className="w-3 h-3 rounded-full flex-shrink-0"
+                      style={{ background: f.cor }} />
+                    {f.nome.split(" ")[0]}
+                    {sel && <span className="ml-1">✓</span>}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Preview do profissional selecionado */}
+            {funcionarioSelecionado && (
+              <div className="flex items-center gap-2 mt-2 px-3 py-2 rounded-xl"
+                style={{ background: `${funcionarioSelecionado.cor}11`, border: `1px solid ${funcionarioSelecionado.cor}33` }}>
+                <div className="w-2 h-2 rounded-full" style={{ background: funcionarioSelecionado.cor }} />
+                <span className="text-xs font-medium" style={{ color: funcionarioSelecionado.cor }}>
+                  {funcionarioSelecionado.nome}
                 </span>
               </div>
             )}
@@ -259,7 +277,7 @@ export function ModalAgendamentoRapido({ inicioSugerido, onClose, onSuccess }: P
             </div>
           </div>
 
-          {/* ✅ Observações */}
+          {/* Observações */}
           <div>
             <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "#a89080" }}>
               Observações <span style={{ color: "#4a3a32" }}>(opcional)</span>
