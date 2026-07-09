@@ -40,12 +40,16 @@ export default function ChatPage() {
   const [funcionarios, setFuncionarios] = useState<{id:string;nome:string;cor:string}[]>([]);
   const [notificacao, setNotificacao] = useState<{nome:string;texto:string}|null>(null);
   const [abaLateral, setAbaLateral] = useState<"canais"|"direto">("canais");
+  // ✅ Controla quando deve scrollar (só ao enviar ou mudar canal)
+  const [deveScrollar, setDeveScrollar] = useState(false);
+
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const canalAtivoRef = useRef<Canal | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const ultimaMsgRef = useRef<string | null>(null);
+  const meRef = useRef<Me | null>(null);
 
   async function buscarMensagens(canalId: string) {
     const res = await fetch(`/api/chat/mensagens?canal_id=${canalId}`);
@@ -53,10 +57,9 @@ export default function ChatPage() {
     if (Array.isArray(data)) {
       setMensagens(data);
       setMsgFixadas(data.filter((m: Mensagem) => m.fixada));
-      // Som para nova mensagem
       if (ultimaMsgRef.current && data.length > 0) {
         const ultima = data[data.length - 1];
-        if (ultima.id !== ultimaMsgRef.current && ultima.funcionario_id !== me?.id) {
+        if (ultima.id !== ultimaMsgRef.current && ultima.funcionario_id !== meRef.current?.id) {
           try { audioRef.current?.play(); } catch {}
           setNotificacao({ nome: ultima.funcionarios?.nome ?? "Alguem", texto: ultima.conteudo });
           setTimeout(() => setNotificacao(null), 5000);
@@ -74,10 +77,11 @@ export default function ChatPage() {
   }
 
   useEffect(() => {
-    // Criar elemento de audio para notificação
     audioRef.current = new Audio("data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAA...");
-
-    fetch("/api/auth/me").then(r => r.json()).then(d => setMe(d));
+    fetch("/api/auth/me").then(r => r.json()).then(d => {
+      setMe(d);
+      meRef.current = d;
+    });
     fetch("/api/funcionarios").then(r => r.json()).then(d => { if (Array.isArray(d)) setFuncionarios(d); });
     fetch("/api/chat/canais").then(r => r.json()).then((d: Canal[]) => {
       if (Array.isArray(d) && d.length > 0) {
@@ -86,19 +90,25 @@ export default function ChatPage() {
         setCanalAtivo(primeiro);
         canalAtivoRef.current = primeiro;
         buscarMensagens(primeiro.id);
+        setDeveScrollar(true);
       }
     });
     buscarOnline();
     const intervalMsg = setInterval(() => {
       if (canalAtivoRef.current) buscarMensagens(canalAtivoRef.current.id);
+      // ✅ Não seta deveScrollar aqui — polling não rola a tela
     }, 3000);
     const intervalOnline = setInterval(buscarOnline, 30000);
     return () => { clearInterval(intervalMsg); clearInterval(intervalOnline); };
   }, []);
 
+  // ✅ Só scrolla quando deveScrollar = true
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [mensagens]);
+    if (deveScrollar) {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+      setDeveScrollar(false);
+    }
+  }, [mensagens, deveScrollar]);
 
   function mudarCanal(canal: Canal) {
     setCanalAtivo(canal);
@@ -106,6 +116,32 @@ export default function ChatPage() {
     setMensagens([]);
     setMsgFixadas([]);
     buscarMensagens(canal.id);
+    setDeveScrollar(true); // ✅ Scrolla ao mudar de canal
+  }
+
+  // ✅ Abre ou cria canal de mensagem direta
+  async function abrirCanalDireto(funcionario: {id:string;nome:string;cor:string}) {
+    if (!meRef.current) return;
+    const nomeCanal = `direto-${[meRef.current.id, funcionario.id].sort().join("-")}`;
+    let canal = canais.find(c => c.nome === nomeCanal);
+    if (!canal) {
+      const res = await fetch("/api/chat/canais", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nome: nomeCanal, descricao: `Conversa com ${funcionario.nome}` }),
+      });
+      const novo = await res.json();
+      if (novo?.id) {
+        canal = novo;
+        const resCanais = await fetch("/api/chat/canais");
+        const todosCanais = await resCanais.json();
+        if (Array.isArray(todosCanais)) setCanais(todosCanais);
+      }
+    }
+    if (canal) {
+      mudarCanal(canal);
+      setAbaLateral("canais");
+    }
   }
 
   async function enviar() {
@@ -130,6 +166,7 @@ export default function ChatPage() {
       setTexto(""); setReplyMsg(null);
     }
     await buscarMensagens(canal.id);
+    setDeveScrollar(true); // ✅ Scrolla ao enviar mensagem
     setEnviando(false);
     inputRef.current?.focus();
   }
@@ -178,6 +215,7 @@ export default function ChatPage() {
         body: JSON.stringify({ conteudo: file.name, canal_id: canal.id, arquivo_url: data.url_publica, arquivo_nome: file.name, arquivo_tipo: file.type }),
       });
       buscarMensagens(canal.id);
+      setDeveScrollar(true);
     }
   }
 
@@ -210,7 +248,6 @@ export default function ChatPage() {
     return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
   }
 
-  // Processar menções no texto
   function renderTexto(conteudo: string) {
     const partes = conteudo.split(/(@\w+)/g);
     return partes.map((parte, i) =>
@@ -245,10 +282,20 @@ export default function ChatPage() {
   const statusLeitura = (msg: Mensagem) => {
     if (msg.funcionario_id !== me?.id) return null;
     const lidoPor = msg.lido_por ?? [];
-    const outrosOnline = online.filter(o => o.funcionario_id !== me?.id);
     if (lidoPor.length > 1) return "✓✓";
     return "✓";
   };
+
+  // ✅ Label amigável para canais diretos
+  function labelCanal(canal: Canal) {
+    if (canal.nome.startsWith("direto-") && me) {
+      const ids = canal.nome.replace("direto-", "").split("-");
+      const outroId = ids.find(id => id !== me.id);
+      const outro = funcionarios.find(f => f.id === outroId);
+      return outro ? `💬 ${outro.nome.split(" ")[0]}` : canal.nome;
+    }
+    return `# ${canal.nome}`;
+  }
 
   return (
     <>
@@ -267,7 +314,7 @@ export default function ChatPage() {
       </div>
     )}
     <div className="flex h-[calc(100vh-140px)] gap-4">
-      {/* Sidebar canais */}
+      {/* Sidebar */}
       <div className="hidden lg:flex flex-col w-56 flex-shrink-0 rounded-3xl overflow-hidden"
         style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
         <div className="px-3 py-3 flex gap-1" style={{ borderBottom: "1px solid var(--border-subtle)" }}>
@@ -281,9 +328,11 @@ export default function ChatPage() {
             style={{ background: abaLateral === "direto" ? "var(--gold-bg)" : "transparent", color: abaLateral === "direto" ? "var(--gold)" : "var(--text-muted)" }}>
             Direto
           </button>
-          {abaLateral === "canais" && <button onClick={() => setNovoCanal(true)}
-            className="w-7 h-7 rounded-lg flex items-center justify-center transition hover:opacity-70"
-            style={{ background: "var(--gold-bg)", color: "var(--gold)" }}>+</button>}
+          {abaLateral === "canais" && (
+            <button onClick={() => setNovoCanal(true)}
+              className="w-7 h-7 rounded-lg flex items-center justify-center transition hover:opacity-70"
+              style={{ background: "var(--gold-bg)", color: "var(--gold)" }}>+</button>
+          )}
         </div>
 
         {novoCanal && (
@@ -300,34 +349,49 @@ export default function ChatPage() {
         )}
 
         <div className="flex-1 overflow-y-auto p-2">
-          {abaLateral === "canais" ? canais.map(c => (
-            <button key={c.id} onClick={() => mudarCanal(c)}
-              className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-left transition mb-0.5"
-              style={{
-                background: canalAtivo?.id === c.id ? "var(--gold-bg)" : "transparent",
-                color: canalAtivo?.id === c.id ? "var(--gold)" : "var(--text-muted)",
-                border: canalAtivo?.id === c.id ? "1px solid var(--border-color)" : "1px solid transparent",
-              }}>
-              <span className="text-sm">#</span>
-              <span className="text-sm font-medium">{c.nome}</span>
-            </button>
-          )) : funcionarios.filter(f => f.id !== me?.id).map(f => {
-            const isOnline = online.some(o => o.funcionario_id === f.id);
-            return (
-              <button key={f.id}
-                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-left transition mb-0.5 hover:bg-[var(--bg-hover)]"
-                style={{ color: "var(--text-secondary)" }}>
-                <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
-                  style={{ background: f.cor + "22", color: f.cor }}>
-                  {f.nome.charAt(0).toUpperCase()}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate" style={{ color: "var(--text-primary)" }}>{f.nome.split(" ")[0]}</p>
-                </div>
-                <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: isOnline ? "var(--success)" : "var(--border-color)" }} />
+          {abaLateral === "canais" ? (
+            canais.map(c => (
+              <button key={c.id} onClick={() => mudarCanal(c)}
+                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-left transition mb-0.5"
+                style={{
+                  background: canalAtivo?.id === c.id ? "var(--gold-bg)" : "transparent",
+                  color: canalAtivo?.id === c.id ? "var(--gold)" : "var(--text-muted)",
+                  border: canalAtivo?.id === c.id ? "1px solid var(--border-color)" : "1px solid transparent",
+                }}>
+                <span className="text-sm truncate">{labelCanal(c)}</span>
               </button>
-            );
-          })}
+            ))
+          ) : (
+            // ✅ Aba Direto — clicável para abrir/criar canal direto
+            funcionarios.filter(f => f.id !== me?.id).map(f => {
+              const isOnline = online.some(o => o.funcionario_id === f.id);
+              const nomeCanal = me ? `direto-${[me.id, f.id].sort().join("-")}` : "";
+              const canalDireto = canais.find(c => c.nome === nomeCanal);
+              const ativo = canalAtivo?.id === canalDireto?.id;
+              return (
+                <button key={f.id}
+                  onClick={() => abrirCanalDireto(f)}
+                  className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-left transition mb-0.5"
+                  style={{
+                    background: ativo ? "var(--gold-bg)" : "transparent",
+                    border: ativo ? "1px solid var(--border-color)" : "1px solid transparent",
+                    color: "var(--text-secondary)",
+                  }}>
+                  <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+                    style={{ background: f.cor + "22", color: f.cor }}>
+                    {f.nome.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate" style={{ color: ativo ? "var(--gold)" : "var(--text-primary)" }}>
+                      {f.nome.split(" ")[0]}
+                    </p>
+                  </div>
+                  <div className="w-2 h-2 rounded-full flex-shrink-0"
+                    style={{ background: isOnline ? "var(--success)" : "var(--border-color)" }} />
+                </button>
+              );
+            })
+          )}
         </div>
 
         <div className="p-3" style={{ borderTop: "1px solid var(--border-subtle)" }}>
@@ -349,12 +413,11 @@ export default function ChatPage() {
       <div className="flex-1 rounded-3xl flex flex-col overflow-hidden"
         style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
 
-        {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 flex-shrink-0"
           style={{ borderBottom: "1px solid var(--border-subtle)" }}>
           <div className="flex items-center gap-3">
             <span className="text-sm font-semibold" style={{ color: "var(--gold)" }}>
-              #{canalAtivo?.nome ?? "carregando..."}
+              {canalAtivo ? labelCanal(canalAtivo) : "carregando..."}
             </span>
             {msgFixadas.length > 0 && (
               <button onClick={() => setMostrarFixadas(!mostrarFixadas)}
@@ -379,7 +442,6 @@ export default function ChatPage() {
           </div>
         </div>
 
-        {/* Busca */}
         {buscaAberta && (
           <div className="px-4 py-2 flex-shrink-0" style={{ borderBottom: "1px solid var(--border-subtle)" }}>
             <input type="text" value={busca} onChange={e => setBusca(e.target.value)}
@@ -389,7 +451,6 @@ export default function ChatPage() {
           </div>
         )}
 
-        {/* Mensagens fixadas */}
         {mostrarFixadas && msgFixadas.length > 0 && (
           <div className="px-4 py-3 flex-shrink-0 flex flex-col gap-2" style={{ borderBottom: "1px solid var(--border-subtle)", background: "var(--bg-input)" }}>
             <p className="text-xs uppercase tracking-widest mb-1" style={{ color: "var(--gold)" }}>📌 Mensagens Fixadas</p>
@@ -475,7 +536,7 @@ export default function ChatPage() {
                 value={editandoMsg ? textoEdit : texto}
                 onChange={e => editandoMsg ? setTextoEdit(e.target.value) : setTexto(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={`Mensagem em #${canalAtivo?.nome ?? "geral"}... (use @nome para mencionar)`}
+                placeholder={`Mensagem em ${canalAtivo ? labelCanal(canalAtivo) : "..."}... (use @nome para mencionar)`}
                 className="flex-1 bg-transparent outline-none text-sm"
                 style={{ color: "var(--text-primary)" }} />
               <button onClick={() => fileRef.current?.click()}
@@ -522,9 +583,7 @@ function MsgCard({ msg, me, menuMsgId, setMenuMsgId, emojiPickerId, setEmojiPick
       )}
       <div className="max-w-[70%]">
         {!isMe && <p className="text-xs mb-1 ml-1" style={{ color: cor }}>{msg.funcionarios?.nome}</p>}
-        {msg.fixada && (
-          <p className="text-[10px] ml-1 mb-0.5" style={{ color: "var(--gold)" }}>📌 fixada</p>
-        )}
+        {msg.fixada && <p className="text-[10px] ml-1 mb-0.5" style={{ color: "var(--gold)" }}>📌 fixada</p>}
         {msg.reply && (
           <div className="rounded-xl px-3 py-1.5 mb-1 ml-1"
             style={{ background: "var(--bg-input)", borderLeft: "2px solid var(--border-color)" }}>
@@ -564,7 +623,6 @@ function MsgCard({ msg, me, menuMsgId, setMenuMsgId, emojiPickerId, setEmojiPick
             </div>
           </div>
 
-          {/* Ações hover */}
           {!msg.deletado && (
             <div className={`absolute top-1 opacity-0 group-hover:opacity-100 transition flex gap-1 ${isMe ? "right-full mr-2" : "left-full ml-2"}`}>
               <button onClick={() => setEmojiPickerId(emojiPickerId === msg.id ? null : msg.id)}
@@ -587,7 +645,6 @@ function MsgCard({ msg, me, menuMsgId, setMenuMsgId, emojiPickerId, setEmojiPick
             </div>
           )}
 
-          {/* Emoji picker */}
           {emojiPickerId === msg.id && (
             <div className="absolute z-20 flex gap-1 p-2 rounded-2xl shadow-xl"
               style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)", bottom: "100%", [isMe ? "right" : "left"]: 0 }}>
@@ -597,7 +654,6 @@ function MsgCard({ msg, me, menuMsgId, setMenuMsgId, emojiPickerId, setEmojiPick
             </div>
           )}
 
-          {/* Menu */}
           {menuMsgId === msg.id && (
             <div className="absolute z-20 rounded-2xl overflow-hidden shadow-xl"
               style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)", bottom: "100%", [isMe ? "right" : "left"]: 0, minWidth: 150 }}>
@@ -618,7 +674,6 @@ function MsgCard({ msg, me, menuMsgId, setMenuMsgId, emojiPickerId, setEmojiPick
           )}
         </div>
 
-        {/* Reações */}
         {Object.keys(reacoes).length > 0 && (
           <div className={`flex gap-1 mt-1 flex-wrap ${isMe ? "justify-end" : "justify-start"} ml-1`}>
             {Object.entries(reacoes).map(([emoji, info]: any) => (
@@ -633,7 +688,5 @@ function MsgCard({ msg, me, menuMsgId, setMenuMsgId, emojiPickerId, setEmojiPick
         )}
       </div>
     </div>
-
   );
 }
-
