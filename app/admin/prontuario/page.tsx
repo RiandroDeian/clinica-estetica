@@ -54,6 +54,7 @@ export default function ProntuarioPage() {
   const [modalTermo, setModalTermo] = useState(false);
   const [salvandoTermo, setSalvandoTermo] = useState(false);
   const [modalFoto, setModalFoto] = useState(false);
+  const [modalVerAtendimento, setModalVerAtendimento] = useState<any | null>(null);
   const [formFoto, setFormFoto] = useState({ tipo: "antes", descricao: "" });
   const tiposAnotacao = [
     { key: "geral", label: "Geral", cor: "var(--text-muted)" },
@@ -367,6 +368,11 @@ export default function ProntuarioPage() {
                 <div className="flex items-center gap-2">
                   <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "var(--gold-bg)", color: "var(--gold)" }}>{c.tipo}</span>
                   {c.titulo && <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>{c.titulo}</p>}
+                  <button onClick={() => setModalVerAtendimento(c)}
+                    className="ml-auto text-xs px-3 py-1 rounded-xl transition hover:opacity-70"
+                    style={{ background: "var(--gold-bg)", color: "var(--gold)", border: "1px solid rgba(200,160,120,0.3)" }}>
+                    Ver
+                  </button>
                 </div>
                 <p className="text-xs" style={{ color: "var(--text-muted)" }}>{c.funcionarios?.nome} · {new Date(c.criado_em).toLocaleDateString("pt-BR")}</p>
               </div>
@@ -914,6 +920,138 @@ export default function ProntuarioPage() {
               <button onClick={() => salvarDados("atualizar_paciente", formSaude)} disabled={salvando}
                 className="flex-1 py-3 rounded-2xl text-sm font-semibold" style={{ background: "var(--gold)", color: "#0a0707" }}>
                 {salvando ? "Salvando..." : "Salvar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+ {modalVerAtendimento && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}
+          onClick={e => e.target === e.currentTarget && setModalVerAtendimento(null)}>
+          <div className="w-full max-w-lg rounded-3xl overflow-hidden"
+            style={{ background: "var(--bg-card)", border: "1px solid rgba(200,160,120,0.2)" }}>
+            <div className="flex items-center justify-between px-6 py-5"
+              style={{ borderBottom: "1px solid var(--border-subtle)" }}>
+              <div>
+                <p className="text-xs uppercase tracking-widest mb-1" style={{ color: "var(--gold)" }}>
+                  {modalVerAtendimento.tipo ?? "Atendimento"}
+                </p>
+                <h2 className="text-lg font-bold" style={{ color: "var(--text-primary)" }}>
+                  {modalVerAtendimento.titulo ?? modalVerAtendimento.procedimento_realizado ?? "Detalhes"}
+                </h2>
+                <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+                  {new Date(modalVerAtendimento.criado_em).toLocaleDateString("pt-BR", {
+                    day: "2-digit", month: "long", year: "numeric"
+                  })} · {modalVerAtendimento.funcionarios?.nome ?? ""}
+                </p>
+              </div>
+              <button onClick={() => setModalVerAtendimento(null)}
+                className="w-8 h-8 rounded-full flex items-center justify-center"
+                style={{ background: "var(--bg-input)", color: "var(--text-muted)" }}>✕</button>
+            </div>
+            <div className="p-6 max-h-[60vh] overflow-y-auto flex flex-col gap-4">
+              {[
+                { key: "descricao",              label: "Descrição" },
+                { key: "procedimento_realizado", label: "Procedimento realizado" },
+                { key: "evolucao",               label: "Evolução" },
+                { key: "observacoes",            label: "Observações" },
+                { key: "queixa_principal",       label: "Queixa principal" },
+                { key: "historia_doenca",        label: "História da doença" },
+                { key: "antecedentes",           label: "Antecedentes" },
+                { key: "habitos",                label: "Hábitos" },
+                { key: "medicamento",            label: "Medicamento" },
+                { key: "dosagem",                label: "Dosagem" },
+                { key: "frequencia",             label: "Frequência" },
+                { key: "duracao",                label: "Duração" },
+                { key: "tipo_exame",             label: "Tipo de exame" },
+                { key: "resultado",              label: "Resultado" },
+                { key: "conteudo",               label: "Conteúdo" },
+              ]
+                .filter(f => modalVerAtendimento[f.key])
+                .map(f => (
+                  <div key={f.key} className="rounded-2xl px-4 py-3"
+                    style={{ background: "var(--bg-input)", border: "1px solid var(--border-subtle)" }}>
+                    <p className="text-xs uppercase tracking-widest mb-1" style={{ color: "var(--text-muted)" }}>
+                      {f.label}
+                    </p>
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: "var(--text-primary)" }}>
+                      {String(modalVerAtendimento[f.key])}
+                    </p>
+                  </div>
+                ))}
+            </div>
+            <div className="px-6 py-4" style={{ borderTop: "1px solid var(--border-subtle)" }}>
+              <button onClick={() => setModalVerAtendimento(null)}
+                className="w-full py-3 rounded-2xl text-sm uppercase tracking-widest"
+                style={{ border: "1px solid var(--border-color)", color: "var(--text-muted)" }}>
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {modalVerAtendimento && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}
+          onClick={e => e.target === e.currentTarget && setModalVerAtendimento(null)}>
+          <div className="w-full max-w-lg rounded-3xl overflow-hidden"
+            style={{ background: "var(--bg-card)", border: "1px solid rgba(200,160,120,0.2)" }}>
+            <div className="flex items-center justify-between px-6 py-5"
+              style={{ borderBottom: "1px solid var(--border-subtle)" }}>
+              <div>
+                <p className="text-xs uppercase tracking-widest mb-1" style={{ color: "var(--gold)" }}>
+                  {modalVerAtendimento.tipo ?? "Atendimento"}
+                </p>
+                <h2 className="text-lg font-bold" style={{ color: "var(--text-primary)" }}>
+                  {modalVerAtendimento.titulo ?? modalVerAtendimento.procedimento_realizado ?? "Detalhes"}
+                </h2>
+                <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+                  {new Date(modalVerAtendimento.criado_em).toLocaleDateString("pt-BR", {
+                    day: "2-digit", month: "long", year: "numeric"
+                  })} · {modalVerAtendimento.funcionarios?.nome ?? ""}
+                </p>
+              </div>
+              <button onClick={() => setModalVerAtendimento(null)}
+                className="w-8 h-8 rounded-full flex items-center justify-center"
+                style={{ background: "var(--bg-input)", color: "var(--text-muted)" }}>✕</button>
+            </div>
+            <div className="p-6 max-h-[60vh] overflow-y-auto flex flex-col gap-4">
+              {[
+                { key: "descricao",              label: "Descrição" },
+                { key: "procedimento_realizado", label: "Procedimento realizado" },
+                { key: "evolucao",               label: "Evolução" },
+                { key: "observacoes",            label: "Observações" },
+                { key: "queixa_principal",       label: "Queixa principal" },
+                { key: "historia_doenca",        label: "História da doença" },
+                { key: "antecedentes",           label: "Antecedentes" },
+                { key: "habitos",                label: "Hábitos" },
+                { key: "medicamento",            label: "Medicamento" },
+                { key: "dosagem",                label: "Dosagem" },
+                { key: "frequencia",             label: "Frequência" },
+                { key: "duracao",                label: "Duração" },
+                { key: "tipo_exame",             label: "Tipo de exame" },
+                { key: "resultado",              label: "Resultado" },
+                { key: "conteudo",               label: "Conteúdo" },
+              ]
+                .filter(f => modalVerAtendimento[f.key])
+                .map(f => (
+                  <div key={f.key} className="rounded-2xl px-4 py-3"
+                    style={{ background: "var(--bg-input)", border: "1px solid var(--border-subtle)" }}>
+                    <p className="text-xs uppercase tracking-widest mb-1" style={{ color: "var(--text-muted)" }}>
+                      {f.label}
+                    </p>
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: "var(--text-primary)" }}>
+                      {String(modalVerAtendimento[f.key])}
+                    </p>
+                  </div>
+                ))}
+            </div>
+            <div className="px-6 py-4" style={{ borderTop: "1px solid var(--border-subtle)" }}>
+              <button onClick={() => setModalVerAtendimento(null)}
+                className="w-full py-3 rounded-2xl text-sm uppercase tracking-widest"
+                style={{ border: "1px solid var(--border-color)", color: "var(--text-muted)" }}>
+                Fechar
               </button>
             </div>
           </div>
