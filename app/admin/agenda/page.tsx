@@ -45,7 +45,6 @@ function inicioSemana(data: Date) {
   return d;
 }
 
-// ✅ Corrige bug de fuso horário: converte ISO para valor correto do input datetime-local
 function toLocalInput(iso: string) {
   const d = new Date(iso);
   const offset = d.getTimezoneOffset() * 60000;
@@ -144,7 +143,6 @@ export default function AgendaPage() {
   function abrirNovoAgendamento(dataStr?: string) {
     setAgendamentoSelecionado(null);
     setProcedimentosSelecionados([]);
-    // ✅ usa toLocalInput para não deslocar o horário
     const inicio = dataStr ? toLocalInput(new Date(dataStr).toISOString()) : toLocalInput(new Date().toISOString());
     const fim = toLocalInput(new Date(new Date(inicio).getTime() + 60 * 60000).toISOString());
     setForm({ paciente_id: "", procedimento_id: "", funcionario_id: "", inicio, fim, status: "pendente", observacoes: "" });
@@ -153,7 +151,6 @@ export default function AgendaPage() {
 
   function abrirEditar(ag: Agendamento) {
     setAgendamentoSelecionado(ag);
-    // ✅ Fix fuso horário: usa toLocalInput em vez de .toISOString().slice(0,16)
     setForm({
       paciente_id: ag.paciente_id ?? "",
       procedimento_id: ag.procedimentos ? (procedimentos.find(p => p.nome === ag.procedimentos?.nome)?.id ?? "") : "",
@@ -186,7 +183,6 @@ export default function AgendaPage() {
   async function salvar() {
     setSalvando(true);
     if (agendamentoSelecionado) {
-      // ✅ Na edição, envia também procedimento_id e funcionario_id
       await fetch(`/api/agendamentos/${agendamentoSelecionado.id}`, {
         method: "PUT", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -248,7 +244,18 @@ export default function AgendaPage() {
     return agsDoDia(data).filter(ag => new Date(ag.inicio).getHours() === hora);
   }
 
-  const corProfissional = (ag: Agendamento) => ag.funcionarios?.cor ?? ag.procedimentos?.cor ?? "var(--gold)";
+  // ✅ Cores por profissional > procedimento > status
+  const corProfissional = (ag: Agendamento) => {
+    if (ag.funcionarios?.cor) return ag.funcionarios.cor;
+    if (ag.procedimentos?.cor) return ag.procedimentos.cor;
+    const coresPorStatus: Record<string, string> = {
+      confirmado: "#7ae8a0",
+      pendente:   "#a89bcc",
+      cancelado:  "#e87a7a",
+      finalizado: "#6b5a4e",
+    };
+    return coresPorStatus[ag.status] ?? "#a89080";
+  };
 
   const diasDoMes = () => {
     const primeiro = new Date(dataAtual.getFullYear(), dataAtual.getMonth(), 1);
@@ -260,22 +267,25 @@ export default function AgendaPage() {
     return dias;
   };
 
+  // ✅ Sem cadastro E sem profissional = amarelo tracejado; com profissional = cor do profissional
   function EventoCard({ ag, compacto = false }: { ag: Agendamento; compacto?: boolean }) {
-    const cor = ag.sem_cadastro ? "#fbbf24" : corProfissional(ag);
-    const semCadastro = ag.sem_cadastro === true;
+    const semCadastro = ag.sem_cadastro === true && !ag.funcionario_id;
+    const cor = semCadastro ? "#fbbf24" : corProfissional(ag);
     return (
       <div onClick={(e) => { e.stopPropagation(); abrirEditar(ag); }}
         className="rounded-xl px-2 py-1.5 mb-1 cursor-pointer transition hover:scale-[1.02] text-left w-full"
         style={{
-          background: semCadastro ? "rgba(251,191,36,0.08)" : `${cor}22`,
+          background: `${cor}18`,
           borderLeft: `3px solid ${cor}`,
-          borderStyle: semCadastro ? "dashed" : "solid",
-          borderWidth: "1px 1px 1px 3px",
-          borderColor: semCadastro ? `#fbbf24` : `${cor}33`,
-          borderLeftStyle: "solid",
+          borderTop: `1px ${semCadastro ? "dashed" : "solid"} ${cor}33`,
+          borderRight: `1px ${semCadastro ? "dashed" : "solid"} ${cor}33`,
+          borderBottom: `1px ${semCadastro ? "dashed" : "solid"} ${cor}33`,
         }}>
         <div className="flex items-center gap-1 flex-wrap">
-          {semCadastro && <span className="text-[9px] px-1 rounded" style={{ background: "rgba(251,191,36,0.2)", color: "#fbbf24" }}>⚠</span>}
+          {ag.sem_cadastro && (
+            <span className="text-[9px] px-1 rounded flex-shrink-0"
+              style={{ background: "rgba(251,191,36,0.2)", color: "#fbbf24" }}>⚠</span>
+          )}
           <p className="text-[11px] font-semibold truncate" style={{ color: cor }}>{nomePaciente(ag)}</p>
         </div>
         {!compacto && (
@@ -467,16 +477,18 @@ export default function AgendaPage() {
                         abrirNovoAgendamento(d.toISOString().slice(0, 16));
                       }}>
                       {ags.map(ag => {
-                        const cor = ag.sem_cadastro ? "#fbbf24" : corProfissional(ag);
+                        // ✅ Sem cadastro E sem profissional = amarelo; com profissional = cor dele
+                        const semCadastro = ag.sem_cadastro === true && !ag.funcionario_id;
+                        const cor = semCadastro ? "#fbbf24" : corProfissional(ag);
                         return (
                           <div key={ag.id} onClick={(e) => { e.stopPropagation(); abrirEditar(ag); }}
                             className="rounded-xl px-3 py-2 mb-1 cursor-pointer transition hover:scale-[1.02]"
                             style={{
-                              background: ag.sem_cadastro ? "rgba(251,191,36,0.08)" : `${cor}22`,
-                              borderTop: ag.sem_cadastro ? "1px dashed #fbbf2466" : `1px solid ${cor}33`,
-                              borderRight: ag.sem_cadastro ? "1px dashed #fbbf2466" : `1px solid ${cor}33`,
-                              borderBottom: ag.sem_cadastro ? "1px dashed #fbbf2466" : `1px solid ${cor}33`,
-                              borderLeft: `3px solid ${ag.sem_cadastro ? "#fbbf24" : cor}`,
+                              background: `${cor}18`,
+                              borderLeft: `3px solid ${cor}`,
+                              borderTop: `1px ${semCadastro ? "dashed" : "solid"} ${cor}33`,
+                              borderRight: `1px ${semCadastro ? "dashed" : "solid"} ${cor}33`,
+                              borderBottom: `1px ${semCadastro ? "dashed" : "solid"} ${cor}33`,
                             }}>
                             <div className="flex items-center justify-between gap-2 flex-wrap">
                               <div className="flex-1 min-w-0">
@@ -515,7 +527,6 @@ export default function AgendaPage() {
         </div>
       </div>
 
-      {/* MODAL EDITAR / NOVO AGENDAMENTO */}
       {modalAberto && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ background: "rgba(0,0,0,0.8)", backdropFilter: "blur(8px)" }}>
@@ -599,7 +610,6 @@ export default function AgendaPage() {
                 </>
               )}
 
-              {/* ✅ Na edição: permite trocar procedimento e profissional */}
               {agendamentoSelecionado && (
                 <>
                   <div>

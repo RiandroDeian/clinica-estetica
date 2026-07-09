@@ -18,6 +18,7 @@ type Pacote = {
   validade?: string;
   observacoes?: string;
   comprado_em?: string;
+  paciente_id?: string;
   pacientes?: { nome: string };
   procedimentos?: { id: string; nome: string }[];
 };
@@ -58,7 +59,10 @@ export default function PacotesPage() {
   const [editando, setEditando] = useState<Pacote | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [form, setForm] = useState(formInicial);
-  const [abaGestao, setAbaGestao] = useState<"resumo"|"sessoes"|"financeiro">("resumo");
+  const [abaGestao, setAbaGestao] = useState<"resumo"|"sessoes"|"atendimentos"|"financeiro">("resumo");
+
+  // ✅ Mapa de paciente_id -> tem agendamento futuro
+  const [agendadosFuturos, setAgendadosFuturos] = useState<Set<string>>(new Set());
 
   async function carregar() {
     try {
@@ -67,10 +71,35 @@ export default function PacotesPage() {
         fetch("/api/pacientes").then(r => r.json()),
         fetch("/api/procedimentos").then(r => r.json()),
       ]);
-      setPacotes(Array.isArray(p1) ? p1 : p1.data ?? []);
+      const pacotesData: Pacote[] = Array.isArray(p1) ? p1 : p1.data ?? [];
+      setPacotes(pacotesData);
       setPacientes(Array.isArray(p2) ? p2 : p2.data ?? []);
       setProcedimentos(Array.isArray(p3) ? p3 : p3.data ?? []);
+
+      // ✅ Busca agendamentos futuros para checar quais pacientes estão agendados
+      await verificarAgendamentosFuturos(pacotesData);
     } catch (e) { console.error(e); }
+  }
+
+  // ✅ Verifica quais pacientes têm agendamento futuro
+  async function verificarAgendamentosFuturos(pacotesData: Pacote[]) {
+    try {
+      const agora = new Date().toISOString();
+      const em30dias = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+      const res = await fetch(`/api/agendamentos?inicio=${agora}&fim=${em30dias}`);
+      const agendamentos = await res.json();
+
+      if (!Array.isArray(agendamentos)) return;
+
+      // Pega IDs de pacientes com agendamento futuro não cancelado
+      const comAgendamento = new Set<string>(
+        agendamentos
+          .filter((a: any) => a.status !== "cancelado" && a.paciente_id)
+          .map((a: any) => a.paciente_id as string)
+      );
+
+      setAgendadosFuturos(comAgendamento);
+    } catch {}
   }
 
   useEffect(() => { carregar(); }, []);
@@ -171,10 +200,14 @@ export default function PacotesPage() {
     } else toast.error("Erro ao salvar");
   }
 
-  // KPIs
   const ativos    = pacotes.filter(p => p.status === "Ativo").length;
   const expirados = pacotes.filter(p => p.status === "Expirado").length;
   const receita   = pacotes.reduce((acc, p) => acc + (p.valor ?? 0), 0);
+
+  // ✅ Conta pacotes ativos sem agendamento futuro
+  const semAgendamento = pacotes.filter(p =>
+    p.status === "Ativo" && p.paciente_id && !agendadosFuturos.has(p.paciente_id)
+  ).length;
 
   const inp = "w-full rounded-2xl px-4 py-3 text-sm outline-none";
   const inpStyle = { background: "var(--bg-input)", border: "1px solid var(--border-color)", color: "var(--text-primary)" } as const;
@@ -193,6 +226,33 @@ export default function PacotesPage() {
           Novo Pacote
         </button>
       </div>
+
+      {/* ✅ Alerta global de pacientes sem agendamento */}
+      {semAgendamento > 0 && (
+        <div className="mb-5 rounded-2xl px-5 py-4"
+          style={{ background: "rgba(232,201,122,0.08)", border: "1px solid rgba(232,201,122,0.35)" }}>
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-lg">📅</span>
+            <p className="text-sm font-semibold" style={{ color: "#e8c97a" }}>
+              {semAgendamento} pacote{semAgendamento > 1 ? "s" : ""} sem agendamento nos próximos 30 dias
+            </p>
+          </div>
+          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+            Os pacientes abaixo estão com pacotes ativos mas sem sessão agendada. Entre em contato para reagendar.
+          </p>
+          <div className="flex flex-wrap gap-2 mt-3">
+            {pacotes
+              .filter(p => p.status === "Ativo" && p.paciente_id && !agendadosFuturos.has(p.paciente_id))
+              .map(p => (
+                <span key={p.id} className="text-xs px-3 py-1.5 rounded-xl cursor-pointer transition hover:scale-105"
+                  style={{ background: "rgba(232,201,122,0.12)", color: "#e8c97a", border: "1px solid rgba(232,201,122,0.3)" }}
+                  onClick={() => { setModalGestao(p); setAbaGestao("resumo"); }}>
+                  ⚠ {p.pacientes?.nome ?? "—"} · {p.nome_pacote}
+                </span>
+              ))}
+          </div>
+        </div>
+      )}
 
       {/* KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
@@ -226,16 +286,32 @@ export default function PacotesPage() {
             const restantes = totalReal - pacote.sessoes_usadas;
             const procs = pacote.procedimentos ?? [];
 
+            // ✅ Verifica se paciente está sem agendamento futuro
+            const semAg = pacote.status === "Ativo" && pacote.paciente_id && !agendadosFuturos.has(pacote.paciente_id);
+
             return (
-              <div key={pacote.id} className="rounded-3xl p-6 transition hover:scale-[1.005]"
-                style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)", cursor: "pointer" }}
+              <div key={pacote.id}
+                className="rounded-3xl p-6 transition hover:scale-[1.005]"
+                style={{
+                  background: "var(--bg-card)",
+                  border: semAg ? "1px solid rgba(232,201,122,0.4)" : "1px solid var(--border-color)",
+                  cursor: "pointer",
+                }}
                 onClick={() => { setModalGestao(pacote); setAbaGestao("resumo"); }}>
+
                 <div className="flex items-start justify-between gap-4 mb-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-1">
                       <h2 className="font-bold text-lg" style={{ color: "var(--text-primary)" }}>{pacote.nome_pacote}</h2>
                       <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ color: cc.color, background: cc.bg }}>{pacote.categoria}</span>
                       <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ color: sc.color, background: sc.bg }}>{pacote.status}</span>
+                      {/* ✅ Badge de alerta */}
+                      {semAg && (
+                        <span className="text-xs px-2 py-0.5 rounded-full font-medium flex items-center gap-1"
+                          style={{ background: "rgba(232,201,122,0.12)", color: "#e8c97a", border: "1px solid rgba(232,201,122,0.3)" }}>
+                          📅 Sem agendamento
+                        </span>
+                      )}
                     </div>
                     <p className="text-sm" style={{ color: "var(--text-muted)" }}>
                       Paciente: <span style={{ color: "var(--text-secondary)" }}>{pacote.pacientes?.nome ?? "—"}</span>
@@ -315,16 +391,22 @@ export default function PacotesPage() {
                 <p className="text-xs uppercase tracking-widest mb-1" style={{ color: "var(--gold)" }}>Gestão do Pacote</p>
                 <p className="font-bold" style={{ color: "var(--text-primary)" }}>{modalGestao.nome_pacote}</p>
                 <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>{modalGestao.pacientes?.nome}</p>
+                {/* ✅ Alerta no modal de gestão */}
+                {modalGestao.status === "Ativo" && modalGestao.paciente_id && !agendadosFuturos.has(modalGestao.paciente_id) && (
+                  <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full mt-1"
+                    style={{ background: "rgba(232,201,122,0.12)", color: "#e8c97a", border: "1px solid rgba(232,201,122,0.3)" }}>
+                    📅 Sem agendamento nos próximos 30 dias
+                  </span>
+                )}
               </div>
               <button onClick={() => setModalGestao(null)} style={{ color: "var(--text-muted)" }}>
                 <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5" stroke="currentColor" strokeWidth={1.5}><path d="M18 6L6 18M6 6l12 12" strokeLinecap="round"/></svg>
               </button>
             </div>
 
-            {/* Abas */}
             <div className="flex" style={{ borderBottom: "1px solid var(--gold-bg)" }}>
               {(["resumo","sessoes","atendimentos","financeiro"] as const).map(aba => (
-                <button key={aba} onClick={() => { setAbaGestao(aba as any); if (aba === "atendimentos" && modalGestao) buscarHistorico(modalGestao.id); }}
+                <button key={aba} onClick={() => { setAbaGestao(aba); if (aba === "atendimentos" && modalGestao) buscarHistorico(modalGestao.id); }}
                   className="flex-1 py-3 text-xs uppercase tracking-widest transition"
                   style={{ background: abaGestao === aba ? "var(--gold-bg)" : "transparent", color: abaGestao === aba ? "var(--gold)" : "var(--text-muted)", borderBottom: abaGestao === aba ? "2px solid #c8a078" : "2px solid transparent" }}>
                   {aba === "resumo" ? "Resumo" : aba === "sessoes" ? "Sessões" : aba === "atendimentos" ? "Atendimentos" : "Financeiro"}
@@ -333,8 +415,6 @@ export default function PacotesPage() {
             </div>
 
             <div className="p-6 max-h-[60vh] overflow-y-auto">
-
-              {/* ABA RESUMO */}
               {abaGestao === "resumo" && (
                 <div className="flex flex-col gap-4">
                   {[
@@ -349,7 +429,6 @@ export default function PacotesPage() {
                       <span className="text-sm" style={{ color: "var(--text-primary)" }}>{item.valor}</span>
                     </div>
                   ))}
-
                   <div>
                     <label className="block text-xs uppercase tracking-widest mb-2" style={{ color: "var(--text-muted)" }}>Status</label>
                     <div className="flex gap-2 flex-wrap">
@@ -365,7 +444,6 @@ export default function PacotesPage() {
                 </div>
               )}
 
-              {/* ABA SESSÕES */}
               {abaGestao === "sessoes" && (
                 <div className="flex flex-col gap-4">
                   <div className="px-4 py-3 rounded-2xl text-sm"
@@ -373,7 +451,6 @@ export default function PacotesPage() {
                     Total atual: <strong style={{ color: "var(--gold)" }}>{modalGestao.total_sessoes + (modalGestao.sessoes_bonus ?? 0)}</strong> sessões
                     ({modalGestao.total_sessoes} + {modalGestao.sessoes_bonus ?? 0} bônus)
                   </div>
-
                   <div>
                     <label className="block text-xs uppercase tracking-widest mb-2" style={{ color: "var(--text-muted)" }}>Adicionar sessões bônus</label>
                     <div className="flex gap-2">
@@ -386,7 +463,6 @@ export default function PacotesPage() {
                       ))}
                     </div>
                   </div>
-
                   <div>
                     <label className="block text-xs uppercase tracking-widest mb-2" style={{ color: "var(--text-muted)" }}>Sessões usadas</label>
                     <div className="flex items-center gap-3">
@@ -399,7 +475,6 @@ export default function PacotesPage() {
                         style={{ background: "rgba(122,232,160,0.1)", color: "#7ae8a0" }}>+</button>
                     </div>
                   </div>
-
                   <div>
                     <label className="block text-xs uppercase tracking-widest mb-2" style={{ color: "var(--text-muted)" }}>Nova validade</label>
                     <input type="date" defaultValue={modalGestao.validade ?? ""}
@@ -409,8 +484,7 @@ export default function PacotesPage() {
                 </div>
               )}
 
-              {/* ABA ATENDIMENTOS */}
-              {(abaGestao as string) === "atendimentos" && (
+              {abaGestao === "atendimentos" && (
                 <div className="flex flex-col gap-4">
                   <div className="flex items-center justify-between">
                     <div className="rounded-2xl px-4 py-2 text-sm" style={{ background: "var(--gold-bg)", border: "1px solid var(--border-color)", color: "var(--gold)" }}>
@@ -422,7 +496,6 @@ export default function PacotesPage() {
                       + Registrar Atendimento
                     </button>
                   </div>
-
                   {registrandoAtend && (
                     <div className="rounded-2xl p-4 flex flex-col gap-3" style={{ background: "var(--bg-input)", border: "1px solid var(--border-color)" }}>
                       <div>
@@ -455,7 +528,6 @@ export default function PacotesPage() {
                       </div>
                     </div>
                   )}
-
                   {historicoPacote.length === 0 ? (
                     <div className="text-center py-8 rounded-2xl" style={{ background: "var(--bg-input)", border: "1px solid var(--border-subtle)" }}>
                       <p className="text-2xl mb-2">📋</p>
@@ -483,7 +555,6 @@ export default function PacotesPage() {
                 </div>
               )}
 
-              {/* ABA FINANCEIRO */}
               {abaGestao === "financeiro" && (
                 <div className="flex flex-col gap-4">
                   <div>
@@ -527,14 +598,12 @@ export default function PacotesPage() {
                 <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6" stroke="currentColor" strokeWidth={1.5}><path d="M18 6L6 18M6 6l12 12" strokeLinecap="round"/></svg>
               </button>
             </div>
-
             <div className="space-y-4">
               <div>
                 <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>Nome do Pacote</label>
                 <input value={form.nome_pacote} onChange={e => setForm(f => ({ ...f, nome_pacote: e.target.value }))}
                   placeholder="Ex: Pacote Laser Feminino" className={inp} style={inpStyle} />
               </div>
-
               {!editando && (
                 <div>
                   <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>Paciente</label>
@@ -545,7 +614,6 @@ export default function PacotesPage() {
                   </select>
                 </div>
               )}
-
               <div>
                 <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>Categoria</label>
                 <div className="flex gap-2">
@@ -558,7 +626,6 @@ export default function PacotesPage() {
                   ))}
                 </div>
               </div>
-
               <div>
                 <label className="text-xs uppercase tracking-widest block mb-3" style={{ color: "var(--text-secondary)" }}>
                   Procedimentos <span style={{ color: "var(--text-muted)" }}>({form.procedimento_ids.length} selecionado{form.procedimento_ids.length !== 1 ? "s" : ""})</span>
@@ -581,7 +648,6 @@ export default function PacotesPage() {
                   })}
                 </div>
               </div>
-
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>Total de Sessões</label>
@@ -599,14 +665,12 @@ export default function PacotesPage() {
                     className={inp} style={{ ...inpStyle, opacity: form.categoria === "Gratuito" ? 0.4 : 1 }} />
                 </div>
               </div>
-
               <div>
                 <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>Validade</label>
                 <input type="date" value={form.validade}
                   onChange={e => setForm(f => ({ ...f, validade: e.target.value }))}
                   className={inp} style={{ ...inpStyle, colorScheme: "dark" }} />
               </div>
-
               <div>
                 <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>Observações</label>
                 <textarea value={form.observacoes} onChange={e => setForm(f => ({ ...f, observacoes: e.target.value }))}
@@ -614,7 +678,6 @@ export default function PacotesPage() {
                   className="w-full rounded-2xl px-4 py-3 text-sm outline-none resize-none" style={inpStyle} />
               </div>
             </div>
-
             <div className="flex gap-3 mt-6">
               <button onClick={() => setModalAberto(false)}
                 className="flex-1 py-3 rounded-2xl text-sm uppercase tracking-widest transition hover:opacity-70"
@@ -632,10 +695,3 @@ export default function PacotesPage() {
     </div>
   );
 }
-
-
-
-
-
-
-
