@@ -3,6 +3,24 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getSessao } from "@/lib/auth";
 
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const sessao = await getSessao();
+  if (!sessao) return NextResponse.json({ erro: "Não autorizado" }, { status: 401 });
+
+  const { data, error } = await supabaseAdmin
+    .from("laser_pacotes")
+    .select("*, pacientes(nome, telefone, cpf), funcionarios(nome, cor)")
+    .eq("id", id)
+    .single();
+
+  if (error) return NextResponse.json({ erro: error.message }, { status: 500 });
+  return NextResponse.json(data);
+}
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
