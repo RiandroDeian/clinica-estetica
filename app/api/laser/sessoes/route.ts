@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
     .from("laser_sessoes")
     .select("*, funcionarios(nome, cor)")
     .eq("pacote_id", pacote_id)
-    .order("data_sessao", { ascending: false });
+    .order("numero_sessao", { ascending: false });
 
   if (error) return NextResponse.json({ erro: error.message }, { status: 500 });
   return NextResponse.json(data ?? []);
@@ -26,37 +26,39 @@ export async function POST(request: NextRequest) {
   if (!sessao) return NextResponse.json({ erro: "Não autorizado" }, { status: 401 });
 
   const body = await request.json();
-  const { pacote_id, paciente_id, areas_tratadas, observacoes, reacoes, data_sessao } = body;
+  const { pacote_id, observacoes, intercorrencias, data_sessao } = body;
 
   if (!pacote_id) return NextResponse.json({ erro: "pacote_id obrigatório" }, { status: 400 });
 
-  // Insere a sessão
-  const { data, error } = await supabaseAdmin
-    .from("laser_sessoes")
-    .insert({
-      pacote_id,
-      paciente_id: paciente_id || null,
-      funcionario_id: sessao.id,
-      data_sessao: data_sessao || new Date().toISOString(),
-      areas_tratadas: areas_tratadas || null,
-      observacoes: observacoes || null,
-      reacoes: reacoes || null,
-    })
-    .select("*, funcionarios(nome, cor)")
-    .single();
-
-  if (error) return NextResponse.json({ erro: error.message }, { status: 500 });
-
-  // Incrementa sessoes_feitas no pacote
+  // Pega o número da próxima sessão
   const { data: pacoteAtual } = await supabaseAdmin
     .from("laser_pacotes")
     .select("sessoes_feitas")
     .eq("id", pacote_id)
     .single();
 
+  const proximaSessao = (pacoteAtual?.sessoes_feitas ?? 0) + 1;
+
+  const { data, error } = await supabaseAdmin
+    .from("laser_sessoes")
+    .insert({
+      pacote_id,
+      paciente_id: body.paciente_id || null,
+      funcionario_id: sessao.id,
+      numero_sessao: proximaSessao,
+      realizada_em: data_sessao ? new Date(data_sessao).toISOString() : new Date().toISOString(),
+      observacoes: observacoes || null,
+      intercorrencias: intercorrencias || null,
+    })
+    .select("*, funcionarios(nome, cor)")
+    .single();
+
+  if (error) return NextResponse.json({ erro: error.message }, { status: 500 });
+
+  // Incrementa sessoes_feitas
   await supabaseAdmin
     .from("laser_pacotes")
-    .update({ sessoes_feitas: (pacoteAtual?.sessoes_feitas ?? 0) + 1 })
+    .update({ sessoes_feitas: proximaSessao })
     .eq("id", pacote_id);
 
   return NextResponse.json(data);
@@ -73,7 +75,6 @@ export async function DELETE(request: NextRequest) {
 
   await supabaseAdmin.from("laser_sessoes").delete().eq("id", id);
 
-  // Decrementa sessoes_feitas
   const { data: pacoteAtual } = await supabaseAdmin
     .from("laser_pacotes")
     .select("sessoes_feitas")

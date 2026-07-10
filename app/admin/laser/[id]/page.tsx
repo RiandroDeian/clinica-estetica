@@ -26,10 +26,10 @@ type Pacote = {
 
 type Sessao = {
   id: string;
-  data_sessao: string;
-  areas_tratadas?: string;
+  numero_sessao: number;
+  realizada_em?: string;
   observacoes?: string;
-  reacoes?: string;
+  intercorrencias?: string;
   funcionarios?: { nome: string; cor: string };
 };
 
@@ -57,9 +57,8 @@ const formaCfg: Record<string, { label: string; color: string }> = {
 
 const formSessaoInicial = {
   data_sessao: new Date().toISOString().slice(0, 16),
-  areas_tratadas: "",
   observacoes: "",
-  reacoes: "",
+  intercorrencias: "",
 };
 
 export default function LaserDetalhePage() {
@@ -109,11 +108,9 @@ export default function LaserDetalhePage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         pacote_id: id,
-        paciente_id: null,
         data_sessao: new Date(formSessao.data_sessao).toISOString(),
-        areas_tratadas: formSessao.areas_tratadas || null,
         observacoes: formSessao.observacoes || null,
-        reacoes: formSessao.reacoes || null,
+        intercorrencias: formSessao.intercorrencias || null,
       }),
     });
     if (res.ok) {
@@ -121,7 +118,10 @@ export default function LaserDetalhePage() {
       setModalSessao(false);
       setFormSessao(formSessaoInicial);
       buscar();
-    } else toast.error("Erro ao registrar atendimento");
+    } else {
+      const err = await res.json();
+      toast.error(err.erro ?? "Erro ao registrar atendimento");
+    }
     setSalvando(false);
   }
 
@@ -211,10 +211,7 @@ export default function LaserDetalhePage() {
               <span className="text-lg mb-0.5" style={{ color: "var(--text-muted)" }}>/ {pacote.total_sessoes}</span>
             </div>
           </div>
-          <button onClick={() => {
-            setFormSessao({ ...formSessaoInicial, areas_tratadas: areas.join(", ") });
-            setModalSessao(true);
-          }}
+          <button onClick={() => { setFormSessao(formSessaoInicial); setModalSessao(true); }}
             disabled={pacote.sessoes_feitas >= pacote.total_sessoes}
             className="px-5 py-3 rounded-2xl text-sm font-semibold uppercase tracking-widest transition hover:scale-105 disabled:opacity-40"
             style={{ background: "var(--gold)", color: "var(--bg-card)" }}>
@@ -340,20 +337,25 @@ export default function LaserDetalhePage() {
             <p className="text-sm" style={{ color: "var(--text-muted)" }}>Nenhum atendimento registrado ainda</p>
           </div>
         ) : (
-          <div className="divide-y" style={{ borderColor: "var(--border-subtle)" }}>
-            {sessoes.map((s, i) => (
-              <div key={s.id} className="px-6 py-4 flex gap-4">
-                {/* Número da sessão */}
+          <div>
+            {sessoes.map(s => (
+              <div key={s.id} className="px-6 py-4 flex gap-4"
+                style={{ borderBottom: "1px solid var(--border-subtle)" }}>
                 <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
                   style={{ background: "var(--gold-bg)", color: "var(--gold)" }}>
-                  {sessoes.length - i}
+                  {s.numero_sessao}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-1">
                     <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
-                      {new Date(s.data_sessao).toLocaleDateString("pt-BR", {
-                        day: "2-digit", month: "long", year: "numeric"
-                      })}
+                      Sessão {s.numero_sessao}
+                      {s.realizada_em && (
+                        <span className="font-normal ml-2" style={{ color: "var(--text-muted)" }}>
+                          · {new Date(s.realizada_em).toLocaleDateString("pt-BR", {
+                            day: "2-digit", month: "long", year: "numeric"
+                          })}
+                        </span>
+                      )}
                     </p>
                     <button onClick={() => excluirSessao(s.id)}
                       className="text-xs px-2 py-1 rounded-lg transition hover:opacity-70"
@@ -366,18 +368,13 @@ export default function LaserDetalhePage() {
                       {s.funcionarios.nome}
                     </p>
                   )}
-                  {s.areas_tratadas && (
-                    <p className="text-xs mb-1" style={{ color: "var(--text-secondary)" }}>
-                      Áreas: {s.areas_tratadas}
-                    </p>
-                  )}
                   {s.observacoes && (
-                    <p className="text-xs" style={{ color: "var(--text-muted)" }}>{s.observacoes}</p>
+                    <p className="text-xs" style={{ color: "var(--text-secondary)" }}>{s.observacoes}</p>
                   )}
-                  {s.reacoes && (
+                  {s.intercorrencias && (
                     <p className="text-xs mt-1 px-2 py-1 rounded-lg"
                       style={{ background: "rgba(232,122,122,0.06)", color: "#e87a7a" }}>
-                      ⚠ Reações: {s.reacoes}
+                      ⚠ Intercorrências: {s.intercorrencias}
                     </p>
                   )}
                 </div>
@@ -422,33 +419,22 @@ export default function LaserDetalhePage() {
 
               <div>
                 <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-muted)" }}>
-                  Áreas Tratadas
-                </label>
-                <input type="text" value={formSessao.areas_tratadas}
-                  onChange={e => setFormSessao(f => ({ ...f, areas_tratadas: e.target.value }))}
-                  placeholder={areas.join(", ")}
-                  className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
-                  style={{ background: "var(--bg-input)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
-              </div>
-
-              <div>
-                <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-muted)" }}>
                   Observações <span style={{ color: "var(--text-muted)" }}>(opcional)</span>
                 </label>
                 <textarea value={formSessao.observacoes}
                   onChange={e => setFormSessao(f => ({ ...f, observacoes: e.target.value }))}
-                  rows={2} placeholder="Evolução do tratamento, parâmetros utilizados..."
+                  rows={3} placeholder="Evolução do tratamento, parâmetros utilizados, áreas tratadas..."
                   className="w-full rounded-2xl px-4 py-3 text-sm outline-none resize-none"
                   style={{ background: "var(--bg-input)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
               </div>
 
               <div>
                 <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "#e87a7a" }}>
-                  Reações da Pele <span style={{ color: "var(--text-muted)" }}>(opcional)</span>
+                  Intercorrências <span style={{ color: "var(--text-muted)" }}>(opcional)</span>
                 </label>
-                <textarea value={formSessao.reacoes}
-                  onChange={e => setFormSessao(f => ({ ...f, reacoes: e.target.value }))}
-                  rows={2} placeholder="Eritema, edema, foliculite..."
+                <textarea value={formSessao.intercorrencias}
+                  onChange={e => setFormSessao(f => ({ ...f, intercorrencias: e.target.value }))}
+                  rows={2} placeholder="Eritema, edema, foliculite, reações da pele..."
                   className="w-full rounded-2xl px-4 py-3 text-sm outline-none resize-none"
                   style={{ background: "var(--bg-input)", border: "1px solid rgba(232,122,122,0.3)", color: "var(--text-primary)" }} />
               </div>
@@ -469,6 +455,7 @@ export default function LaserDetalhePage() {
           </div>
         </div>
       )}
+      <style>{`textarea::placeholder { color: var(--text-muted); }`}</style>
     </div>
   );
 }
