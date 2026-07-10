@@ -1,107 +1,109 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-
-type Sessao = {
-  id: string;
-  numero_sessao: number;
-  realizada_em: string;
-  observacoes?: string;
-  intercorrencias?: string;
-  funcionarios?: { nome: string };
-};
+import { toast } from "sonner";
 
 type Pacote = {
   id: string;
-  procedimento: string;
+  procedimento: string | string[];
   total_sessoes: number;
   sessoes_feitas: number;
   status: string;
   status_pagamento: string;
+  categoria: string;
   forma_pagamento?: string;
   valor?: number;
   data_inicio?: string;
+  data_acerto?: string;
+  assinou_contrato?: boolean;
+  assinou_termo?: boolean;
   observacoes?: string;
-  assinou_termo: boolean;
   criado_em: string;
-  pacientes?: { nome: string; telefone: string; cpf?: string; data_nascimento?: string; alergias?: string };
+  pacientes?: { nome: string; telefone: string; cpf?: string };
   funcionarios?: { nome: string; cor: string };
-  sessoes: Sessao[];
 };
-
-const AREAS = ["Axila","Buco","Virilha","Meia Perna","Perna Completa","Braco Completo","Antebraco","Rosto","Pescoco","Abdomen","Costas","Peitoral","Gluteos","Full Body"];
 
 const statusCfg: Record<string, { label: string; color: string; bg: string }> = {
   em_tratamento: { label: "Em tratamento", color: "#7ae8a0", bg: "rgba(122,232,160,0.1)" },
-  finalizado:    { label: "Finalizado",    color: "#a89080", bg: "rgba(168,144,128,0.1)" },
+  finalizado:    { label: "Finalizado",    color: "var(--text-secondary)", bg: "rgba(168,144,128,0.1)" },
   pausado:       { label: "Pausado",       color: "#e8c97a", bg: "rgba(232,201,122,0.1)" },
   cancelado:     { label: "Cancelado",     color: "#e87a7a", bg: "rgba(232,122,122,0.1)" },
 };
 
-export default function LaserProntuarioPage() {
+const pagCfg: Record<string, { label: string; color: string; bg: string }> = {
+  pago:     { label: "Pago",     color: "#7ae8a0", bg: "rgba(122,232,160,0.1)" },
+  pendente: { label: "Pendente", color: "#e8c97a", bg: "rgba(232,201,122,0.1)" },
+  parcial:  { label: "Parcial",  color: "var(--gold)", bg: "var(--gold-bg)" },
+};
+
+const formaCfg: Record<string, { label: string; color: string }> = {
+  boleto:        { label: "Boleto",        color: "#e87a7a" },
+  pix:           { label: "PIX",           color: "#7ae8a0" },
+  credito:       { label: "Cartão Créd.",  color: "#a89bcc" },
+  debito:        { label: "Cartão Déb.",   color: "#7ab8e8" },
+  dinheiro:      { label: "Dinheiro",      color: "#e8c97a" },
+  transferencia: { label: "Transferência", color: "var(--gold)" },
+};
+
+export default function LaserDetalhePage() {
   const params = useParams();
   const router = useRouter();
+  const id = params.id as string;
+
   const [pacote, setPacote] = useState<Pacote | null>(null);
   const [carregando, setCarregando] = useState(true);
-  const [modalSessao, setModalSessao] = useState(false);
   const [salvando, setSalvando] = useState(false);
-  const [formSessao, setFormSessao] = useState({ observacoes: "", intercorrencias: "" });
-  const [editando, setEditando] = useState(false);
-  const [formEdit, setFormEdit] = useState<any>({});
+  const [editandoSessoes, setEditandoSessoes] = useState(false);
+  const [novasSessoes, setNovasSessoes] = useState("");
 
   async function buscar() {
     setCarregando(true);
-    const res = await fetch(`/api/laser/${params.id}`);
+    const res = await fetch(`/api/laser/${id}`);
+    if (!res.ok) { toast.error("Erro ao carregar pacote"); setCarregando(false); return; }
     const data = await res.json();
     setPacote(data);
-    setFormEdit(data);
     setCarregando(false);
   }
 
-  useEffect(() => { buscar(); }, [params.id]);
+  useEffect(() => { buscar(); }, [id]);
+
+  async function atualizar(campos: Partial<Pacote>) {
+    setSalvando(true);
+    const res = await fetch(`/api/laser/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(campos),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      setPacote(data);
+      toast.success("Salvo!");
+    } else {
+      toast.error("Erro ao salvar");
+    }
+    setSalvando(false);
+  }
 
   async function registrarSessao() {
-    setSalvando(true);
-    await fetch(`/api/laser/${params.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        acao: "registrar_sessao",
-        paciente_id: pacote?.pacientes ? (pacote as any).paciente_id : "",
-        ...formSessao
-      }),
-    });
-    setModalSessao(false);
-    setFormSessao({ observacoes: "", intercorrencias: "" });
-    buscar();
-    setSalvando(false);
+    if (!pacote) return;
+    if (pacote.sessoes_feitas >= pacote.total_sessoes) {
+      toast.error("Todas as sessões já foram realizadas");
+      return;
+    }
+    await atualizar({ sessoes_feitas: pacote.sessoes_feitas + 1 });
   }
 
-  function toggleAreaEdit(area: string) {
-    setFormEdit((f: any) => {
-      const areas = Array.isArray(f.procedimento) ? f.procedimento : (f.procedimento ?? "").split(", ").filter(Boolean);
-      const novas = areas.includes(area) ? areas.filter((a: string) => a !== area) : [...areas, area];
-      return { ...f, procedimento: novas };
-    });
-  }
-
-  async function salvarEdicao() {
-    setSalvando(true);
-    await fetch(`/api/laser/${params.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(formEdit),
-    });
-    setEditando(false);
-    buscar();
-    setSalvando(false);
+  async function removerSessao() {
+    if (!pacote || pacote.sessoes_feitas <= 0) return;
+    await atualizar({ sessoes_feitas: pacote.sessoes_feitas - 1 });
   }
 
   if (carregando) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 rounded-full border-2 animate-spin" style={{ borderColor: "rgba(200,160,120,0.2)", borderTopColor: "#c8a078" }} />
+        <div className="w-8 h-8 rounded-full border-2 animate-spin"
+          style={{ borderColor: "rgba(200,160,120,0.2)", borderTopColor: "var(--gold)" }} />
       </div>
     );
   }
@@ -109,260 +111,196 @@ export default function LaserProntuarioPage() {
   if (!pacote) {
     return (
       <div className="text-center py-20">
-        <p style={{ color: "#6b5a4e" }}>Pacote nao encontrado</p>
-        <button onClick={() => router.push("/admin/laser")} className="mt-4 px-6 py-3 rounded-2xl text-sm"
-          style={{ border: "1px solid rgba(200,160,120,0.2)", color: "#c8a078" }}>Voltar</button>
+        <p className="text-4xl mb-4">⚠️</p>
+        <p style={{ color: "var(--text-muted)" }}>Pacote não encontrado</p>
+        <button onClick={() => router.back()} className="mt-4 px-4 py-2 rounded-xl text-sm"
+          style={{ background: "var(--gold-bg)", color: "var(--gold)" }}>Voltar</button>
       </div>
     );
   }
 
-  const pct = Math.round((pacote.sessoes_feitas / pacote.total_sessoes) * 100);
-  const restantes = pacote.total_sessoes - pacote.sessoes_feitas;
+  const areas = Array.isArray(pacote.procedimento)
+    ? pacote.procedimento
+    : (pacote.procedimento ?? "").split(", ").filter(Boolean);
+
+  const pct = pacote.total_sessoes > 0
+    ? Math.round((pacote.sessoes_feitas / pacote.total_sessoes) * 100)
+    : 0;
+
   const sc = statusCfg[pacote.status] ?? statusCfg.em_tratamento;
+  const pc = pagCfg[pacote.status_pagamento] ?? pagCfg.pendente;
+  const fc = formaCfg[pacote.forma_pagamento ?? ""] ?? null;
+  const eBoleto = pacote.forma_pagamento === "boleto";
 
   return (
-    <div>
-      <div className="flex items-center gap-4 mb-6">
-        <button onClick={() => router.push("/admin/laser")}
-          className="w-9 h-9 rounded-xl flex items-center justify-center transition hover:opacity-70"
-          style={{ border: "1px solid rgba(200,160,120,0.2)", color: "#c8a078" }}>
-          <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth={1.5}>
+    <div className="max-w-2xl mx-auto">
+      {/* Cabeçalho */}
+      <div className="flex items-center gap-4 mb-8">
+        <button onClick={() => router.back()}
+          className="w-10 h-10 rounded-2xl flex items-center justify-center transition hover:opacity-70"
+          style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+          <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5" stroke="var(--text-muted)" strokeWidth={1.5}>
             <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </button>
         <div>
-          <p className="text-xs uppercase tracking-widest" style={{ color: "#c8a078" }}>Prontuario Laser</p>
-          <h1 className="text-2xl font-bold" style={{ color: "#e8d5c0" }}>{pacote.pacientes?.nome}</h1>
+          <p className="text-xs uppercase tracking-widest mb-1" style={{ color: "var(--gold)" }}>Laser</p>
+          <h1 className="text-2xl font-bold" style={{ color: "var(--text-primary)" }}>
+            {pacote.pacientes?.nome ?? "Paciente"}
+          </h1>
+          <p className="text-sm" style={{ color: "var(--text-muted)" }}>{pacote.pacientes?.telefone}</p>
         </div>
       </div>
 
-      <div className="rounded-3xl p-6 mb-6" style={{ background: "#120d0d", border: "1px solid rgba(200,160,120,0.12)" }}>
-        <div className="flex items-start justify-between flex-wrap gap-4 mb-6">
-          <div>
-            <p className="text-sm font-semibold mb-1" style={{ color: "#e8d5c0" }}>{pacote.procedimento}</p>
-            <p className="text-xs" style={{ color: "#6b5a4e" }}>
-              {pacote.pacientes?.telefone}
-              {pacote.pacientes?.cpf && ` - CPF: ${pacote.pacientes.cpf}`}
-            </p>
-            {pacote.pacientes?.alergias && (
-              <p className="text-xs mt-1" style={{ color: "#e8c97a" }}>Alergias: {pacote.pacientes.alergias}</p>
-            )}
+      {/* ✅ Alerta boleto */}
+      {eBoleto && (
+        <div className="rounded-2xl px-5 py-4 mb-5"
+          style={{ background: "rgba(232,122,122,0.06)", border: "1px solid rgba(232,122,122,0.3)" }}>
+          <div className="flex items-center gap-2 mb-1">
+            <span style={{ color: "#e87a7a" }}>🔴 Pacote Boleto</span>
           </div>
-          <div className="flex items-center gap-3 flex-wrap">
-            <span className="text-xs px-3 py-1.5 rounded-full font-medium" style={{ color: sc.color, background: sc.bg }}>{sc.label}</span>
-            <span className="text-xs px-3 py-1.5 rounded-full"
-              style={{ background: pacote.assinou_termo ? "rgba(122,232,160,0.1)" : "rgba(232,122,122,0.1)", color: pacote.assinou_termo ? "#7ae8a0" : "#e87a7a" }}>
-              {pacote.assinou_termo ? "Termo assinado" : "Sem termo"}
-            </span>
-            <button onClick={() => setEditando(true)}
-              className="px-4 py-2 rounded-xl text-xs uppercase tracking-widest transition hover:opacity-70"
-              style={{ border: "1px solid rgba(200,160,120,0.2)", color: "#c8a078" }}>
-              Editar
-            </button>
-            {pacote.status === "em_tratamento" && (
-              <button onClick={() => setModalSessao(true)}
-                className="px-4 py-2 rounded-xl text-xs uppercase tracking-widest font-semibold transition hover:scale-105"
-                style={{ background: "#c8a078", color: "#0a0707" }}>
-                Registrar Sessao
-              </button>
-            )}
-          </div>
+          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+            Data de acerto: <strong style={{ color: "#e87a7a" }}>
+              {pacote.data_acerto
+                ? new Date(pacote.data_acerto + "T12:00:00").toLocaleDateString("pt-BR")
+                : "Não definida"}
+            </strong>
+          </p>
         </div>
+      )}
 
-        <div className="grid grid-cols-3 gap-4 mb-6">
-          <div className="text-center rounded-2xl p-4" style={{ background: "#0e0a0a" }}>
-            <p className="text-3xl font-bold mb-1" style={{ color: "#c8a078" }}>{pacote.sessoes_feitas}</p>
-            <p className="text-xs uppercase tracking-widest" style={{ color: "#6b5a4e" }}>Feitas</p>
-          </div>
-          <div className="text-center rounded-2xl p-4" style={{ background: "#0e0a0a" }}>
-            <p className="text-3xl font-bold mb-1" style={{ color: restantes === 0 ? "#7ae8a0" : "#e8d5c0" }}>{restantes}</p>
-            <p className="text-xs uppercase tracking-widest" style={{ color: "#6b5a4e" }}>Restantes</p>
-          </div>
-          <div className="text-center rounded-2xl p-4" style={{ background: "#0e0a0a" }}>
-            <p className="text-3xl font-bold mb-1" style={{ color: "#c8a078" }}>{pacote.total_sessoes}</p>
-            <p className="text-xs uppercase tracking-widest" style={{ color: "#6b5a4e" }}>Total</p>
-          </div>
-        </div>
+      {/* Card principal */}
+      <div className="rounded-3xl overflow-hidden mb-5"
+        style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
 
-        <div className="mb-2 flex justify-between text-xs" style={{ color: "#6b5a4e" }}>
-          <span>Progresso</span><span>{pct}%</span>
-        </div>
-        <div className="h-3 rounded-full mb-4" style={{ background: "rgba(200,160,120,0.1)" }}>
-          <div className="h-3 rounded-full transition-all duration-700"
-            style={{ width: `${pct}%`, background: pct === 100 ? "#7ae8a0" : "#c8a078" }} />
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {[
-            { label: "Profissional", val: pacote.funcionarios?.nome ?? "-" },
-            { label: "Valor", val: pacote.valor ? `R$ ${Number(pacote.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "-" },
-            { label: "Pagamento", val: pacote.status_pagamento },
-            { label: "Inicio", val: pacote.data_inicio ? new Date(pacote.data_inicio).toLocaleDateString("pt-BR") : "-" },
-          ].map((item, i) => (
-            <div key={i} className="rounded-xl p-3" style={{ background: "#0e0a0a" }}>
-              <p className="text-xs uppercase tracking-widest mb-1" style={{ color: "#3a2e28" }}>{item.label}</p>
-              <p className="text-sm font-semibold" style={{ color: "#e8d5c0" }}>{item.val}</p>
+        {/* Sessões */}
+        <div className="p-6" style={{ borderBottom: "1px solid var(--border-subtle)" }}>
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-xs uppercase tracking-widest" style={{ color: "var(--text-muted)" }}>Sessões</p>
+            <div className="flex gap-2">
+              <button onClick={removerSessao} disabled={salvando || pacote.sessoes_feitas <= 0}
+                className="w-8 h-8 rounded-xl flex items-center justify-center text-lg font-bold transition hover:scale-110 disabled:opacity-40"
+                style={{ background: "rgba(232,122,122,0.1)", color: "#e87a7a" }}>−</button>
+              <button onClick={registrarSessao} disabled={salvando || pacote.sessoes_feitas >= pacote.total_sessoes}
+                className="w-8 h-8 rounded-xl flex items-center justify-center text-lg font-bold transition hover:scale-110 disabled:opacity-40"
+                style={{ background: "rgba(122,232,160,0.1)", color: "#7ae8a0" }}>+</button>
             </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="rounded-3xl p-6" style={{ background: "#120d0d", border: "1px solid rgba(200,160,120,0.12)" }}>
-        <h2 className="text-sm font-semibold uppercase tracking-widest mb-5" style={{ color: "#c8a078" }}>
-          Historico de Sessoes
-        </h2>
-        {pacote.sessoes.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-3xl mb-3">📋</p>
-            <p className="text-sm" style={{ color: "#6b5a4e" }}>Nenhuma sessao registrada ainda</p>
           </div>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {pacote.sessoes.map(s => (
-              <div key={s.id} className="rounded-2xl p-4 flex items-start gap-4"
-                style={{ background: "#0e0a0a", border: "1px solid rgba(200,160,120,0.08)" }}>
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0"
-                  style={{ background: "rgba(200,160,120,0.12)", color: "#c8a078" }}>
-                  {s.numero_sessao}
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-1 flex-wrap">
-                    <p className="text-sm font-semibold" style={{ color: "#e8d5c0" }}>
-                      Sessao {s.numero_sessao}
-                    </p>
-                    <p className="text-xs" style={{ color: "#6b5a4e" }}>
-                      {new Date(s.realizada_em).toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })} - {new Date(s.realizada_em).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-                    </p>
-                    {s.funcionarios?.nome && (
-                      <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "rgba(200,160,120,0.1)", color: "#c8a078" }}>
-                        {s.funcionarios.nome}
-                      </span>
-                    )}
-                  </div>
-                  {s.observacoes && <p className="text-xs mb-1" style={{ color: "#a89080" }}>{s.observacoes}</p>}
-                  {s.intercorrencias && (
-                    <p className="text-xs px-2 py-1 rounded-lg" style={{ background: "rgba(232,201,122,0.08)", color: "#e8c97a" }}>
-                      Intercorrencia: {s.intercorrencias}
-                    </p>
-                  )}
-                </div>
+          <div className="flex items-end gap-3 mb-3">
+            <span className="text-5xl font-bold" style={{ color: "var(--gold)" }}>{pacote.sessoes_feitas}</span>
+            <span className="text-xl mb-1" style={{ color: "var(--text-muted)" }}>/ {pacote.total_sessoes}</span>
+            <span className="text-sm mb-1 ml-auto" style={{ color: "var(--text-muted)" }}>
+              {pacote.total_sessoes - pacote.sessoes_feitas} restantes
+            </span>
+          </div>
+          <div className="h-3 rounded-full" style={{ background: "var(--border-subtle)" }}>
+            <div className="h-3 rounded-full transition-all"
+              style={{ width: `${pct}%`, background: pct >= 100 ? "#e87a7a" : "var(--gold)" }} />
+          </div>
+          <p className="text-xs mt-1 text-right" style={{ color: "var(--text-muted)" }}>{pct}%</p>
+        </div>
+
+        {/* Informações */}
+        <div className="p-6 flex flex-col gap-4">
+          {/* Áreas */}
+          <div>
+            <p className="text-xs uppercase tracking-widest mb-2" style={{ color: "var(--text-muted)" }}>Áreas tratadas</p>
+            <div className="flex flex-wrap gap-1.5">
+              {areas.map(a => (
+                <span key={a} className="text-xs px-2.5 py-1 rounded-full"
+                  style={{ background: "var(--border-subtle)", color: "var(--text-secondary)" }}>{a}</span>
+              ))}
+            </div>
+          </div>
+
+          {/* Status */}
+          <div>
+            <p className="text-xs uppercase tracking-widest mb-2" style={{ color: "var(--text-muted)" }}>Status do tratamento</p>
+            <div className="flex gap-2 flex-wrap">
+              {Object.entries(statusCfg).map(([key, cfg]) => (
+                <button key={key} onClick={() => atualizar({ status: key })}
+                  className="px-3 py-1.5 rounded-xl text-xs font-medium transition"
+                  style={{
+                    background: pacote.status === key ? cfg.bg : "transparent",
+                    color: cfg.color,
+                    border: `1px solid ${pacote.status === key ? cfg.color : `${cfg.color}40`}`,
+                  }}>
+                  {cfg.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Status pagamento */}
+          <div>
+            <p className="text-xs uppercase tracking-widest mb-2" style={{ color: "var(--text-muted)" }}>Status do pagamento</p>
+            <div className="flex gap-2 flex-wrap">
+              {Object.entries(pagCfg).map(([key, cfg]) => (
+                <button key={key} onClick={() => atualizar({ status_pagamento: key })}
+                  className="px-3 py-1.5 rounded-xl text-xs font-medium transition"
+                  style={{
+                    background: pacote.status_pagamento === key ? cfg.bg : "transparent",
+                    color: cfg.color,
+                    border: `1px solid ${pacote.status_pagamento === key ? cfg.color : `${cfg.color}40`}`,
+                  }}>
+                  {cfg.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Detalhes */}
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { label: "Categoria",       valor: pacote.categoria },
+              { label: "Forma pagamento", valor: fc?.label ?? pacote.forma_pagamento ?? "—", color: fc?.color },
+              { label: "Valor",           valor: pacote.valor ? `R$ ${Number(pacote.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—" },
+              { label: "Profissional",    valor: pacote.funcionarios?.nome ?? "—" },
+              { label: "Início",          valor: pacote.data_inicio ? new Date(pacote.data_inicio + "T12:00:00").toLocaleDateString("pt-BR") : "—" },
+              { label: "Cadastrado em",   valor: new Date(pacote.criado_em).toLocaleDateString("pt-BR") },
+            ].map(item => (
+              <div key={item.label} className="rounded-2xl px-4 py-3"
+                style={{ background: "var(--bg-input)", border: "1px solid var(--border-subtle)" }}>
+                <p className="text-xs uppercase tracking-widest mb-1" style={{ color: "var(--text-muted)" }}>{item.label}</p>
+                <p className="text-sm font-medium" style={{ color: (item as any).color ?? "var(--text-primary)" }}>{item.valor}</p>
               </div>
             ))}
           </div>
-        )}
+
+          {/* Termos e contrato */}
+          <div className="flex gap-3">
+            <div className="flex-1 rounded-2xl px-4 py-3 flex items-center justify-between"
+              style={{ background: "var(--bg-input)", border: "1px solid var(--border-subtle)" }}>
+              <span className="text-sm" style={{ color: "var(--text-muted)" }}>Termo</span>
+              <button onClick={() => atualizar({ assinou_termo: !pacote.assinou_termo })}
+                className="relative w-11 h-6 rounded-full transition-colors"
+                style={{ background: pacote.assinou_termo ? "var(--gold)" : "var(--border-color)" }}>
+                <div className="absolute top-1 w-4 h-4 rounded-full bg-white transition-all"
+                  style={{ left: pacote.assinou_termo ? "calc(100% - 20px)" : "4px" }} />
+              </button>
+            </div>
+            <div className="flex-1 rounded-2xl px-4 py-3 flex items-center justify-between"
+              style={{ background: "var(--bg-input)", border: "1px solid var(--border-subtle)" }}>
+              <span className="text-sm" style={{ color: "var(--text-muted)" }}>Contrato</span>
+              <button onClick={() => atualizar({ assinou_contrato: !pacote.assinou_contrato })}
+                className="relative w-11 h-6 rounded-full transition-colors"
+                style={{ background: pacote.assinou_contrato ? "#7ae8a0" : "var(--border-color)" }}>
+                <div className="absolute top-1 w-4 h-4 rounded-full bg-white transition-all"
+                  style={{ left: pacote.assinou_contrato ? "calc(100% - 20px)" : "4px" }} />
+              </button>
+            </div>
+          </div>
+
+          {/* Observações */}
+          {pacote.observacoes && (
+            <div className="rounded-2xl px-4 py-3"
+              style={{ background: "var(--bg-input)", border: "1px solid var(--border-subtle)" }}>
+              <p className="text-xs uppercase tracking-widest mb-1" style={{ color: "var(--text-muted)" }}>Observações</p>
+              <p className="text-sm" style={{ color: "var(--text-primary)" }}>{pacote.observacoes}</p>
+            </div>
+          )}
+        </div>
       </div>
-
-      {modalSessao && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}>
-          <div className="w-full max-w-md rounded-3xl p-8" style={{ background: "#120d0d", border: "1px solid rgba(200,160,120,0.2)" }}>
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-xl font-bold" style={{ color: "#c8a078" }}>Registrar Sessao</h2>
-                <p className="text-xs mt-1" style={{ color: "#6b5a4e" }}>Sessao {pacote.sessoes_feitas + 1} de {pacote.total_sessoes}</p>
-              </div>
-              <button onClick={() => setModalSessao(false)} style={{ color: "#6b5a4e" }}>
-                <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6" stroke="currentColor" strokeWidth={1.5}><path d="M18 6L6 18M6 6l12 12" strokeLinecap="round"/></svg>
-              </button>
-            </div>
-            <div className="flex flex-col gap-4">
-              <div>
-                <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "#a89080" }}>Observacoes</label>
-                <textarea value={formSessao.observacoes} onChange={e => setFormSessao(f => ({ ...f, observacoes: e.target.value }))}
-                  rows={3} placeholder="Evolucao, tecnica utilizada..."
-                  className="w-full rounded-2xl px-4 py-3 text-sm outline-none resize-none"
-                  style={{ background: "#0e0a0a", border: "1px solid rgba(200,160,120,0.15)", color: "#e8d5c0" }} />
-              </div>
-              <div>
-                <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "#a89080" }}>Intercorrencias</label>
-                <textarea value={formSessao.intercorrencias} onChange={e => setFormSessao(f => ({ ...f, intercorrencias: e.target.value }))}
-                  rows={2} placeholder="Reacoes, intercorrencias (opcional)..."
-                  className="w-full rounded-2xl px-4 py-3 text-sm outline-none resize-none"
-                  style={{ background: "#0e0a0a", border: "1px solid rgba(200,160,120,0.15)", color: "#e8d5c0" }} />
-              </div>
-            </div>
-            <div className="flex gap-3 mt-6">
-              <button onClick={() => setModalSessao(false)}
-                className="flex-1 py-3 rounded-2xl text-sm uppercase tracking-widest transition hover:opacity-70"
-                style={{ border: "1px solid rgba(200,160,120,0.2)", color: "#6b5a4e" }}>
-                Cancelar
-              </button>
-              <button onClick={registrarSessao} disabled={salvando}
-                className="flex-1 py-3 rounded-2xl text-sm uppercase tracking-widest font-semibold transition hover:scale-105"
-                style={{ background: "#c8a078", color: "#0a0707" }}>
-                {salvando ? "Salvando..." : "Confirmar Sessao"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {editando && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}>
-          <div className="w-full max-w-lg rounded-3xl p-8 max-h-[90vh] overflow-y-auto" style={{ background: "#120d0d", border: "1px solid rgba(200,160,120,0.2)" }}>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold" style={{ color: "#c8a078" }}>Editar Pacote</h2>
-              <button onClick={() => setEditando(false)} style={{ color: "#6b5a4e" }}>
-                <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6" stroke="currentColor" strokeWidth={1.5}><path d="M18 6L6 18M6 6l12 12" strokeLinecap="round"/></svg>
-              </button>
-            </div>
-            <div className="flex flex-col gap-4">
-              {[
-                { label: "___AREAS___", key: "procedimento", type: "areas" },
-              { label: "Status", key: "status", type: "select", opts: ["em_tratamento","finalizado","pausado","cancelado"] },
-                { label: "Status Pagamento", key: "status_pagamento", type: "select", opts: ["pendente","pago","parcial"] },
-                { label: "Valor (R$)", key: "valor", type: "number" },
-                { label: "Observacoes", key: "observacoes", type: "textarea" },
-              ].map(field => (
-                <div key={field.key}>
-                  <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "#a89080" }}>{field.label}</label>
-                  {field.type === "areas" ? (
-                    <div className="flex flex-wrap gap-2">
-                      {AREAS.map(area => {
-                        const areas = Array.isArray(formEdit.procedimento) ? formEdit.procedimento : (formEdit.procedimento ?? "").split(", ").filter(Boolean);
-                        const sel = areas.includes(area);
-                        return (
-                          <button key={area} type="button" onClick={() => toggleAreaEdit(area)}
-                            className="px-3 py-1.5 rounded-xl text-xs transition hover:scale-105"
-                            style={{ background: sel ? "rgba(200,160,120,0.2)" : "rgba(200,160,120,0.05)", color: sel ? "#c8a078" : "#6b5a4e", border: sel ? "1px solid rgba(200,160,120,0.4)" : "1px solid rgba(200,160,120,0.1)" }}>
-                            {sel ? "✓ " : ""}{area}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : field.type === "select" ? (
-                    <select value={formEdit[field.key] ?? ""} onChange={e => setFormEdit((f: any) => ({ ...f, [field.key]: e.target.value }))}
-                      className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
-                      style={{ background: "#0e0a0a", border: "1px solid rgba(200,160,120,0.15)", color: "#e8d5c0" }}>
-                      {field.opts?.map(o => <option key={o} value={o}>{o}</option>)}
-                    </select>
-                  ) : field.type === "textarea" ? (
-                    <textarea value={formEdit[field.key] ?? ""} onChange={e => setFormEdit((f: any) => ({ ...f, [field.key]: e.target.value }))}
-                      rows={3} className="w-full rounded-2xl px-4 py-3 text-sm outline-none resize-none"
-                      style={{ background: "#0e0a0a", border: "1px solid rgba(200,160,120,0.15)", color: "#e8d5c0" }} />
-                  ) : (
-                    <input type={field.type} value={formEdit[field.key] ?? ""} onChange={e => setFormEdit((f: any) => ({ ...f, [field.key]: e.target.value }))}
-                      className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
-                      style={{ background: "#0e0a0a", border: "1px solid rgba(200,160,120,0.15)", color: "#e8d5c0" }} />
-                  )}
-                </div>
-              ))}
-            </div>
-            <div className="flex gap-3 mt-6">
-              <button onClick={() => setEditando(false)}
-                className="flex-1 py-3 rounded-2xl text-sm uppercase tracking-widest transition hover:opacity-70"
-                style={{ border: "1px solid rgba(200,160,120,0.2)", color: "#6b5a4e" }}>
-                Cancelar
-              </button>
-              <button onClick={salvarEdicao} disabled={salvando}
-                className="flex-1 py-3 rounded-2xl text-sm uppercase tracking-widest font-semibold transition hover:scale-105"
-                style={{ background: "#c8a078", color: "#0a0707" }}>
-                {salvando ? "Salvando..." : "Salvar"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      <style>{`select option { background: #120d0d; } textarea::placeholder { color: #3a2e28; }`}</style>
     </div>
   );
 }
