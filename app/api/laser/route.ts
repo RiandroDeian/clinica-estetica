@@ -23,9 +23,7 @@ export async function GET(request: NextRequest) {
   if (status)          query = query.eq("status", status);
   if (funcionario_id)  query = query.eq("funcionario_id", funcionario_id);
   if (status_pagamento) query = query.eq("status_pagamento", status_pagamento);
-  // ✅ Filtro por categoria
   if (categoria)       query = query.eq("categoria", categoria);
-  // ✅ Filtro por forma de pagamento
   if (forma_pagamento) query = query.eq("forma_pagamento", forma_pagamento);
 
   const { data, error } = await query;
@@ -46,7 +44,6 @@ export async function GET(request: NextRequest) {
     .filter((p: any) => p.status_pagamento === "pago")
     .reduce((s: number, p: any) => s + Number(p.valor ?? 0), 0);
 
-  // ✅ Contadores por categoria e forma de pagamento
   const totalPacotes   = lista.filter((p: any) => p.categoria === "Pacote").length;
   const totalGratuitos = lista.filter((p: any) => p.categoria === "Gratuito").length;
   const totalAvulsos   = lista.filter((p: any) => p.categoria === "Avulso").length;
@@ -77,6 +74,8 @@ export async function POST(request: NextRequest) {
 
     const payload = {
       ...dados,
+      // ✅ FIX: categoria estava sendo desestruturada mas nunca incluída no payload
+      categoria: categoria ?? "Pacote",
       procedimento: Array.isArray(body.procedimento)
         ? body.procedimento.join(", ")
         : Array.isArray(body.areas)
@@ -84,7 +83,6 @@ export async function POST(request: NextRequest) {
         : body.procedimento,
       status: "em_tratamento",
       funcionario_id: body.funcionario_id?.trim() ? body.funcionario_id : sessao.id,
-      // ✅ Novos campos
       data_acerto:      body.data_acerto      || null,
       assinou_contrato: body.assinou_contrato ?? false,
     };

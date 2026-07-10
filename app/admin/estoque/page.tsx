@@ -77,13 +77,28 @@ export default function EstoquePage() {
       quantidade: Number(form.quantidade),
       quantidade_minima: Number(form.quantidade_minima),
       custo_medio: form.custo_medio ? Number(form.custo_medio) : null,
+      // ✅ FIX: campo date não aceita string vazia — precisa ser null
+      validade: form.validade || null,
       ambiente: form.ambiente || ambienteAtivo,
     };
-    if (editando) {
-      await fetch(`/api/estoque/${editando.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-    } else {
-      await fetch("/api/estoque", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+
+    const url = editando ? `/api/estoque/${editando.id}` : "/api/estoque";
+    const method = editando ? "PATCH" : "POST";
+
+    const res = await fetch(url, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    // ✅ FIX: agora verifica se deu erro antes de fechar o modal silenciosamente
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ erro: "Erro desconhecido" }));
+      alert("Erro ao salvar item: " + (err.erro ?? "Erro desconhecido"));
+      setSalvando(false);
+      return;
     }
+
     setModalAberto(false);
     setEditando(null);
     setForm({ nome: "", categoria: "", quantidade: "0", unidade: "un", quantidade_minima: "5", custo_medio: "", fornecedor: "", validade: "", ambiente: "geral" });
@@ -94,7 +109,7 @@ export default function EstoquePage() {
   async function movimentar() {
     if (!modalMov || !qtdMov) return;
     setSalvando(true);
-    await fetch(`/api/estoque/${modalMov.item.id}`, {
+    const res = await fetch(`/api/estoque/${modalMov.item.id}`, {
       method: "PUT", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         tipo: modalMov.tipo,
@@ -105,6 +120,14 @@ export default function EstoquePage() {
         ambiente: modalMov.item.ambiente || ambienteAtivo,
       }),
     });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ erro: "Erro desconhecido" }));
+      alert("Erro ao movimentar: " + (err.erro ?? "Erro desconhecido"));
+      setSalvando(false);
+      return;
+    }
+
     setModalMov(null);
     setQtdMov("");
     setMotivoMov("");
