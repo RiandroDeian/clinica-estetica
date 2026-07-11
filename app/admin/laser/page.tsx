@@ -15,6 +15,7 @@ type Pacote = {
   valor?: number;
   data_inicio?: string;
   data_acerto?: string;
+  dia_vencimento_boleto?: number;
   assinou_contrato?: boolean;
   observacoes?: string;
   assinou_termo: boolean;
@@ -53,7 +54,6 @@ const categoriaCfg: Record<string, { label: string; color: string; bg: string }>
   Avulso:   { label: "Avulso",   color: "#a89bcc",     bg: "rgba(168,155,204,0.1)" },
 };
 
-// ✅ Formas de pagamento com boleto em destaque
 const formas = ["pix", "debito", "credito", "dinheiro", "transferencia", "boleto"];
 
 const formaCfg: Record<string, { label: string; color: string; bg: string }> = {
@@ -76,7 +76,7 @@ const formInicial = {
   categoria: "Pacote", total_sessoes: "6", valor: "",
   forma_pagamento: "pix", status_pagamento: "pendente",
   data_inicio: new Date().toISOString().slice(0, 10),
-  data_acerto: "", assinou_contrato: false,
+  data_acerto: "", dia_vencimento_boleto: "", assinou_contrato: false,
   observacoes: "", assinou_termo: false,
 };
 
@@ -84,7 +84,6 @@ function toggleArea(areas: string[], area: string) {
   return areas.includes(area) ? areas.filter(a => a !== area) : [...areas, area];
 }
 
-// ✅ Campos obrigatórios para alerta de cadastro incompleto
 function camposFaltando(paciente?: { nome: string; telefone: string; cpf?: string }) {
   if (!paciente) return [];
   const faltando = [];
@@ -101,7 +100,7 @@ export default function LaserPage() {
   const [filtroStatus, setFiltroStatus] = useState("");
   const [filtroPag, setFiltroPag] = useState("");
   const [filtroCategoria, setFiltroCategoria] = useState("");
-  const [filtroForma, setFiltroForma] = useState(""); // ✅ novo filtro
+  const [filtroForma, setFiltroForma] = useState("");
   const [modalAberto, setModalAberto] = useState(false);
   const [editando, setEditando] = useState<Pacote | null>(null);
   const [salvando, setSalvando] = useState(false);
@@ -115,7 +114,7 @@ export default function LaserPage() {
     if (filtroStatus)    url += `&status=${filtroStatus}`;
     if (filtroPag)       url += `&status_pagamento=${filtroPag}`;
     if (filtroCategoria) url += `&categoria=${filtroCategoria}`;
-    if (filtroForma)     url += `&forma_pagamento=${filtroForma}`; // ✅
+    if (filtroForma)     url += `&forma_pagamento=${filtroForma}`;
     const res = await fetch(url);
     const data = await res.json();
     setPacotes(data.pacotes ?? []);
@@ -165,6 +164,7 @@ export default function LaserPage() {
       status_pagamento: p.status_pagamento,
       data_inicio: p.data_inicio ?? new Date().toISOString().slice(0, 10),
       data_acerto: p.data_acerto ?? "",
+      dia_vencimento_boleto: p.dia_vencimento_boleto ? String(p.dia_vencimento_boleto) : "",
       assinou_contrato: p.assinou_contrato ?? false,
       observacoes: p.observacoes ?? "",
       assinou_termo: p.assinou_termo,
@@ -181,6 +181,8 @@ export default function LaserPage() {
       total_sessoes: Number(form.total_sessoes),
       valor: form.valor ? Number(form.valor) : null,
       data_acerto: form.forma_pagamento === "boleto" ? (form.data_acerto || null) : null,
+      dia_vencimento_boleto: form.forma_pagamento === "boleto" && form.dia_vencimento_boleto
+        ? Number(form.dia_vencimento_boleto) : null,
     };
     const method = editando ? "PATCH" : "POST";
     const url = editando ? `/api/laser/${editando.id}` : "/api/laser";
@@ -212,17 +214,30 @@ export default function LaserPage() {
           <p className="text-xs uppercase tracking-widest mb-1" style={{ color: "var(--gold)" }}>Controle</p>
           <h1 className="text-3xl font-bold" style={{ color: "var(--text-primary)" }}>Pacientes Laser</h1>
         </div>
-        <button onClick={abrirNovo}
-          className="flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-semibold uppercase tracking-widest transition hover:scale-105"
-          style={{ background: "var(--gold)", color: "var(--bg-input)" }}>
-          <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth={2}>
-            <path d="M12 5v14M5 12h14" strokeLinecap="round" />
-          </svg>
-          Novo Pacote
-        </button>
+        <div className="flex gap-2">
+          {/* ✅ Botão para acessar aba de Boletos */}
+          <button onClick={() => router.push("/admin/laser/boletos")}
+            className="flex items-center gap-2 px-5 py-3 rounded-2xl text-sm font-semibold uppercase tracking-widest transition hover:scale-105"
+            style={{ background: "rgba(232,122,122,0.1)", color: "#e87a7a", border: "1px solid rgba(232,122,122,0.3)" }}>
+            🔴 Boletos
+            {resumo && resumo.totalBoleto > 0 && (
+              <span className="text-xs px-1.5 py-0.5 rounded-full" style={{ background: "#e87a7a", color: "white" }}>
+                {resumo.totalBoleto}
+              </span>
+            )}
+          </button>
+          <button onClick={abrirNovo}
+            className="flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-semibold uppercase tracking-widest transition hover:scale-105"
+            style={{ background: "var(--gold)", color: "var(--bg-input)" }}>
+            <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth={2}>
+              <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+            </svg>
+            Novo Pacote
+          </button>
+        </div>
       </div>
 
-      {/* ✅ Cards de resumo expandidos */}
+      {/* Cards de resumo */}
       {resumo && (
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3 mb-6">
           {[
@@ -235,7 +250,9 @@ export default function LaserPage() {
             { label: "Avulsos",    valor: resumo.totalAvulsos,   icon: "⚡", cor: "#a89bcc" },
             { label: "Boleto",     valor: resumo.totalBoleto,    icon: "🔴", cor: "#e87a7a" },
           ].map((c, i) => (
-            <div key={i} className="rounded-2xl p-4" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+            <div key={i} className="rounded-2xl p-4"
+              onClick={() => c.label === "Boleto" && router.push("/admin/laser/boletos")}
+              style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)", cursor: c.label === "Boleto" ? "pointer" : "default" }}>
               <div className="text-lg mb-1">{c.icon}</div>
               <p className="text-lg font-bold" style={{ color: c.cor }}>{c.valor}</p>
               <p className="text-[10px] uppercase tracking-widest" style={{ color: "var(--text-muted)" }}>{c.label}</p>
@@ -256,7 +273,6 @@ export default function LaserPage() {
             style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
         </div>
 
-        {/* ✅ Filtro por forma de pagamento (boleto em destaque) */}
         <select value={filtroForma} onChange={e => setFiltroForma(e.target.value)}
           className="rounded-2xl px-4 py-3 text-sm outline-none"
           style={{ background: filtroForma === "boleto" ? "rgba(232,122,122,0.1)" : "var(--bg-card)", border: filtroForma === "boleto" ? "1px solid #e87a7a" : "1px solid var(--border-color)", color: filtroForma ? "var(--text-primary)" : "var(--text-muted)" }}>
@@ -325,7 +341,6 @@ export default function LaserPage() {
                       className="transition cursor-pointer"
                       style={{
                         borderBottom: i < pacotes.length - 1 ? "1px solid var(--border-subtle)" : "none",
-                        // ✅ Destaque visual para boleto
                         background: eBoleto ? "rgba(232,122,122,0.03)" : "transparent",
                       }}
                       onClick={() => router.push(`/admin/laser/${p.id}`)}>
@@ -339,7 +354,6 @@ export default function LaserPage() {
                           <div>
                             <div className="flex items-center gap-1.5">
                               <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>{p.pacientes?.nome}</p>
-                              {/* ✅ Alerta cadastro incompleto */}
                               {faltaCadastro.length > 0 && (
                                 <span title={`Faltando: ${faltaCadastro.join(", ")}`}
                                   className="text-[10px] px-1.5 py-0.5 rounded-full"
@@ -366,11 +380,11 @@ export default function LaserPage() {
                         <span className="text-xs px-2 py-1 rounded-full font-medium" style={{ color: cc.color, background: cc.bg }}>{cc.label}</span>
                       </td>
 
-                      {/* ✅ Forma de pagamento com destaque para boleto */}
                       <td className="px-4 py-4">
                         {fc ? (
                           <span className="text-xs px-2 py-1 rounded-full font-medium" style={{ color: fc.color, background: fc.bg }}>
                             {eBoleto ? "🔴 " : ""}{fc.label}
+                            {eBoleto && p.dia_vencimento_boleto && ` (dia ${p.dia_vencimento_boleto})`}
                           </span>
                         ) : (
                           <span className="text-xs" style={{ color: "var(--text-muted)" }}>—</span>
@@ -381,14 +395,12 @@ export default function LaserPage() {
                         <span className="text-xs px-2 py-1 rounded-full font-medium" style={{ color: pc.color, background: pc.bg }}>{pc.label}</span>
                       </td>
 
-                      {/* ✅ Data de acerto (só para boleto) */}
                       <td className="px-4 py-4 text-xs" style={{ color: eBoleto ? "#e87a7a" : "var(--text-muted)" }}>
                         {eBoleto && p.data_acerto
                           ? new Date(p.data_acerto + "T12:00:00").toLocaleDateString("pt-BR")
                           : eBoleto ? <span style={{ color: "#e87a7a" }}>⚠ Sem data</span> : "—"}
                       </td>
 
-                      {/* ✅ Assinou contrato */}
                       <td className="px-4 py-4">
                         <span className="text-xs px-2 py-0.5 rounded-full"
                           style={{ background: p.assinou_contrato ? "rgba(122,232,160,0.1)" : "rgba(232,122,122,0.1)", color: p.assinou_contrato ? "#7ae8a0" : "#e87a7a" }}>
@@ -452,7 +464,6 @@ export default function LaserPage() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Paciente */}
               <div className="sm:col-span-2">
                 <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-muted)" }}>Paciente</label>
                 <select value={form.paciente_id} onChange={e => setForm(f => ({ ...f, paciente_id: e.target.value }))}
@@ -462,7 +473,6 @@ export default function LaserPage() {
                 </select>
               </div>
 
-              {/* Categoria */}
               <div className="sm:col-span-2">
                 <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-muted)" }}>Categoria</label>
                 <div className="flex gap-2">
@@ -481,7 +491,6 @@ export default function LaserPage() {
                 </div>
               </div>
 
-              {/* Áreas */}
               <div className="sm:col-span-2">
                 <label className="text-xs uppercase tracking-widest block mb-3" style={{ color: "var(--text-muted)" }}>
                   Áreas Tratadas <span style={{ color: "var(--text-muted)" }}>({form.areas.length} selecionada{form.areas.length !== 1 ? "s" : ""})</span>
@@ -513,7 +522,6 @@ export default function LaserPage() {
                 </div>
               </div>
 
-              {/* Sessões e Valor */}
               <div>
                 <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-muted)" }}>Total de Sessões</label>
                 <input type="number" value={form.total_sessoes}
@@ -531,7 +539,6 @@ export default function LaserPage() {
                   style={{ ...inputStyle, opacity: form.categoria === "Gratuito" ? 0.4 : 1 }} />
               </div>
 
-              {/* ✅ Forma de pagamento com boleto destacado */}
               <div>
                 <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-muted)" }}>Forma de Pagamento</label>
                 <select value={form.forma_pagamento} onChange={e => setForm(f => ({ ...f, forma_pagamento: e.target.value }))}
@@ -553,23 +560,40 @@ export default function LaserPage() {
                 </select>
               </div>
 
-              {/* ✅ Data de acerto — só aparece para boleto */}
+              {/* ✅ Campos exclusivos de boleto */}
               {form.forma_pagamento === "boleto" && (
-                <div className="sm:col-span-2">
-                  <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "#e87a7a" }}>
-                    🔴 Data de Acerto (Boleto)
-                  </label>
-                  <input type="date" value={form.data_acerto}
-                    onChange={e => setForm(f => ({ ...f, data_acerto: e.target.value }))}
-                    className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
-                    style={{ ...inputStyle, borderColor: "#e87a7a", colorScheme: "dark" }} />
-                  <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
-                    Dia do mês para cobrança mensal
-                  </p>
-                </div>
+                <>
+                  <div>
+                    <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "#e87a7a" }}>
+                      🔴 Dia de Vencimento
+                    </label>
+                    <div className="flex gap-2">
+                      {["10", "15", "20"].map(dia => (
+                        <button key={dia} type="button"
+                          onClick={() => setForm(f => ({ ...f, dia_vencimento_boleto: dia }))}
+                          className="flex-1 py-2.5 rounded-2xl text-sm font-semibold transition"
+                          style={{
+                            background: form.dia_vencimento_boleto === dia ? "#e87a7a" : "var(--bg-input)",
+                            color: form.dia_vencimento_boleto === dia ? "white" : "var(--text-muted)",
+                            border: "1px solid rgba(232,122,122,0.3)",
+                          }}>
+                          Dia {dia}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "#e87a7a" }}>
+                      Data do Último Acerto
+                    </label>
+                    <input type="date" value={form.data_acerto}
+                      onChange={e => setForm(f => ({ ...f, data_acerto: e.target.value }))}
+                      className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
+                      style={{ ...inputStyle, borderColor: "#e87a7a", colorScheme: "dark" }} />
+                  </div>
+                </>
               )}
 
-              {/* Data início e Profissional */}
               <div>
                 <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-muted)" }}>Data de Início</label>
                 <input type="date" value={form.data_inicio} onChange={e => setForm(f => ({ ...f, data_inicio: e.target.value }))}
@@ -584,7 +608,6 @@ export default function LaserPage() {
                 </select>
               </div>
 
-              {/* Observações */}
               <div className="sm:col-span-2">
                 <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-muted)" }}>Observações</label>
                 <textarea value={form.observacoes} onChange={e => setForm(f => ({ ...f, observacoes: e.target.value }))}
@@ -592,7 +615,6 @@ export default function LaserPage() {
                   className="w-full rounded-2xl px-4 py-3 text-sm outline-none resize-none" style={inputStyle} />
               </div>
 
-              {/* ✅ Assinou Contrato */}
               <div className="sm:col-span-2 flex items-center gap-3">
                 <button type="button" onClick={() => setForm(f => ({ ...f, assinou_contrato: !f.assinou_contrato }))}
                   className="w-6 h-6 rounded-lg flex items-center justify-center transition flex-shrink-0"
@@ -606,7 +628,6 @@ export default function LaserPage() {
                 <span className="text-sm" style={{ color: "var(--text-muted)" }}>Assinou o contrato</span>
               </div>
 
-              {/* Assinou Termo */}
               <div className="sm:col-span-2 flex items-center gap-3">
                 <button type="button" onClick={() => setForm(f => ({ ...f, assinou_termo: !f.assinou_termo }))}
                   className="w-6 h-6 rounded-lg flex items-center justify-center transition flex-shrink-0"

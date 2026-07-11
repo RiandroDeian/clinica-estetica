@@ -74,7 +74,6 @@ export async function POST(request: NextRequest) {
 
     const payload = {
       ...dados,
-      // ✅ FIX: categoria estava sendo desestruturada mas nunca incluída no payload
       categoria: categoria ?? "Pacote",
       procedimento: Array.isArray(body.procedimento)
         ? body.procedimento.join(", ")
@@ -84,6 +83,8 @@ export async function POST(request: NextRequest) {
       status: "em_tratamento",
       funcionario_id: body.funcionario_id?.trim() ? body.funcionario_id : sessao.id,
       data_acerto:      body.data_acerto      || null,
+      // ✅ Dia de vencimento do boleto
+      dia_vencimento_boleto: body.dia_vencimento_boleto ? Number(body.dia_vencimento_boleto) : null,
       assinou_contrato: body.assinou_contrato ?? false,
     };
 
