@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -31,6 +31,14 @@ type Sessao = {
   observacoes?: string;
   intercorrencias?: string;
   funcionarios?: { nome: string; cor: string };
+};
+
+type Foto = {
+  id: string;
+  tipo: "antes" | "depois";
+  url: string;
+  descricao?: string;
+  criado_em: string;
 };
 
 const statusCfg: Record<string, { label: string; color: string; bg: string }> = {
@@ -68,19 +76,29 @@ export default function LaserDetalhePage() {
 
   const [pacote, setPacote] = useState<Pacote | null>(null);
   const [sessoes, setSessoes] = useState<Sessao[]>([]);
+  const [fotos, setFotos] = useState<Foto[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [modalSessao, setModalSessao] = useState(false);
   const [formSessao, setFormSessao] = useState(formSessaoInicial);
 
+  // ✅ Estado para fotos
+  const [tipoFotoUpload, setTipoFotoUpload] = useState<"antes" | "depois">("antes");
+  const [uploadandoFoto, setUploadandoFoto] = useState(false);
+  const [fotoAmpliada, setFotoAmpliada] = useState<Foto | null>(null);
+  const fileInputAntes = useRef<HTMLInputElement>(null);
+  const fileInputDepois = useRef<HTMLInputElement>(null);
+
   async function buscar() {
     setCarregando(true);
-    const [resPacote, resSessoes] = await Promise.all([
+    const [resPacote, resSessoes, resFotos] = await Promise.all([
       fetch(`/api/laser/${id}`),
       fetch(`/api/laser/sessoes?pacote_id=${id}`),
+      fetch(`/api/laser/fotos?pacote_id=${id}`),
     ]);
     if (resPacote.ok) setPacote(await resPacote.json());
     if (resSessoes.ok) setSessoes(await resSessoes.json());
+    if (resFotos.ok) setFotos(await resFotos.json());
     setCarregando(false);
   }
 
@@ -132,6 +150,36 @@ export default function LaserDetalhePage() {
     toast.success("Atendimento removido!");
   }
 
+  // ✅ Upload de foto
+  async function handleUploadFoto(e: React.ChangeEvent<HTMLInputElement>, tipo: "antes" | "depois") {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploadandoFoto(true);
+    for (const file of Array.from(files)) {
+      const fd = new FormData();
+      fd.append("arquivo", file);
+      fd.append("pacote_id", id);
+      fd.append("tipo", tipo);
+      const res = await fetch("/api/laser/fotos", { method: "POST", body: fd });
+      if (!res.ok) {
+        toast.error(`Erro ao enviar ${file.name}`);
+      }
+    }
+    setUploadandoFoto(false);
+    toast.success("Fotos enviadas!");
+    buscar();
+    e.target.value = "";
+  }
+
+  async function excluirFoto(fotoId: string) {
+    if (!confirm("Excluir esta foto?")) return;
+    await fetch(`/api/laser/fotos?id=${fotoId}`, { method: "DELETE" });
+    setFotoAmpliada(null);
+    buscar();
+    toast.success("Foto removida!");
+  }
+
   if (carregando) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -160,10 +208,12 @@ export default function LaserDetalhePage() {
     ? Math.round((pacote.sessoes_feitas / pacote.total_sessoes) * 100)
     : 0;
 
-  const sc = statusCfg[pacote.status] ?? statusCfg.em_tratamento;
   const pc = pagCfg[pacote.status_pagamento] ?? pagCfg.pendente;
   const fc = formaCfg[pacote.forma_pagamento ?? ""] ?? null;
   const eBoleto = pacote.forma_pagamento === "boleto";
+
+  const fotosAntes = fotos.filter(f => f.tipo === "antes");
+  const fotosDepois = fotos.filter(f => f.tipo === "depois");
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -322,6 +372,86 @@ export default function LaserDetalhePage() {
         </div>
       </div>
 
+      {/* ✅ FOTOS ANTES E DEPOIS */}
+      <div className="rounded-3xl p-6 mb-5"
+        style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+        <p className="text-xs uppercase tracking-widest mb-4" style={{ color: "var(--gold)" }}>
+          Fotos do Tratamento
+        </p>
+
+        <div className="grid grid-cols-2 gap-4">
+          {/* Coluna ANTES */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs px-2 py-0.5 rounded-full font-medium"
+                style={{ background: "rgba(232,122,122,0.1)", color: "#e87a7a" }}>
+                Antes ({fotosAntes.length})
+              </span>
+              <button onClick={() => fileInputAntes.current?.click()}
+                disabled={uploadandoFoto}
+                className="text-xs px-2 py-1 rounded-lg transition hover:opacity-70"
+                style={{ background: "var(--gold-bg)", color: "var(--gold)" }}>
+                + Adicionar
+              </button>
+              <input ref={fileInputAntes} type="file" accept="image/*" multiple hidden
+                onChange={e => handleUploadFoto(e, "antes")} />
+            </div>
+            {fotosAntes.length === 0 ? (
+              <div className="rounded-2xl h-24 flex items-center justify-center"
+                style={{ background: "var(--bg-input)", border: "1px dashed var(--border-color)" }}>
+                <span className="text-xs" style={{ color: "var(--text-muted)" }}>Sem fotos</span>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                {fotosAntes.map(f => (
+                  <img key={f.id} src={f.url} alt="Antes"
+                    onClick={() => setFotoAmpliada(f)}
+                    className="w-full h-20 object-cover rounded-xl cursor-pointer transition hover:opacity-80"
+                    style={{ border: "1px solid var(--border-subtle)" }} />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Coluna DEPOIS */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs px-2 py-0.5 rounded-full font-medium"
+                style={{ background: "rgba(122,232,160,0.1)", color: "#7ae8a0" }}>
+                Depois ({fotosDepois.length})
+              </span>
+              <button onClick={() => fileInputDepois.current?.click()}
+                disabled={uploadandoFoto}
+                className="text-xs px-2 py-1 rounded-lg transition hover:opacity-70"
+                style={{ background: "var(--gold-bg)", color: "var(--gold)" }}>
+                + Adicionar
+              </button>
+              <input ref={fileInputDepois} type="file" accept="image/*" multiple hidden
+                onChange={e => handleUploadFoto(e, "depois")} />
+            </div>
+            {fotosDepois.length === 0 ? (
+              <div className="rounded-2xl h-24 flex items-center justify-center"
+                style={{ background: "var(--bg-input)", border: "1px dashed var(--border-color)" }}>
+                <span className="text-xs" style={{ color: "var(--text-muted)" }}>Sem fotos</span>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                {fotosDepois.map(f => (
+                  <img key={f.id} src={f.url} alt="Depois"
+                    onClick={() => setFotoAmpliada(f)}
+                    className="w-full h-20 object-cover rounded-xl cursor-pointer transition hover:opacity-80"
+                    style={{ border: "1px solid var(--border-subtle)" }} />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {uploadandoFoto && (
+          <p className="text-xs text-center mt-3" style={{ color: "var(--gold)" }}>Enviando fotos...</p>
+        )}
+      </div>
+
       {/* Histórico de atendimentos */}
       <div className="rounded-3xl overflow-hidden"
         style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
@@ -451,6 +581,39 @@ export default function LaserDetalhePage() {
                 style={{ background: "var(--gold)", color: "var(--bg-card)" }}>
                 {salvando ? "Salvando..." : "Confirmar Atendimento"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ✅ Modal foto ampliada */}
+      {fotoAmpliada && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.92)" }}
+          onClick={() => setFotoAmpliada(null)}>
+          <div className="max-w-lg w-full" onClick={e => e.stopPropagation()}>
+            <img src={fotoAmpliada.url} alt={fotoAmpliada.tipo}
+              className="w-full rounded-2xl mb-4" />
+            <div className="flex items-center justify-between">
+              <span className="text-xs px-3 py-1.5 rounded-full font-medium"
+                style={{
+                  background: fotoAmpliada.tipo === "antes" ? "rgba(232,122,122,0.15)" : "rgba(122,232,160,0.15)",
+                  color: fotoAmpliada.tipo === "antes" ? "#e87a7a" : "#7ae8a0",
+                }}>
+                {fotoAmpliada.tipo === "antes" ? "Antes" : "Depois"}
+              </span>
+              <div className="flex gap-2">
+                <button onClick={() => excluirFoto(fotoAmpliada.id)}
+                  className="text-xs px-3 py-1.5 rounded-xl transition hover:opacity-70"
+                  style={{ background: "rgba(232,122,122,0.15)", color: "#e87a7a" }}>
+                  Excluir foto
+                </button>
+                <button onClick={() => setFotoAmpliada(null)}
+                  className="text-xs px-3 py-1.5 rounded-xl transition hover:opacity-70"
+                  style={{ background: "var(--bg-card)", color: "var(--text-muted)", border: "1px solid var(--border-color)" }}>
+                  Fechar
+                </button>
+              </div>
             </div>
           </div>
         </div>
