@@ -70,6 +70,9 @@ export async function POST(request: NextRequest) {
   if (acao === "anamnese") {
     const { data, error } = await supabaseAdmin.from("prontuario_anamneses").insert({
       paciente_id, funcionario_id: sessao.id,
+      respostas: body.respostas ?? null,
+      observacoes_gerais: body.observacoes_gerais || null,
+      // Campos antigos (mantidos para compatibilidade com anamneses anteriores)
       queixa_principal: body.queixa_principal || null,
       historia_doenca: body.historia_doenca || null,
       antecedentes: body.antecedentes || null,

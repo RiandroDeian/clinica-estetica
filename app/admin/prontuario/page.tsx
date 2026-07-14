@@ -22,6 +22,80 @@ function calcularIdade(data?: string) {
   return idade;
 }
 
+// ── Anamnese estruturada (Ficha de Anamnese Facial) ──────────────────────────
+type PerguntaAnamnese = { key: string; label: string; tipo?: "sim_nao" | "texto"; alerta?: boolean; obsPlaceholder?: string };
+const ANAMNESE_SECOES: { titulo: string; perguntas: PerguntaAnamnese[] }[] = [
+  {
+    titulo: "Histórico Geral",
+    perguntas: [
+      { key: "cardiaco",             label: "Problemas cardíacos?" },
+      { key: "hipertensao_diabetes", label: "Hipertensão / Diabetes?" },
+      { key: "hormonais_tireoide",   label: "Distúrbios hormonais / tireoide?" },
+      { key: "autoimune",            label: "Doenças autoimunes?" },
+      { key: "coagulacao",           label: "Distúrbios de coagulação?" },
+      { key: "epilepsia",            label: "Epilepsia ou convulsões?" },
+      { key: "respiratorio",         label: "Asma ou problemas respiratórios?" },
+      { key: "alergias",             label: "Alergias importantes?", alerta: true, obsPlaceholder: "Quais alergias?" },
+      { key: "alergia_lidocaina",    label: "Alergia a lidocaína?", alerta: true },
+      { key: "gestante_amamentando", label: "Está gestante ou amamentando?" },
+      { key: "cirurgias_recentes",   label: "Cirurgias recentes (últimos 6 meses)?" },
+      { key: "queloide",             label: "Histórico de quelóide ou cicatrização ruim?" },
+      { key: "herpes_facial",        label: "Já teve herpes na região facial?" },
+    ],
+  },
+  {
+    titulo: "Medicamentos",
+    perguntas: [
+      { key: "med_continuos",        label: "Medicamentos contínuos?", obsPlaceholder: "Quais?" },
+      { key: "anticoagulantes",      label: "Anticoagulantes?" },
+      { key: "suplementos",          label: "Suplementos (colágeno, vitaminas, pré-treino, etc)?" },
+      { key: "antibioticos_recentes",label: "Uso recente de antibióticos?" },
+    ],
+  },
+  {
+    titulo: "Hábitos",
+    perguntas: [
+      { key: "exposicao_solar",      label: "Exposição solar diária?" },
+      { key: "protetor_solar",       label: "Uso de protetor solar?", obsPlaceholder: "Diário / Ocasional / Não usa" },
+      { key: "tabagismo",            label: "Tabagismo?", obsPlaceholder: "Quantidade por dia" },
+      { key: "alcool",               label: "Consumo alcoólico?" },
+      { key: "atividade_fisica",     label: "Pratica atividade física?" },
+      { key: "alimentacao",          label: "Alimentação", tipo: "texto" },
+      { key: "hidratacao",           label: "Hidratação diária (litros)", tipo: "texto" },
+    ],
+  },
+  {
+    titulo: "Procedimentos Estéticos Anteriores",
+    perguntas: [
+      { key: "toxina_botulinica",    label: "Já realizou toxina botulínica?", obsPlaceholder: "Quando?" },
+      { key: "preenchedores",        label: "Preenchedores prévios?" },
+      { key: "bioestimuladores",     label: "Bioestimuladores realizados?" },
+      { key: "peeling_laser",        label: "Peeling / Laser / Microagulhamento?" },
+      { key: "complicacao_anterior", label: "Alguma complicação anterior?" },
+    ],
+  },
+  {
+    titulo: "Contraindicações",
+    perguntas: [
+      { key: "contraindicacoes",     label: "Possui alguma contraindicação?", alerta: true, obsPlaceholder: "Descreva a contraindicação" },
+    ],
+  },
+];
+
+const ANAMNESE_PERGUNTAS: Record<string, PerguntaAnamnese> = Object.fromEntries(
+  ANAMNESE_SECOES.flatMap(s => s.perguntas).map(p => [p.key, p])
+);
+const CHAVES_ALERTA = ANAMNESE_SECOES.flatMap(s => s.perguntas).filter(p => p.alerta).map(p => p.key);
+
+type RespostaAnamnese = { resposta?: "sim" | "nao" | ""; obs?: string };
+function respostaAtiva(r?: RespostaAnamnese) {
+  return !!r && (r.resposta === "sim" || !!(r.obs && r.obs.trim()));
+}
+function anamneseTemAlerta(respostas?: Record<string, RespostaAnamnese> | null) {
+  if (!respostas) return false;
+  return CHAVES_ALERTA.some(k => respostaAtiva(respostas[k]));
+}
+
 export default function ProntuarioPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -42,7 +116,10 @@ export default function ProntuarioPage() {
   const [modalSaude, setModalSaude] = useState(false);
   const [modalAnotacao, setModalAnotacao] = useState(false);
   const [formConsulta, setFormConsulta] = useState({ tipo: "consulta", titulo: "", descricao: "", procedimento_realizado: "" });
-  const [formAnamnese, setFormAnamnese] = useState({ queixa_principal: "", historia_doenca: "", antecedentes: "", habitos: "" });
+  const [formAnamnese, setFormAnamnese] = useState<{ respostas: Record<string, RespostaAnamnese>; observacoes_gerais: string }>({ respostas: {}, observacoes_gerais: "" });
+  function setResposta(key: string, patch: Partial<RespostaAnamnese>) {
+    setFormAnamnese(f => ({ ...f, respostas: { ...f.respostas, [key]: { ...f.respostas[key], ...patch } } }));
+  }
   const [formPrescricao, setFormPrescricao] = useState({ medicamento: "", dosagem: "", frequencia: "", duracao: "", observacoes: "" });
   const [formExame, setFormExame] = useState({ tipo_exame: "", resultado: "", observacoes: "" });
   const [formAnotacao, setFormAnotacao] = useState({ titulo: "", conteudo: "", tipo: "geral" });
@@ -385,31 +462,83 @@ export default function ProntuarioPage() {
 
       {abaAtiva === "anamnese" && (
         <div className="flex flex-col gap-4">
-          <button onClick={() => setModalAnamnese(true)} className="self-end px-5 py-2.5 rounded-2xl text-sm font-semibold"
+          <button onClick={() => { setFormAnamnese({ respostas: {}, observacoes_gerais: "" }); setModalAnamnese(true); }} className="self-end px-5 py-2.5 rounded-2xl text-sm font-semibold"
             style={{ background: "var(--gold)", color: "#0a0707" }}>+ Nova Anamnese</button>
           {anamneses.length === 0 ? (
             <div className="text-center py-16 rounded-3xl" style={{ background: "var(--bg-card)", border: "1px solid var(--border-subtle)" }}>
               <p className="text-4xl mb-3">📝</p><p style={{ color: "var(--text-muted)" }}>Nenhuma anamnese</p>
             </div>
-          ) : anamneses.map((a: any) => (
-            <div key={a.id} className="rounded-3xl p-5" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-              <div className="flex justify-between mb-3">
-                <p className="text-sm font-semibold" style={{ color: "var(--gold)" }}>Anamnese</p>
+          ) : anamneses.map((a: any) => {
+            const respostas: Record<string, RespostaAnamnese> | null = a.respostas ?? null;
+            const temAlerta = anamneseTemAlerta(respostas);
+            return (
+            <div key={a.id} className="rounded-3xl p-5"
+              style={{ background: "var(--bg-card)", border: `1px solid ${temAlerta ? "#e87a7a" : "var(--border-color)"}` }}>
+              <div className="flex justify-between items-start mb-3">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-semibold" style={{ color: "var(--gold)" }}>Anamnese</p>
+                  {temAlerta && (
+                    <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
+                      style={{ background: "rgba(232,122,122,0.15)", color: "#e87a7a" }}>⚠ Alergia / Contraindicação</span>
+                  )}
+                </div>
                 <p className="text-xs" style={{ color: "var(--text-muted)" }}>{a.funcionarios?.nome} · {new Date(a.criado_em).toLocaleDateString("pt-BR")}</p>
               </div>
-              {[
-                { label: "Queixa", valor: a.queixa_principal },
-                { label: "Historia", valor: a.historia_doenca },
-                { label: "Antecedentes", valor: a.antecedentes },
-                { label: "Habitos", valor: a.habitos },
-              ].filter(i => i.valor).map(item => (
-                <div key={item.label} className="mb-2">
-                  <p className="text-xs uppercase tracking-widest mb-1" style={{ color: "var(--text-muted)" }}>{item.label}</p>
-                  <p className="text-sm" style={{ color: "var(--text-secondary)" }}>{item.valor}</p>
+
+              {respostas ? (
+                <div className="flex flex-col gap-4">
+                  {ANAMNESE_SECOES.map(secao => {
+                    const respondidas = secao.perguntas.filter(p => respostaAtiva(respostas[p.key]) || respostas[p.key]?.resposta === "nao");
+                    if (respondidas.length === 0) return null;
+                    return (
+                      <div key={secao.titulo}>
+                        <p className="text-xs uppercase tracking-widest mb-2" style={{ color: "var(--text-muted)" }}>{secao.titulo}</p>
+                        <div className="flex flex-col gap-1.5">
+                          {respondidas.map(p => {
+                            const r = respostas[p.key] ?? {};
+                            const alertaAtivo = p.alerta && respostaAtiva(r);
+                            return (
+                              <div key={p.key} className="flex items-start gap-2 rounded-xl px-3 py-2"
+                                style={{ background: alertaAtivo ? "rgba(232,122,122,0.1)" : "var(--bg-input)", border: `1px solid ${alertaAtivo ? "#e87a7a" : "var(--border-subtle)"}` }}>
+                                <span className="text-sm flex-1" style={{ color: alertaAtivo ? "#e87a7a" : "var(--text-secondary)" }}>
+                                  {p.label}
+                                  {r.obs ? <span style={{ color: "var(--text-muted)" }}> — {r.obs}</span> : null}
+                                </span>
+                                {p.tipo !== "texto" && r.resposta && (
+                                  <span className="text-xs px-2 py-0.5 rounded-full font-semibold flex-shrink-0"
+                                    style={{ background: r.resposta === "sim" ? (alertaAtivo ? "#e87a7a" : "rgba(122,232,160,0.15)") : "var(--border-subtle)", color: r.resposta === "sim" ? (alertaAtivo ? "white" : "#7ae8a0") : "var(--text-muted)" }}>
+                                    {r.resposta === "sim" ? "Sim" : "Não"}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {a.observacoes_gerais && (
+                    <div>
+                      <p className="text-xs uppercase tracking-widest mb-1" style={{ color: "var(--text-muted)" }}>Observações gerais</p>
+                      <p className="text-sm whitespace-pre-wrap" style={{ color: "var(--text-secondary)" }}>{a.observacoes_gerais}</p>
+                    </div>
+                  )}
                 </div>
-              ))}
+              ) : (
+                [
+                  { label: "Queixa", valor: a.queixa_principal },
+                  { label: "Historia", valor: a.historia_doenca },
+                  { label: "Antecedentes", valor: a.antecedentes },
+                  { label: "Habitos", valor: a.habitos },
+                ].filter(i => i.valor).map(item => (
+                  <div key={item.label} className="mb-2">
+                    <p className="text-xs uppercase tracking-widest mb-1" style={{ color: "var(--text-muted)" }}>{item.label}</p>
+                    <p className="text-sm" style={{ color: "var(--text-secondary)" }}>{item.valor}</p>
+                  </div>
+                ))
+              )}
             </div>
-          ))}
+          );})}
         </div>
       )}
 
@@ -725,26 +854,79 @@ export default function ProntuarioPage() {
 
       {modalAnamnese && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}>
-          <div className="w-full max-w-lg rounded-3xl p-6 max-h-[90vh] overflow-y-auto" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-bold" style={{ color: "var(--gold)" }}>Nova Anamnese</h2>
+          <div className="w-full max-w-2xl rounded-3xl p-6 max-h-[92vh] overflow-y-auto" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+            <div className="flex items-center justify-between mb-1 sticky top-0 z-10 -mx-6 px-6 pb-3" style={{ background: "var(--bg-card)" }}>
+              <h2 className="text-lg font-bold" style={{ color: "var(--gold)" }}>Ficha de Anamnese</h2>
               <button onClick={() => setModalAnamnese(false)} style={{ color: "var(--text-muted)" }}>✕</button>
             </div>
-            <div className="flex flex-col gap-4">
-              {[
-                { label: "Queixa Principal", key: "queixa_principal", placeholder: "O que trouxe?" },
-                { label: "Historia da Doenca", key: "historia_doenca", placeholder: "Descreva..." },
-                { label: "Antecedentes", key: "antecedentes", placeholder: "Cirurgias..." },
-                { label: "Habitos", key: "habitos", placeholder: "Alimentacao..." },
-              ].map(field => (
-                <div key={field.key}>
-                  <label className="block text-xs uppercase tracking-widest mb-2" style={{ color: "var(--text-muted)" }}>{field.label}</label>
-                  <textarea value={(formAnamnese as any)[field.key]} onChange={e => setFormAnamnese(f => ({ ...f, [field.key]: e.target.value }))}
-                    rows={3} className="w-full rounded-2xl px-4 py-3 text-sm outline-none resize-none" style={inpStyle} placeholder={field.placeholder} />
+            <p className="text-xs mb-5" style={{ color: "var(--text-muted)" }}>Marque Sim ou Não. A observação é opcional. Campos de alergia e contraindicação ficam destacados quando marcados.</p>
+
+            {anamneseTemAlerta(formAnamnese.respostas) && (
+              <div className="mb-4 rounded-2xl px-4 py-3 text-sm font-semibold"
+                style={{ background: "rgba(232,122,122,0.12)", color: "#e87a7a", border: "1px solid #e87a7a" }}>
+                ⚠ Atenção: paciente com alergia e/ou contraindicação marcada.
+              </div>
+            )}
+
+            <div className="flex flex-col gap-6">
+              {ANAMNESE_SECOES.map(secao => (
+                <div key={secao.titulo}>
+                  <p className="text-xs uppercase tracking-widest mb-3 font-semibold" style={{ color: "var(--gold)" }}>{secao.titulo}</p>
+                  <div className="flex flex-col gap-2">
+                    {secao.perguntas.map(p => {
+                      const r = formAnamnese.respostas[p.key] ?? {};
+                      const alertaAtivo = p.alerta && respostaAtiva(r);
+                      const isTexto = p.tipo === "texto";
+                      return (
+                        <div key={p.key} className="rounded-2xl px-3 py-2.5"
+                          style={{ background: alertaAtivo ? "rgba(232,122,122,0.1)" : "var(--bg-input)", border: `1px solid ${alertaAtivo ? "#e87a7a" : "var(--border-subtle)"}` }}>
+                          <div className="flex items-center gap-3 flex-wrap">
+                            <span className="text-sm flex-1 min-w-[140px]" style={{ color: alertaAtivo ? "#e87a7a" : "var(--text-primary)" }}>
+                              {p.label} {p.alerta && <span title="Campo de alerta">⚠</span>}
+                            </span>
+                            {!isTexto && (
+                              <div className="flex gap-1.5 flex-shrink-0">
+                                {(["sim", "nao"] as const).map(op => {
+                                  const ativo = r.resposta === op;
+                                  const corSim = p.alerta ? "#e87a7a" : "#7ae8a0";
+                                  return (
+                                    <button key={op} type="button"
+                                      onClick={() => setResposta(p.key, { resposta: ativo ? "" : op })}
+                                      className="px-4 py-1.5 rounded-xl text-xs font-semibold transition"
+                                      style={{
+                                        background: ativo ? (op === "sim" ? corSim : "var(--text-muted)") : "transparent",
+                                        color: ativo ? (op === "sim" && p.alerta ? "white" : "#0a0707") : "var(--text-muted)",
+                                        border: `1px solid ${ativo ? "transparent" : "var(--border-color)"}`,
+                                      }}>
+                                      {op === "sim" ? "Sim" : "Não"}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                          <input type="text" value={r.obs ?? ""}
+                            onChange={e => setResposta(p.key, { obs: e.target.value })}
+                            placeholder={p.obsPlaceholder ?? (isTexto ? "Descreva..." : "Observação (opcional)")}
+                            className="w-full mt-2 rounded-xl px-3 py-2 text-sm outline-none"
+                            style={{ background: "var(--bg-card)", border: "1px solid var(--border-subtle)", color: "var(--text-primary)" }} />
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               ))}
+
+              <div>
+                <p className="text-xs uppercase tracking-widest mb-2 font-semibold" style={{ color: "var(--gold)" }}>Observações gerais</p>
+                <textarea value={formAnamnese.observacoes_gerais}
+                  onChange={e => setFormAnamnese(f => ({ ...f, observacoes_gerais: e.target.value }))}
+                  rows={3} className="w-full rounded-2xl px-4 py-3 text-sm outline-none resize-none" style={inpStyle}
+                  placeholder="Anote aqui qualquer observação adicional..." />
+              </div>
             </div>
-            <div className="flex gap-3 mt-5">
+
+            <div className="flex gap-3 mt-6 sticky bottom-0 -mx-6 px-6 pt-3" style={{ background: "var(--bg-card)" }}>
               <button onClick={() => setModalAnamnese(false)} className="flex-1 py-3 rounded-2xl text-sm" style={{ border: "1px solid var(--border-color)", color: "var(--text-muted)" }}>Cancelar</button>
               <button onClick={() => salvarDados("anamnese", formAnamnese)} disabled={salvando} className="flex-1 py-3 rounded-2xl text-sm font-semibold" style={{ background: "var(--gold)", color: "#0a0707" }}>{salvando ? "Salvando..." : "Salvar"}</button>
             </div>

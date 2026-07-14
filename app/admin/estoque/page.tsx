@@ -32,6 +32,7 @@ const AMBIENTES = [
   { key: "dml",         label: "DML",         icon: "🗄️" },
   { key: "recepcao",    label: "Recepção",    icon: "🏥" },
   { key: "consultorio", label: "Consultório", icon: "🩺" },
+  { key: "produtos",    label: "Produtos",    icon: "🧴" },
 ];
 
 export default function EstoquePage() {

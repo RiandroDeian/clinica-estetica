@@ -13,6 +13,7 @@ type Pacote = {
   categoria: string;
   forma_pagamento?: string;
   valor?: number;
+  valor_mensal?: number;
   data_inicio?: string;
   data_acerto?: string;
   dia_vencimento_boleto?: number;
@@ -66,14 +67,14 @@ const formaCfg: Record<string, { label: string; color: string; bg: string }> = {
 };
 
 const AREAS = [
-  "Axila","Buço","Virilha","Meia Perna","Perna Completa","Braço Completo",
+  "Axila","Buço","Queixo","Virilha","Meia Perna","Perna Completa","Braço Completo",
   "Antebraço","Rosto","Pescoço","Abdômen","Costas","Peitoral","Glúteos",
   "Full Body","Virilha Completa","Dedos das Maos","Dedos dos Pes","Faixa da Barba",
 ];
 
 const formInicial = {
   paciente_id: "", funcionario_id: "", areas: [] as string[],
-  categoria: "Pacote", total_sessoes: "6", valor: "",
+  categoria: "Pacote", total_sessoes: "6", valor: "", valor_mensal: "",
   forma_pagamento: "pix", status_pagamento: "pendente",
   data_inicio: new Date().toISOString().slice(0, 10),
   data_acerto: "", dia_vencimento_boleto: "", assinou_contrato: false,
@@ -160,6 +161,7 @@ export default function LaserPage() {
       categoria: p.categoria ?? "Pacote",
       total_sessoes: String(p.total_sessoes),
       valor: String(p.valor ?? ""),
+      valor_mensal: String(p.valor_mensal ?? ""),
       forma_pagamento: p.forma_pagamento ?? "pix",
       status_pagamento: p.status_pagamento,
       data_inicio: p.data_inicio ?? new Date().toISOString().slice(0, 10),
@@ -180,6 +182,7 @@ export default function LaserPage() {
       procedimento: form.areas,
       total_sessoes: Number(form.total_sessoes),
       valor: form.valor ? Number(form.valor) : null,
+      valor_mensal: form.forma_pagamento === "boleto" && form.valor_mensal ? Number(form.valor_mensal) : null,
       data_acerto: form.forma_pagamento === "boleto" ? (form.data_acerto || null) : null,
       dia_vencimento_boleto: form.forma_pagamento === "boleto" && form.dia_vencimento_boleto
         ? Number(form.dia_vencimento_boleto) : null,
@@ -530,7 +533,7 @@ export default function LaserPage() {
               </div>
               <div>
                 <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-muted)" }}>
-                  Valor (R$) {form.categoria === "Gratuito" && <span style={{ color: "#7ae8a0" }}>— Gratuito</span>}
+                  {form.forma_pagamento === "boleto" ? "Valor Total do Pacote (R$)" : "Valor (R$)"} {form.categoria === "Gratuito" && <span style={{ color: "#7ae8a0" }}>— Gratuito</span>}
                 </label>
                 <input type="number" value={form.valor}
                   onChange={e => setForm(f => ({ ...f, valor: e.target.value }))}
@@ -563,6 +566,19 @@ export default function LaserPage() {
               {/* ✅ Campos exclusivos de boleto */}
               {form.forma_pagamento === "boleto" && (
                 <>
+                  <div>
+                    <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "#e87a7a" }}>
+                      🔴 Valor Mensal / Parcela (R$)
+                    </label>
+                    <input type="number" value={form.valor_mensal}
+                      onChange={e => setForm(f => ({ ...f, valor_mensal: e.target.value }))}
+                      placeholder="0,00"
+                      className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
+                      style={{ ...inputStyle, borderColor: "#e87a7a" }} />
+                    <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+                      Parcela que o paciente paga por mês no boleto.
+                    </p>
+                  </div>
                   <div>
                     <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "#e87a7a" }}>
                       🔴 Dia de Vencimento

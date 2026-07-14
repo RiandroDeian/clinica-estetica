@@ -14,6 +14,7 @@ type Pacote = {
   categoria: string;
   forma_pagamento?: string;
   valor?: number;
+  valor_mensal?: number;
   data_inicio?: string;
   data_acerto?: string;
   assinou_contrato?: boolean;
@@ -334,7 +335,8 @@ export default function LaserDetalhePage() {
           {[
             { label: "Categoria",       valor: pacote.categoria },
             { label: "Forma pagamento", valor: fc?.label ?? pacote.forma_pagamento ?? "—", color: fc?.color },
-            { label: "Valor",           valor: pacote.valor ? `R$ ${Number(pacote.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—" },
+            { label: eBoleto ? "Valor Total" : "Valor", valor: pacote.valor ? `R$ ${Number(pacote.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—" },
+            ...(eBoleto ? [{ label: "Valor Mensal", valor: pacote.valor_mensal ? `R$ ${Number(pacote.valor_mensal).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—", color: "#e87a7a" }] : []),
             { label: "Profissional",    valor: pacote.funcionarios?.nome ?? "—" },
             { label: "Início",          valor: pacote.data_inicio ? new Date(pacote.data_inicio + "T12:00:00").toLocaleDateString("pt-BR") : "—" },
             { label: "Cadastrado em",   valor: new Date(pacote.criado_em).toLocaleDateString("pt-BR") },

@@ -37,6 +37,7 @@ export async function PATCH(
   if (body.categoria        !== undefined) atualizacao.categoria        = body.categoria;
   if (body.total_sessoes    !== undefined) atualizacao.total_sessoes    = body.total_sessoes;
   if (body.valor            !== undefined) atualizacao.valor            = body.valor;
+  if (body.valor_mensal     !== undefined) atualizacao.valor_mensal     = body.valor_mensal;
   if (body.forma_pagamento  !== undefined) atualizacao.forma_pagamento  = body.forma_pagamento;
   if (body.status_pagamento !== undefined) atualizacao.status_pagamento = body.status_pagamento;
   if (body.status           !== undefined) atualizacao.status           = body.status;

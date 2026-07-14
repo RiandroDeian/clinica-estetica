@@ -11,6 +11,7 @@ type PacoteBoleto = {
   dia_vencimento_boleto: number;
   data_acerto?: string;
   valor?: number;
+  valor_mensal?: number;
   assinou_contrato?: boolean;
   pacientes?: { nome: string; telefone: string };
   funcionarios?: { nome: string; cor: string };
@@ -120,6 +121,11 @@ export default function LaserBoletosPage() {
   const dias = [10, 15, 20];
   const semDiaDefinido = pacotes.filter(p => !p.dia_vencimento_boleto);
 
+  // ✅ Somatórios gerais dos pacientes em boleto
+  const somaMensal = pacotes.reduce((s, p) => s + Number(p.valor_mensal ?? 0), 0);
+  const somaTotal  = pacotes.reduce((s, p) => s + Number(p.valor ?? 0), 0);
+  const fmtBRL = (v: number) => "R$ " + v.toLocaleString("pt-BR", { minimumFractionDigits: 2 });
+
   return (
     <div>
       <div className="flex items-center gap-4 mb-6">
@@ -136,17 +142,36 @@ export default function LaserBoletosPage() {
         </div>
       </div>
 
+      {/* ✅ Somatório geral dos boletos */}
+      <div className="grid grid-cols-3 gap-3 mb-4">
+        {[
+          { label: "Pacientes no boleto", valor: String(pacotes.length), icon: "👥", cor: "var(--gold)" },
+          { label: "Total mensal (soma das parcelas)", valor: fmtBRL(somaMensal), icon: "🗓️", cor: "#7ae8a0" },
+          { label: "Total geral dos pacotes", valor: fmtBRL(somaTotal), icon: "💰", cor: "#e87a7a" },
+        ].map(c => (
+          <div key={c.label} className="rounded-2xl p-4"
+            style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+            <p className="text-xs mb-1" style={{ color: "var(--text-muted)" }}>{c.icon} {c.label}</p>
+            <p className="text-xl font-bold" style={{ color: c.cor }}>{c.valor}</p>
+          </div>
+        ))}
+      </div>
+
       {/* Resumo */}
       <div className="grid grid-cols-3 gap-3 mb-6">
         {dias.map(dia => {
           const nesseGrupo = pacotes.filter(p => p.dia_vencimento_boleto === dia);
+          const mensalGrupo = nesseGrupo.reduce((s, p) => s + Number(p.valor_mensal ?? 0), 0);
           const diasFalta = diasAteVencimento(dia);
           const alerta = corAlerta(diasFalta);
           return (
             <div key={dia} className="rounded-2xl p-4"
               style={{ background: "var(--bg-card)", border: `1px solid ${diasFalta <= 3 ? "#e87a7a" : "var(--border-color)"}` }}>
               <p className="text-2xl font-bold mb-1" style={{ color: "var(--gold)" }}>Dia {dia}</p>
-              <p className="text-xs mb-2" style={{ color: "var(--text-muted)" }}>{nesseGrupo.length} paciente{nesseGrupo.length !== 1 ? "s" : ""}</p>
+              <p className="text-xs mb-1" style={{ color: "var(--text-muted)" }}>{nesseGrupo.length} paciente{nesseGrupo.length !== 1 ? "s" : ""}</p>
+              {mensalGrupo > 0 && (
+                <p className="text-xs font-semibold mb-2" style={{ color: "#7ae8a0" }}>{fmtBRL(mensalGrupo)}/mês</p>
+              )}
               <span className="text-xs px-2 py-1 rounded-full font-medium" style={{ background: alerta.bg, color: alerta.color }}>
                 {alerta.label}
               </span>
@@ -219,10 +244,19 @@ export default function LaserBoletosPage() {
                           <span className="text-xs px-2 py-1 rounded-full font-medium flex-shrink-0" style={{ color: pc.color, background: pc.bg }}>
                             {pc.label}
                           </span>
-                          {p.valor && (
-                            <span className="text-sm font-semibold flex-shrink-0" style={{ color: "var(--gold)" }}>
-                              R$ {Number(p.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                            </span>
+                          {(p.valor_mensal || p.valor) && (
+                            <div className="flex flex-col items-end flex-shrink-0 leading-tight">
+                              {p.valor_mensal ? (
+                                <span className="text-sm font-semibold" style={{ color: "#7ae8a0" }}>
+                                  {fmtBRL(Number(p.valor_mensal))}<span className="text-xs font-normal" style={{ color: "var(--text-muted)" }}>/mês</span>
+                                </span>
+                              ) : null}
+                              {p.valor ? (
+                                <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                                  Total {fmtBRL(Number(p.valor))}
+                                </span>
+                              ) : null}
+                            </div>
                           )}
                           {/* ✅ Botão registrar pagamento */}
                           <button onClick={e => { e.stopPropagation(); setModalPagamento(p); setDataPagamento(new Date().toISOString().slice(0, 10)); }}
