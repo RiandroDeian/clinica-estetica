@@ -413,8 +413,8 @@ export default function EstoquePage() {
                 {[
                   { label: "Nome", key: "nome", type: "text", col: 2 },
                   { label: "Categoria", key: "categoria", type: "text", col: 1 },
-                  { label: "Unidade", key: "unidade", type: "text", col: 1 },
-                  { label: "Quantidade inicial", key: "quantidade", type: "number", col: 1 },
+                  { label: "Unidade de medida", key: "unidade", type: "text", col: 1 },
+                  { label: "Quantidade em estoque", key: "quantidade", type: "number", col: 1 },
                   { label: "Quantidade mínima", key: "quantidade_minima", type: "number", col: 1 },
                   { label: "Custo médio (R$)", key: "custo_medio", type: "number", col: 1 },
                   { label: "Fornecedor", key: "fornecedor", type: "text", col: 1 },

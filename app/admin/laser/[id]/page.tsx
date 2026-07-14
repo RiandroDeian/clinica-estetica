@@ -16,6 +16,7 @@ type Pacote = {
   valor?: number;
   valor_mensal?: number;
   data_inicio?: string;
+  data_inicio_pacote?: string;
   data_acerto?: string;
   assinou_contrato?: boolean;
   assinou_termo?: boolean;
@@ -338,7 +339,11 @@ export default function LaserDetalhePage() {
             { label: eBoleto ? "Valor Total" : "Valor", valor: pacote.valor ? `R$ ${Number(pacote.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—" },
             ...(eBoleto ? [{ label: "Valor Mensal", valor: pacote.valor_mensal ? `R$ ${Number(pacote.valor_mensal).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—", color: "#e87a7a" }] : []),
             { label: "Profissional",    valor: pacote.funcionarios?.nome ?? "—" },
-            { label: "Início",          valor: pacote.data_inicio ? new Date(pacote.data_inicio + "T12:00:00").toLocaleDateString("pt-BR") : "—" },
+            { label: "Início do Pacote", valor: pacote.data_inicio_pacote ? new Date(pacote.data_inicio_pacote + "T12:00:00").toLocaleDateString("pt-BR") : "—" },
+            ...(eBoleto ? [
+              { label: "Início do Pagamento", valor: pacote.data_inicio ? new Date(pacote.data_inicio + "T12:00:00").toLocaleDateString("pt-BR") : "—", color: "#e87a7a" },
+              { label: "Último Pagamento",    valor: pacote.data_acerto ? new Date(pacote.data_acerto + "T12:00:00").toLocaleDateString("pt-BR") : "—", color: "#e87a7a" },
+            ] : []),
             { label: "Cadastrado em",   valor: new Date(pacote.criado_em).toLocaleDateString("pt-BR") },
           ].map(item => (
             <div key={item.label} className="rounded-2xl px-4 py-3"

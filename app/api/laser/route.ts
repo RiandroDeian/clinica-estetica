@@ -37,6 +37,24 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  // ✅ Anexa o próximo agendamento FUTURO de cada paciente (alerta "sem agendamento futuro")
+  const pacienteIds = Array.from(new Set(lista.map((p: any) => p.paciente_id).filter(Boolean)));
+  if (pacienteIds.length) {
+    const agora = new Date().toISOString();
+    const { data: ags } = await supabaseAdmin
+      .from("agendamentos")
+      .select("paciente_id, inicio, status")
+      .in("paciente_id", pacienteIds as string[])
+      .gte("inicio", agora)
+      .order("inicio", { ascending: true });
+    const proximo: Record<string, string> = {};
+    for (const a of ags ?? []) {
+      if (a.status === "cancelado") continue;          // agendamento cancelado não conta
+      if (!proximo[a.paciente_id]) proximo[a.paciente_id] = a.inicio; // o mais próximo
+    }
+    lista = lista.map((p: any) => ({ ...p, proximo_agendamento: proximo[p.paciente_id] ?? null }));
+  }
+
   const totalPacientes = lista.length;
   const pacotesAtivos  = lista.filter((p: any) => p.status === "em_tratamento").length;
   const sessoesMes     = lista.reduce((s: number, p: any) => s + (p.sessoes_feitas ?? 0), 0);
@@ -82,6 +100,8 @@ export async function POST(request: NextRequest) {
         : body.procedimento,
       status: "em_tratamento",
       funcionario_id: body.funcionario_id?.trim() ? body.funcionario_id : sessao.id,
+      data_inicio:        body.data_inicio        || null,
+      data_inicio_pacote: body.data_inicio_pacote || null,
       data_acerto:      body.data_acerto      || null,
       // ✅ Dia de vencimento do boleto
       dia_vencimento_boleto: body.dia_vencimento_boleto ? Number(body.dia_vencimento_boleto) : null,

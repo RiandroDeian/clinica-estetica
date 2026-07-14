@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getSessao } from "@/lib/auth";
+import { v4 as uuidv4 } from "uuid";
 
 export async function GET(request: NextRequest) {
   const sessao = await getSessao();
@@ -20,6 +21,7 @@ export async function POST(request: NextRequest) {
   if (!sessao) return NextResponse.json({ erro: "Nao autorizado" }, { status: 401 });
   const body = await request.json();
   const { data, error } = await supabaseAdmin.from("agenda_bloqueios").insert({
+    id: uuidv4(),                       // a tabela não gera id sozinha; geramos aqui
     funcionario_id: body.funcionario_id || null,
     data_inicio: body.data_inicio,
     data_fim: body.data_fim,

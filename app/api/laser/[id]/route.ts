@@ -41,7 +41,8 @@ export async function PATCH(
   if (body.forma_pagamento  !== undefined) atualizacao.forma_pagamento  = body.forma_pagamento;
   if (body.status_pagamento !== undefined) atualizacao.status_pagamento = body.status_pagamento;
   if (body.status           !== undefined) atualizacao.status           = body.status;
-  if (body.data_inicio      !== undefined) atualizacao.data_inicio      = body.data_inicio;
+  if (body.data_inicio        !== undefined) atualizacao.data_inicio        = body.data_inicio || null;
+  if (body.data_inicio_pacote !== undefined) atualizacao.data_inicio_pacote = body.data_inicio_pacote || null;
   if (body.data_acerto      !== undefined) atualizacao.data_acerto      = body.data_acerto || null;
   // ✅ Dia de vencimento do boleto
   if (body.dia_vencimento_boleto !== undefined) atualizacao.dia_vencimento_boleto = body.dia_vencimento_boleto ? Number(body.dia_vencimento_boleto) : null;

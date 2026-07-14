@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { toast } from "sonner";
 import { ModalAgendamentoRapido } from "@/components/agenda/ModalAgendamentoRapido";
 import { BadgeSemCadastro, ModalCadastrarPaciente } from "@/components/agenda/AgendamentoRapidoComponents";
 
@@ -303,11 +304,19 @@ export default function AgendaPage() {
 
   async function salvarBloqueio() {
     setSalvandoBloqueio(true);
-    const res = await fetch("/api/agenda/bloqueios", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(formBloqueio) });
-    if (res.ok) {
-      setModalBloqueio(false);
-      setFormBloqueio({ funcionario_id: "", data_inicio: "", data_fim: "", motivo: "Bloqueado", tipo: "geral" });
-      fetch("/api/agenda/bloqueios").then(r => r.json()).then(d => setBloqueios(Array.isArray(d) ? d : []));
+    try {
+      const res = await fetch("/api/agenda/bloqueios", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(formBloqueio) });
+      if (res.ok) {
+        toast.success("Bloqueio criado!");
+        setModalBloqueio(false);
+        setFormBloqueio({ funcionario_id: "", data_inicio: "", data_fim: "", motivo: "Bloqueado", tipo: "geral" });
+        fetch("/api/agenda/bloqueios").then(r => r.json()).then(d => setBloqueios(Array.isArray(d) ? d : []));
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast.error("Erro ao criar bloqueio: " + (err?.erro ?? res.status));
+      }
+    } catch (e: any) {
+      toast.error("Falha de conexão ao criar bloqueio");
     }
     setSalvandoBloqueio(false);
   }

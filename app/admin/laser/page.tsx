@@ -15,12 +15,14 @@ type Pacote = {
   valor?: number;
   valor_mensal?: number;
   data_inicio?: string;
+  data_inicio_pacote?: string;
   data_acerto?: string;
   dia_vencimento_boleto?: number;
   assinou_contrato?: boolean;
   observacoes?: string;
   assinou_termo: boolean;
   criado_em: string;
+  proximo_agendamento?: string | null;
   pacientes?: { nome: string; telefone: string; cpf?: string };
   funcionarios?: { nome: string; cor: string };
 };
@@ -67,7 +69,7 @@ const formaCfg: Record<string, { label: string; color: string; bg: string }> = {
 };
 
 const AREAS = [
-  "Axila","Buço","Queixo","Virilha","Meia Perna","Perna Completa","Braço Completo",
+  "Axila","Buço","Queixo","Virilha","Meia Perna","Perna Completa","Coxa","Posterior de Coxa","Braço Completo",
   "Antebraço","Rosto","Pescoço","Abdômen","Costas","Peitoral","Glúteos",
   "Full Body","Virilha Completa","Dedos das Maos","Dedos dos Pes","Faixa da Barba",
 ];
@@ -76,13 +78,19 @@ const formInicial = {
   paciente_id: "", funcionario_id: "", areas: [] as string[],
   categoria: "Pacote", total_sessoes: "6", valor: "", valor_mensal: "",
   forma_pagamento: "pix", status_pagamento: "pendente",
-  data_inicio: new Date().toISOString().slice(0, 10),
+  data_inicio_pacote: new Date().toISOString().slice(0, 10),
+  data_inicio: "",
   data_acerto: "", dia_vencimento_boleto: "", assinou_contrato: false,
   observacoes: "", assinou_termo: false,
 };
 
 function toggleArea(areas: string[], area: string) {
   return areas.includes(area) ? areas.filter(a => a !== area) : [...areas, area];
+}
+
+// Paciente de laser que ainda tem sessões e NÃO tem agendamento futuro na agenda
+function semAgendamentoFuturo(p: Pacote) {
+  return !p.proximo_agendamento && (p.sessoes_feitas ?? 0) < (p.total_sessoes ?? 0);
 }
 
 function camposFaltando(paciente?: { nome: string; telefone: string; cpf?: string }) {
@@ -102,6 +110,7 @@ export default function LaserPage() {
   const [filtroPag, setFiltroPag] = useState("");
   const [filtroCategoria, setFiltroCategoria] = useState("");
   const [filtroForma, setFiltroForma] = useState("");
+  const [filtroSemAgenda, setFiltroSemAgenda] = useState(false);
   const [modalAberto, setModalAberto] = useState(false);
   const [editando, setEditando] = useState<Pacote | null>(null);
   const [salvando, setSalvando] = useState(false);
@@ -164,7 +173,8 @@ export default function LaserPage() {
       valor_mensal: String(p.valor_mensal ?? ""),
       forma_pagamento: p.forma_pagamento ?? "pix",
       status_pagamento: p.status_pagamento,
-      data_inicio: p.data_inicio ?? new Date().toISOString().slice(0, 10),
+      data_inicio_pacote: p.data_inicio_pacote ?? "",
+      data_inicio: p.data_inicio ?? "",
       data_acerto: p.data_acerto ?? "",
       dia_vencimento_boleto: p.dia_vencimento_boleto ? String(p.dia_vencimento_boleto) : "",
       assinou_contrato: p.assinou_contrato ?? false,
@@ -183,6 +193,8 @@ export default function LaserPage() {
       total_sessoes: Number(form.total_sessoes),
       valor: form.valor ? Number(form.valor) : null,
       valor_mensal: form.forma_pagamento === "boleto" && form.valor_mensal ? Number(form.valor_mensal) : null,
+      data_inicio_pacote: form.data_inicio_pacote || null,
+      data_inicio: form.forma_pagamento === "boleto" ? (form.data_inicio || null) : null,
       data_acerto: form.forma_pagamento === "boleto" ? (form.data_acerto || null) : null,
       dia_vencimento_boleto: form.forma_pagamento === "boleto" && form.dia_vencimento_boleto
         ? Number(form.dia_vencimento_boleto) : null,
@@ -208,6 +220,9 @@ export default function LaserPage() {
     border: "1px solid var(--border-color)",
     color: "var(--text-primary)",
   } as const;
+
+  const semAgendaCount = pacotes.filter(semAgendamentoFuturo).length;
+  const pacotesExibidos = filtroSemAgenda ? pacotes.filter(semAgendamentoFuturo) : pacotes;
 
   return (
     <div>
@@ -303,6 +318,17 @@ export default function LaserPage() {
           <option value="">Todos pagamentos</option>
           {Object.entries(pagCfg).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
         </select>
+
+        {/* ✅ Filtro: pacientes com pacote em aberto e sem agendamento futuro */}
+        <button type="button" onClick={() => setFiltroSemAgenda(v => !v)}
+          className="rounded-2xl px-4 py-3 text-sm outline-none transition font-medium"
+          style={{
+            background: filtroSemAgenda ? "rgba(232,122,122,0.12)" : "var(--bg-card)",
+            border: `1px solid ${filtroSemAgenda ? "#e87a7a" : "var(--border-color)"}`,
+            color: filtroSemAgenda ? "#e87a7a" : "var(--text-muted)",
+          }}>
+          ⚠ Sem agendamento futuro{semAgendaCount ? ` (${semAgendaCount})` : ""}
+        </button>
       </div>
 
       {/* Tabela */}
@@ -310,11 +336,15 @@ export default function LaserPage() {
         <div className="flex items-center justify-center h-48">
           <div className="w-8 h-8 rounded-full border-2 animate-spin" style={{ borderColor: "rgba(200,160,120,0.2)", borderTopColor: "var(--gold)" }} />
         </div>
-      ) : pacotes.length === 0 ? (
+      ) : pacotesExibidos.length === 0 ? (
         <div className="text-center py-20 rounded-3xl" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-          <p className="text-4xl mb-4">🔆</p>
-          <p className="text-lg font-semibold mb-2" style={{ color: "var(--gold)" }}>Nenhum pacote encontrado</p>
-          <p className="text-sm" style={{ color: "var(--text-muted)" }}>Cadastre o primeiro pacote laser</p>
+          <p className="text-4xl mb-4">{filtroSemAgenda ? "✅" : "🔆"}</p>
+          <p className="text-lg font-semibold mb-2" style={{ color: "var(--gold)" }}>
+            {filtroSemAgenda ? "Todos com agendamento futuro" : "Nenhum pacote encontrado"}
+          </p>
+          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+            {filtroSemAgenda ? "Nenhum paciente em aberto está sem agendamento." : "Cadastre o primeiro pacote laser"}
+          </p>
         </div>
       ) : (
         <div className="rounded-3xl overflow-hidden" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
@@ -328,7 +358,7 @@ export default function LaserPage() {
                 </tr>
               </thead>
               <tbody>
-                {pacotes.map((p, i) => {
+                {pacotesExibidos.map((p, i) => {
                   const areas = Array.isArray(p.procedimento) ? p.procedimento : ((p.procedimento as string) ?? "").split(", ").filter(Boolean);
                   const pct = Math.round((p.sessoes_feitas / p.total_sessoes) * 100);
                   const restantes = p.total_sessoes - p.sessoes_feitas;
@@ -343,7 +373,7 @@ export default function LaserPage() {
                     <tr key={p.id}
                       className="transition cursor-pointer"
                       style={{
-                        borderBottom: i < pacotes.length - 1 ? "1px solid var(--border-subtle)" : "none",
+                        borderBottom: i < pacotesExibidos.length - 1 ? "1px solid var(--border-subtle)" : "none",
                         background: eBoleto ? "rgba(232,122,122,0.03)" : "transparent",
                       }}
                       onClick={() => router.push(`/admin/laser/${p.id}`)}>
@@ -366,6 +396,17 @@ export default function LaserPage() {
                               )}
                             </div>
                             <p className="text-xs" style={{ color: "var(--text-muted)" }}>{p.pacientes?.telefone}</p>
+                            {semAgendamentoFuturo(p) ? (
+                              <span className="inline-block mt-1 text-[10px] px-2 py-0.5 rounded-full font-semibold"
+                                style={{ background: "rgba(232,122,122,0.15)", color: "#e87a7a" }}>
+                                ⚠ Sem agendamento futuro
+                              </span>
+                            ) : p.proximo_agendamento ? (
+                              <span className="inline-block mt-1 text-[10px] px-2 py-0.5 rounded-full font-medium"
+                                style={{ background: "rgba(122,232,160,0.12)", color: "#7ae8a0" }}>
+                                📅 {new Date(p.proximo_agendamento).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })} às {new Date(p.proximo_agendamento).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                              </span>
+                            ) : null}
                           </div>
                         </div>
                       </td>
@@ -600,19 +641,34 @@ export default function LaserPage() {
                   </div>
                   <div>
                     <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "#e87a7a" }}>
-                      Data do Último Acerto
+                      🔴 Início do Pagamento
+                    </label>
+                    <input type="date" value={form.data_inicio}
+                      onChange={e => setForm(f => ({ ...f, data_inicio: e.target.value }))}
+                      className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
+                      style={{ ...inputStyle, borderColor: "#e87a7a", colorScheme: "dark" }} />
+                    <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+                      Quando começou a pagar as parcelas do boleto.
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "#e87a7a" }}>
+                      🔴 Último Pagamento
                     </label>
                     <input type="date" value={form.data_acerto}
                       onChange={e => setForm(f => ({ ...f, data_acerto: e.target.value }))}
                       className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
                       style={{ ...inputStyle, borderColor: "#e87a7a", colorScheme: "dark" }} />
+                    <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+                      Atualiza sozinho quando você registra um pagamento na aba Boletos.
+                    </p>
                   </div>
                 </>
               )}
 
               <div>
-                <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-muted)" }}>Data de Início</label>
-                <input type="date" value={form.data_inicio} onChange={e => setForm(f => ({ ...f, data_inicio: e.target.value }))}
+                <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-muted)" }}>Início do Pacote <span style={{ color: "var(--text-muted)" }}>(1º atendimento)</span></label>
+                <input type="date" value={form.data_inicio_pacote} onChange={e => setForm(f => ({ ...f, data_inicio_pacote: e.target.value }))}
                   className="w-full rounded-2xl px-4 py-3 text-sm outline-none" style={{ ...inputStyle, colorScheme: "dark" }} />
               </div>
               <div>
