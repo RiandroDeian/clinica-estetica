@@ -259,6 +259,34 @@ export default function AgendaPage() {
     return agsDoDia(data).filter(ag => new Date(ag.inicio).getHours() === hora);
   }
 
+  // ✅ Bloqueios que cobrem a célula (dia + hora), respeitando o filtro de profissional
+  function bloqueiosDaCelula(data: Date, hora: number) {
+    const inicioCel = new Date(data); inicioCel.setHours(hora, 0, 0, 0);
+    const fimCel = new Date(data); fimCel.setHours(hora + 1, 0, 0, 0);
+    return bloqueios.filter((b: any) => {
+      const bi = new Date(b.data_inicio);
+      const bf = new Date(b.data_fim);
+      if (!(bi < fimCel && bf > inicioCel)) return false;               // sobrepõe a hora?
+      if (filtroFuncionario) return !b.funcionario_id || b.funcionario_id === filtroFuncionario;
+      return true;
+    });
+  }
+
+  const BLOQUEIO_LISTRAS = "repeating-linear-gradient(45deg, rgba(232,122,122,0.16), rgba(232,122,122,0.16) 6px, rgba(232,122,122,0.05) 6px, rgba(232,122,122,0.05) 12px)";
+
+  // ✅ Dia (na visão Mês) que possui algum bloqueio
+  function diaTemBloqueio(data: Date) {
+    const ini = new Date(data); ini.setHours(0, 0, 0, 0);
+    const fim = new Date(data); fim.setHours(24, 0, 0, 0);
+    return bloqueios.some((b: any) => {
+      const bi = new Date(b.data_inicio);
+      const bf = new Date(b.data_fim);
+      if (!(bi < fim && bf > ini)) return false;
+      if (filtroFuncionario) return !b.funcionario_id || b.funcionario_id === filtroFuncionario;
+      return true;
+    });
+  }
+
   // ✅ Cores por profissional > status (sem fallback de procedimento)
   const corProfissional = (ag: Agendamento) => {
     if (ag.funcionarios?.cor) return ag.funcionarios.cor;
@@ -427,7 +455,10 @@ export default function AgendaPage() {
                     <div key={i} onClick={() => { setDataAtual(dia); setView("dia"); }}
                       className="rounded-2xl p-2 min-h-[80px] cursor-pointer transition hover:scale-[1.02]"
                       style={{ background: ehHoje ? "rgba(200,160,120,0.08)" : "var(--bg-input)", border: ehHoje ? "1px solid rgba(200,160,120,0.3)" : "1px solid var(--border-subtle)" }}>
-                      <p className="text-xs font-semibold mb-1" style={{ color: ehHoje ? "var(--gold)" : "var(--text-secondary)" }}>{dia.getDate()}</p>
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-xs font-semibold" style={{ color: ehHoje ? "var(--gold)" : "var(--text-secondary)" }}>{dia.getDate()}</p>
+                        {diaTemBloqueio(dia) && <span className="text-[10px]" title="Há bloqueio neste dia" style={{ color: "#e87a7a" }}>⛔</span>}
+                      </div>
                       {ags.slice(0, 2).map(ag => <EventoCard key={ag.id} ag={ag} compacto />)}
                       {ags.length > 2 && <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>+{ags.length - 2}</p>}
                     </div>
@@ -458,6 +489,7 @@ export default function AgendaPage() {
                   </div>
                   {semana.map((dia, i) => {
                     const ags = agsDaHora(dia, hora);
+                    const bloq = bloqueiosDaCelula(dia, hora);
                     return (
                       <div key={i} className="border-l cursor-pointer transition hover:bg-[rgba(200,160,120,0.03)] relative p-1"
                         style={{ borderColor: "var(--border-subtle)" }}
@@ -465,7 +497,18 @@ export default function AgendaPage() {
                           const d = new Date(dia); d.setHours(hora, 0, 0, 0);
                           abrirNovoAgendamento(d.toISOString().slice(0, 16));
                         }}>
-                        {ags.map(ag => <EventoCard key={ag.id} ag={ag} />)}
+                        {bloq.length > 0 && (
+                          <div className="absolute inset-0 pointer-events-none overflow-hidden"
+                            title={bloq.map((b: any) => b.motivo + (b.funcionarios?.nome ? ` — ${b.funcionarios.nome}` : "")).join(" · ")}
+                            style={{ background: BLOQUEIO_LISTRAS, borderTop: "1px solid rgba(232,122,122,0.35)", zIndex: 0 }}>
+                            <span className="text-[9px] font-semibold px-1 leading-tight block" style={{ color: "#e87a7a" }}>
+                              ⛔ {bloq[0].motivo}{bloq[0].funcionarios?.nome ? ` · ${bloq[0].funcionarios.nome.split(" ")[0]}` : ""}
+                            </span>
+                          </div>
+                        )}
+                        <div className="relative" style={{ zIndex: 1 }}>
+                          {ags.map(ag => <EventoCard key={ag.id} ag={ag} />)}
+                        </div>
                       </div>
                     );
                   })}
@@ -486,17 +529,28 @@ export default function AgendaPage() {
               </div>
               {HORAS.map(hora => {
                 const ags = agsDaHora(dataAtual, hora);
+                const bloq = bloqueiosDaCelula(dataAtual, hora);
                 return (
                   <div key={hora} className="grid" style={{ gridTemplateColumns: "64px 1fr", borderBottom: "1px solid var(--bg-hover)", minHeight: 72 }}>
                     <div className="text-right pr-3 pt-2">
                       <span className="text-xs" style={{ color: "var(--text-muted)" }}>{horaStr(hora)}</span>
                     </div>
-                    <div className="border-l p-2 cursor-pointer transition hover:bg-[rgba(200,160,120,0.03)]"
+                    <div className="border-l p-2 cursor-pointer transition hover:bg-[rgba(200,160,120,0.03)] relative"
                       style={{ borderColor: "var(--border-subtle)" }}
                       onClick={() => {
                         const d = new Date(dataAtual); d.setHours(hora, 0, 0, 0);
                         abrirNovoAgendamento(d.toISOString().slice(0, 16));
                       }}>
+                      {bloq.length > 0 && (
+                        <div className="absolute inset-0 pointer-events-none overflow-hidden"
+                          title={bloq.map((b: any) => b.motivo + (b.funcionarios?.nome ? ` — ${b.funcionarios.nome}` : "")).join(" · ")}
+                          style={{ background: BLOQUEIO_LISTRAS, borderTop: "1px solid rgba(232,122,122,0.35)", zIndex: 0 }}>
+                          <span className="text-[10px] font-semibold px-1.5 py-0.5 leading-tight block" style={{ color: "#e87a7a" }}>
+                            ⛔ {bloq[0].motivo}{bloq[0].funcionarios?.nome ? ` · ${bloq[0].funcionarios.nome.split(" ")[0]}` : ""}
+                          </span>
+                        </div>
+                      )}
+                      <div className="relative" style={{ zIndex: 1 }}>
                       {ags.map(ag => {
                         const semCadastro = ag.sem_cadastro === true && !ag.funcionario_id;
                         const cor = semCadastro ? "#fbbf24" : corProfissional(ag);
@@ -538,6 +592,7 @@ export default function AgendaPage() {
                           </div>
                         );
                       })}
+                      </div>
                     </div>
                   </div>
                 );
