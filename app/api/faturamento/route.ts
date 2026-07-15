@@ -40,8 +40,6 @@ export async function GET(request: NextRequest) {
     const { data, error } = await query;
 
     if (error) {
-      console.log("ERRO AO BUSCAR FATURAMENTO:", error);
-
       return NextResponse.json(
         { erro: error.message },
         { status: 500 }
@@ -113,8 +111,6 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (err) {
-    console.log("ERRO GERAL:", err);
-
     return NextResponse.json(
       { erro: "Erro interno" },
       { status: 500 }
@@ -134,8 +130,6 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-
-    console.log("BODY FATURAMENTO:", body);
 
     const valor = Number(body.valor || 0);
     const desconto = Number(body.desconto || 0);
@@ -168,8 +162,6 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) {
-      console.log("ERRO AO SALVAR FATURAMENTO:", error);
-
       return NextResponse.json(
         { erro: error.message },
         { status: 500 }
@@ -178,8 +170,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(data);
   } catch (err) {
-    console.log("ERRO GERAL POST:", err);
-
     return NextResponse.json(
       { erro: "Erro interno" },
       { status: 500 }
