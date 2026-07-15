@@ -185,31 +185,42 @@ export default function AgendaPage() {
 
   async function salvar() {
     setSalvando(true);
-    if (agendamentoSelecionado) {
-      await fetch(`/api/agendamentos/${agendamentoSelecionado.id}`, {
-        method: "PUT", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          status: form.status,
-          observacoes: form.observacoes,
-          inicio: new Date(form.inicio).toISOString(),
-          fim: new Date(form.fim).toISOString(),
-          // ✅ Envia undefined quando vazio para não sobrescrever com null
-          procedimento_id: form.procedimento_id || undefined,
-          funcionario_id: form.funcionario_id || null,
-        }),
-      });
-    } else {
-      await fetch("/api/agendamentos", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...form,
-          inicio: new Date(form.inicio).toISOString(),
-          fim: new Date(form.fim).toISOString(),
-        }),
-      });
+    try {
+      let res: Response;
+      if (agendamentoSelecionado) {
+        res = await fetch(`/api/agendamentos/${agendamentoSelecionado.id}`, {
+          method: "PUT", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            status: form.status,
+            observacoes: form.observacoes,
+            inicio: new Date(form.inicio).toISOString(),
+            fim: new Date(form.fim).toISOString(),
+            // ✅ Envia undefined quando vazio para não sobrescrever com null
+            procedimento_id: form.procedimento_id || undefined,
+            funcionario_id: form.funcionario_id || null,
+          }),
+        });
+      } else {
+        res = await fetch("/api/agendamentos", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...form,
+            inicio: new Date(form.inicio).toISOString(),
+            fim: new Date(form.fim).toISOString(),
+          }),
+        });
+      }
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err?.erro ?? "Erro ao salvar agendamento");
+        setSalvando(false);
+        return;
+      }
+      setModalAberto(false);
+      buscarDados();
+    } catch {
+      toast.error("Falha de conexão ao salvar agendamento");
     }
-    setModalAberto(false);
-    buscarDados();
     setSalvando(false);
   }
 

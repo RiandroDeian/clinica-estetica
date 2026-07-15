@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getSessao } from "@/lib/auth";
 import { registrarLog } from "@/lib/audit";
+import { bloqueioConflitante, mensagemBloqueio } from "@/lib/bloqueios";
 
 export async function GET(request: NextRequest) {
   try {
@@ -35,6 +36,12 @@ export async function POST(request: NextRequest) {
     if (!sessao) return NextResponse.json({ erro: "Nao autorizado" }, { status: 401 });
 
     const body = await request.json();
+
+    // ✅ Bloqueio de agenda impede o agendamento
+    const bloqueio = await bloqueioConflitante(body.inicio, body.fim, body.funcionario_id || null);
+    if (bloqueio) {
+      return NextResponse.json({ erro: mensagemBloqueio(bloqueio) }, { status: 409 });
+    }
 
     const novoAgendamento = {
       paciente_id:     body.paciente_id     || null,

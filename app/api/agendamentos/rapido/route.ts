@@ -1,6 +1,7 @@
 ﻿export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { bloqueioConflitante, mensagemBloqueio } from "@/lib/bloqueios";
 
 export async function POST(request: NextRequest) {
   try {
@@ -19,6 +20,12 @@ export async function POST(request: NextRequest) {
 
     if (!nomeReal || !telefoneReal || !procedimentoReal || !inicio || !fim) {
       return NextResponse.json({ erro: "Campos obrigatórios faltando" }, { status: 400 });
+    }
+
+    // ✅ Bloqueio de agenda impede o agendamento
+    const bloqueio = await bloqueioConflitante(inicio, fim, funcionario_id || null);
+    if (bloqueio) {
+      return NextResponse.json({ erro: mensagemBloqueio(bloqueio) }, { status: 409 });
     }
 
     const data    = new Date(inicio).toISOString().split("T")[0];
