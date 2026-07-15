@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
+import AnamneseLaserCard from "@/components/laser/AnamneseLaserCard";
 
 type Pacote = {
   id: string;
@@ -21,6 +22,7 @@ type Pacote = {
   assinou_contrato?: boolean;
   assinou_termo?: boolean;
   observacoes?: string;
+  anamnese?: any;
   criado_em: string;
   pacientes?: { nome: string; telefone: string; cpf?: string };
   funcionarios?: { nome: string; cor: string };
@@ -378,6 +380,13 @@ export default function LaserDetalhePage() {
           </div>
         </div>
       </div>
+
+      {/* ✅ ANAMNESE DO LASER */}
+      <AnamneseLaserCard
+        anamnese={pacote.anamnese}
+        salvando={salvando}
+        onSalvar={(a) => atualizar({ anamnese: a })}
+      />
 
       {/* ✅ FOTOS ANTES E DEPOIS */}
       <div className="rounded-3xl p-6 mb-5"

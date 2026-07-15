@@ -49,6 +49,7 @@ export async function PATCH(
   if (body.assinou_contrato !== undefined) atualizacao.assinou_contrato = body.assinou_contrato;
   if (body.assinou_termo    !== undefined) atualizacao.assinou_termo    = body.assinou_termo;
   if (body.observacoes      !== undefined) atualizacao.observacoes      = body.observacoes;
+  if (body.anamnese         !== undefined) atualizacao.anamnese         = body.anamnese;
   if (body.funcionario_id   !== undefined) atualizacao.funcionario_id   = body.funcionario_id || null;
   if (body.sessoes_feitas   !== undefined) atualizacao.sessoes_feitas   = body.sessoes_feitas;
 
