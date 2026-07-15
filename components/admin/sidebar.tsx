@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import { useTheme } from "@/components/theme/theme-provider";
+import { podeVerRota } from "@/lib/rotasPermissoes";
 
 type LinkItem = { href: string; label: string; icon: string };
 
@@ -52,11 +53,14 @@ const todosLinks: LinkItem[] = [
   { href: "/admin/auditoria",     label: "Auditoria",     icon: "auditoria"     },
 ];
 
-export default function AdminSidebar({ role }: { role: string }) {
+export default function AdminSidebar({ role, permissoes }: { role: string; permissoes?: Record<string, boolean> }) {
   const pathname = usePathname();
   const { darkMode, toggleTheme, theme, setTheme } = useTheme();
   const [collapsed, setCollapsed] = useState(false);
   const [cargo, setCargo] = useState(role);
+
+  // Mostra no menu só o que o usuário tem permissão (admin vê tudo)
+  const linksVisiveis = todosLinks.filter(link => podeVerRota(link.href, role, permissoes));
   
 
   useEffect(() => {
@@ -107,7 +111,7 @@ export default function AdminSidebar({ role }: { role: string }) {
 
       {/* Nav */}
       <nav className="flex-1 flex flex-col gap-1 p-3 overflow-y-auto">
-        {todosLinks.map(link => {
+        {linksVisiveis.map(link => {
           const ativo = link.href === "/admin" ? pathname === "/admin" : pathname.startsWith(link.href);
           return (
             <a

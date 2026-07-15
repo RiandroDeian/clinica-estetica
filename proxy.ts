@@ -1,28 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 import { getSecretBytes } from "@/lib/authSecret";
-
-// ✅ Mapa de rota -> chave de permissão
-const ROTAS_PERMISSOES: Record<string, string> = {
-  "/admin/agenda":        "agenda",
-  "/admin/pacientes":     "pacientes",
-  "/admin/prontuario":    "pacientes",
-  "/admin/pacotes":       "pacotes",
-  "/admin/laser":         "laser",
-  "/admin/procedimentos": "procedimentos",
-  "/admin/estoque":       "estoque",
-  "/admin/faturamento":   "financeiro",
-  "/admin/relatorios":    "relatorios",
-  "/admin/configuracoes": "configuracoes",
-  "/admin/whatsapp":      "whatsapp",
-  "/admin/orcamentos":    "orcamentos",
-  "/admin/recepcao":      "recepcao",
-  "/admin/crm":           "crm",
-  "/admin/metas":         "metas",
-  "/admin/comissoes":     "comissoes",
-  "/admin/chat":          "chat",
-  "/admin/auditoria":     "auditoria",
-};
+import { ROTAS_PERMISSOES } from "@/lib/rotasPermissoes";
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
