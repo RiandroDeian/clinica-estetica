@@ -2,8 +2,7 @@
 import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
 import { SignJWT, jwtVerify } from "jose";
-
-const SECRET = new TextEncoder().encode(process.env.AUTH_SECRET ?? "moncie-secret-mude-em-producao");
+import { getSecretBytes } from "@/lib/authSecret";
 
 export type SessionUser = {
   id: string;
@@ -19,7 +18,7 @@ export async function criarSessao(user: SessionUser) {
     .setProtectedHeader({ alg: "HS256" })
     .setExpirationTime("8h")
     .setIssuedAt()
-    .sign(SECRET);
+    .sign(getSecretBytes());
   const cookieStore = await cookies();
   cookieStore.set("moncie_session", token, {
     httpOnly: true,
@@ -35,7 +34,7 @@ export async function getSessao(): Promise<SessionUser | null> {
     const cookieStore = await cookies();
     const token = cookieStore.get("moncie_session")?.value;
     if (!token) return null;
-    const { payload } = await jwtVerify(token, SECRET);
+    const { payload } = await jwtVerify(token, getSecretBytes());
     return payload as unknown as SessionUser;
   } catch {
     return null;

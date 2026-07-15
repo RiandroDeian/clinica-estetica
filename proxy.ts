@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify } from "jose";
-
-const SECRET = new TextEncoder().encode(
-  process.env.AUTH_SECRET ?? "moncie-secret-mude-em-producao"
-);
+import { getSecretBytes } from "@/lib/authSecret";
 
 // ✅ Mapa de rota -> chave de permissão
 const ROTAS_PERMISSOES: Record<string, string> = {
@@ -50,7 +47,7 @@ export async function proxy(request: NextRequest) {
   }
 
   try {
-    const { payload } = await jwtVerify(token, SECRET);
+    const { payload } = await jwtVerify(token, getSecretBytes());
     const sessao = payload as any;
 
     // Admin tem acesso total
