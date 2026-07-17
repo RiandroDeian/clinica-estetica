@@ -52,7 +52,7 @@ export default function PacientesPage() {
   const [painelPaciente, setPainelPaciente] = useState<Paciente | null>(null);
 
   // ✅ Follow-ups pendentes (só para quem tem o alerta ligado)
-  const [followUps, setFollowUps] = useState<Record<string, FollowUp>>({});
+  const [followUps, setFollowUps] = useState<Record<string, FollowUp[]>>({});
   const [followUpsAtivo, setFollowUpsAtivo] = useState(false);
 
   const buscarFollowUps = useCallback(async () => {
@@ -60,11 +60,10 @@ export default function PacientesPage() {
     if (!res.ok) return;
     const d = await res.json();
     setFollowUpsAtivo(!!d.ativo);
-    const mapa: Record<string, FollowUp> = {};
-    // A API já vem do atendimento mais recente para o mais antigo:
-    // guardamos só a tarefa mais recente de cada paciente.
+    // Um paciente pode ter mais de uma tarefa (ex.: mensagem 24h + retorno 3 meses)
+    const mapa: Record<string, FollowUp[]> = {};
     for (const item of (d.itens ?? []) as FollowUp[]) {
-      if (!mapa[item.paciente_id]) mapa[item.paciente_id] = item;
+      (mapa[item.paciente_id] ??= []).push(item);
     }
     setFollowUps(mapa);
   }, []);
@@ -74,7 +73,11 @@ export default function PacientesPage() {
   async function marcarFollowUpFeito(fu: FollowUp) {
     setFollowUps(prev => {
       const novo = { ...prev };
-      delete novo[fu.paciente_id];
+      const restantes = (novo[fu.paciente_id] ?? []).filter(
+        x => !(x.agendamento_id === fu.agendamento_id && x.tipo === fu.tipo),
+      );
+      if (restantes.length) novo[fu.paciente_id] = restantes;
+      else delete novo[fu.paciente_id];
       return novo;
     });
     await fetch("/api/follow-ups", {
@@ -126,7 +129,7 @@ export default function PacientesPage() {
   const pacientesFiltrados = pacientes.filter(p => {
     if (filtro === "sem_termo") return !p.assinou_termo;
     if (filtro === "aniversario") return ehAniversario(p.data_nascimento);
-    if (filtro === "precisa_contato") return !!followUps[p.id];
+    if (filtro === "precisa_contato") return (followUps[p.id]?.length ?? 0) > 0;
     return true;
   });
 
@@ -269,7 +272,7 @@ export default function PacientesPage() {
                   {pacientesFiltrados.map((p, i) => {
                     const idade = calcularIdade(p.data_nascimento);
                     const aniv = ehAniversario(p.data_nascimento);
-                    const fu = followUps[p.id];
+                    const fus = followUps[p.id] ?? [];
                     return (
                       <tr key={p.id}
                         className="transition hover:bg-[var(--bg-hover)] cursor-pointer"
@@ -282,25 +285,31 @@ export default function PacientesPage() {
                               {p.nome.charAt(0).toUpperCase()}
                             </div>
                             <div>
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 flex-wrap">
                                 <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>{p.nome}</span>
                                 {aniv && <span className="text-xs">🎂</span>}
                                 {!p.assinou_termo && <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "rgba(232,122,122,0.1)", color: "#e87a7a" }}>⚠ Termo</span>}
-                                {fu && (
-                                  <>
-                                    <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold"
-                                      title={`Atendido em ${new Date(fu.atendido_em).toLocaleDateString("pt-BR")}${fu.procedimento ? " · " + fu.procedimento : ""}`}
-                                      style={{ background: "rgba(232,201,122,0.15)", color: "#e8c97a" }}>
-                                      {fu.icone} {fu.label}
+                                {fus.map(fu => {
+                                  const eRetorno = fu.tipo.startsWith("retorno_");
+                                  return (
+                                    <span key={`${fu.agendamento_id}:${fu.tipo}`} className="inline-flex items-center gap-1">
+                                      <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold"
+                                        title={`Atendido em ${new Date(fu.atendido_em).toLocaleDateString("pt-BR")}${fu.procedimento ? " · " + fu.procedimento : ""}`}
+                                        style={{
+                                          background: eRetorno ? "rgba(200,122,232,0.15)" : "rgba(232,201,122,0.15)",
+                                          color: eRetorno ? "#c87ae8" : "#e8c97a",
+                                        }}>
+                                        {fu.icone} {fu.label}
+                                      </span>
+                                      <button onClick={(e) => { e.stopPropagation(); marcarFollowUpFeito(fu); }}
+                                        title="Marcar como contatado"
+                                        className="text-[10px] px-1.5 py-0.5 rounded transition hover:opacity-70"
+                                        style={{ background: "rgba(122,232,160,0.12)", color: "#7ae8a0", border: "1px solid rgba(122,232,160,0.3)" }}>
+                                        ✓ feito
+                                      </button>
                                     </span>
-                                    <button onClick={(e) => { e.stopPropagation(); marcarFollowUpFeito(fu); }}
-                                      title="Marcar como contatado"
-                                      className="text-[10px] px-1.5 py-0.5 rounded transition hover:opacity-70"
-                                      style={{ background: "rgba(122,232,160,0.12)", color: "#7ae8a0", border: "1px solid rgba(122,232,160,0.3)" }}>
-                                      ✓ feito
-                                    </button>
-                                  </>
-                                )}
+                                  );
+                                })}
                               </div>
                               {p.email && <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>{p.email}</p>}
                             </div>

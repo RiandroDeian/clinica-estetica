@@ -2,10 +2,76 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getSessao } from "@/lib/auth";
-import { REGRAS_FOLLOW_UP, regraDevida } from "@/lib/followUps";
+import {
+  REGRAS_FOLLOW_UP,
+  regraDevida,
+  retornoDevido,
+  normalizarRetornos,
+  MAX_MESES_RETORNO,
+} from "@/lib/followUps";
 
 // Quantos dias para trás olhamos os atendimentos (a maior janela é 14 dias).
 const DIAS_JANELA = 15;
+
+type Item = {
+  agendamento_id: string;
+  paciente_id: string;
+  paciente_nome: string;
+  telefone: string;
+  procedimento: string | null;
+  atendido_em: string;
+  tipo: string;
+  label: string;
+  icone: string;
+};
+
+// Retornos configurados por procedimento (ex.: botox 3 e 6 meses).
+async function calcularRetornos(agora: Date): Promise<Item[]> {
+  const { data: procs } = await supabaseAdmin
+    .from("procedimentos")
+    .select("id, nome, retornos_meses")
+    .not("retornos_meses", "is", null);
+
+  const comRetorno = (procs ?? [])
+    .map((p: any) => ({ ...p, meses: normalizarRetornos(p.retornos_meses) }))
+    .filter((p: any) => p.meses.length > 0);
+
+  if (comRetorno.length === 0) return [];
+
+  const limite = new Date(agora);
+  limite.setMonth(limite.getMonth() - MAX_MESES_RETORNO);
+
+  const { data: ags } = await supabaseAdmin
+    .from("agendamentos")
+    .select("id, inicio, status, paciente_id, procedimento_id, pacientes(nome, telefone)")
+    .in("procedimento_id", comRetorno.map((p: any) => p.id))
+    .gte("inicio", limite.toISOString())
+    .lt("inicio", agora.toISOString())
+    .order("inicio", { ascending: false });
+
+  const validos = (ags ?? []).filter((a: any) => a.status !== "cancelado" && a.paciente_id);
+  if (validos.length === 0) return [];
+
+  const porProc = new Map(comRetorno.map((p: any) => [p.id, p]));
+
+  return validos.flatMap((a: any) => {
+    const proc = porProc.get(a.procedimento_id);
+    if (!proc) return [];
+    return proc.meses
+      .filter((m: number) => retornoDevido(new Date(a.inicio), m, agora))
+      .map((m: number) => ({
+        agendamento_id: a.id,
+        paciente_id:    a.paciente_id,
+        paciente_nome:  a.pacientes?.nome ?? "",
+        telefone:       a.pacientes?.telefone ?? "",
+        procedimento:   proc.nome,
+        atendido_em:    a.inicio,
+        tipo:           `retorno_${m}m`,
+        label:          `${proc.nome} · ${m} ${m === 1 ? "mês" : "meses"}`,
+        icone:          "💉",
+      }));
+  });
+}
 
 export async function GET() {
   const sessao = await getSessao();
@@ -38,19 +104,11 @@ export async function GET() {
   const atendidos = (ags ?? []).filter(
     (a: any) => a.status !== "cancelado" && a.paciente_id,
   );
-  if (atendidos.length === 0) return NextResponse.json({ ativo: true, itens: [] });
 
-  const { data: feitos } = await supabaseAdmin
-    .from("follow_ups_feitos")
-    .select("agendamento_id, tipo")
-    .in("agendamento_id", atendidos.map((a: any) => a.id));
-
-  const jaFeito = new Set((feitos ?? []).map((f: any) => `${f.agendamento_id}:${f.tipo}`));
-
-  const itens = atendidos.flatMap((a: any) => {
+  // Follow-ups pós-atendimento (24h / 48h / feedback 72h / 7 dias)
+  const posAtendimento: Item[] = atendidos.flatMap((a: any) => {
     const regra = regraDevida(new Date(a.inicio), agora);
     if (!regra) return [];
-    if (jaFeito.has(`${a.id}:${regra.tipo}`)) return [];
     return [{
       agendamento_id: a.id,
       paciente_id:    a.paciente_id,
@@ -63,6 +121,21 @@ export async function GET() {
       icone:          regra.icone,
     }];
   });
+
+  // Retornos configurados por procedimento (botox 3/6 meses, etc.)
+  const retornos = await calcularRetornos(agora);
+
+  const candidatos = [...posAtendimento, ...retornos];
+  if (candidatos.length === 0) return NextResponse.json({ ativo: true, itens: [] });
+
+  // Remove os que já foram marcados como feitos
+  const { data: feitos } = await supabaseAdmin
+    .from("follow_ups_feitos")
+    .select("agendamento_id, tipo")
+    .in("agendamento_id", Array.from(new Set(candidatos.map(c => c.agendamento_id))));
+
+  const jaFeito = new Set((feitos ?? []).map((f: any) => `${f.agendamento_id}:${f.tipo}`));
+  const itens = candidatos.filter(c => !jaFeito.has(`${c.agendamento_id}:${c.tipo}`));
 
   return NextResponse.json({ ativo: true, itens, regras: REGRAS_FOLLOW_UP });
 }

@@ -11,11 +11,22 @@ type Procedimento = {
   preco?: number;
   desconto_maximo?: number;
   ativo: boolean;
+  retornos_meses?: number[] | null;
 };
 
 const CORES = ["#c8a078","#b08060","#a07050","#d0a080","#c09070","#7ae8a0","#7ab8e8","#e87a7a","#e8c97a","#c87ae8","#78c8e8","#e8a07a","#a0c878","#e87ac8","#8a6f5a"];
 
-const formInicial = { nome: "", cor: "#c8a078", duracao_minutos: 60, preco: "", desconto_maximo: "0" };
+const formInicial = { nome: "", cor: "#c8a078", duracao_minutos: 60, preco: "", desconto_maximo: "0", retornos_meses: "" };
+
+// "3, 6" -> [3, 6]  (vazio -> null, para não gerar alerta nenhum)
+function parseRetornos(texto: string): number[] | null {
+  const lista = texto
+    .split(",")
+    .map(v => Number(v.trim()))
+    .filter(n => Number.isFinite(n) && n > 0 && n <= 24)
+    .sort((a, b) => a - b);
+  return lista.length ? Array.from(new Set(lista)) : null;
+}
 
 export default function ProcedimentosPage() {
   const [procedimentos, setProcedimentos] = useState<Procedimento[]>([]);
@@ -45,13 +56,13 @@ export default function ProcedimentosPage() {
 
   function abrirEditar(p: Procedimento) {
     setEditando(p);
-    setForm({ nome: p.nome, cor: p.cor, duracao_minutos: p.duracao_minutos, preco: p.preco?.toString() ?? "", desconto_maximo: p.desconto_maximo?.toString() ?? "0" });
+    setForm({ nome: p.nome, cor: p.cor, duracao_minutos: p.duracao_minutos, preco: p.preco?.toString() ?? "", desconto_maximo: p.desconto_maximo?.toString() ?? "0", retornos_meses: (p.retornos_meses ?? []).join(", ") });
     setModalAberto(true);
   }
 
   async function salvar() {
     setSalvando(true);
-    const body = { ...form, preco: form.preco ? parseFloat(form.preco) : null, desconto_maximo: parseFloat(form.desconto_maximo) || 0, duracao_minutos: Number(form.duracao_minutos) };
+    const body = { ...form, preco: form.preco ? parseFloat(form.preco) : null, desconto_maximo: parseFloat(form.desconto_maximo) || 0, duracao_minutos: Number(form.duracao_minutos), retornos_meses: parseRetornos(form.retornos_meses) };
     const url = editando ? `/api/procedimentos/${editando.id}` : "/api/procedimentos";
     const method = editando ? "PUT" : "POST";
     const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -257,6 +268,16 @@ export default function ProcedimentosPage() {
                   className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
                   style={{ background: "var(--bg-input)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
                 <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>Limite de desconto que a recepcionista pode conceder</p>
+              </div>
+              <div>
+                <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>Lembrar retorno em (meses)</label>
+                <input type="text" value={form.retornos_meses} onChange={e => setForm(f => ({ ...f, retornos_meses: e.target.value }))}
+                  placeholder="Ex: 3, 6"
+                  className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
+                  style={{ background: "var(--bg-input)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
+                <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+                  Gera alerta na aba Pacientes para entrar em contato. Separe por vírgula — ex.: botox <strong>3, 6</strong>; remodelação <strong>12</strong>. Deixe vazio para não lembrar.
+                </p>
               </div>
               <div>
                 <label className="text-xs uppercase tracking-widest block mb-3" style={{ color: "var(--text-secondary)" }}>Cor no calendário</label>
