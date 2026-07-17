@@ -46,6 +46,8 @@ export async function PATCH(
   if (body.data_acerto      !== undefined) atualizacao.data_acerto      = body.data_acerto || null;
   // ✅ Dia de vencimento do boleto
   if (body.dia_vencimento_boleto !== undefined) atualizacao.dia_vencimento_boleto = body.dia_vencimento_boleto ? Number(body.dia_vencimento_boleto) : null;
+  if (body.contatado        !== undefined) atualizacao.contatado        = body.contatado;
+  if (body.contato_em       !== undefined) atualizacao.contato_em       = body.contato_em || null;
   if (body.assinou_contrato !== undefined) atualizacao.assinou_contrato = body.assinou_contrato;
   if (body.assinou_termo    !== undefined) atualizacao.assinou_termo    = body.assinou_termo;
   if (body.observacoes      !== undefined) atualizacao.observacoes      = body.observacoes;

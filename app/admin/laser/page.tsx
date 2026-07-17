@@ -22,6 +22,8 @@ type Pacote = {
   observacoes?: string;
   assinou_termo: boolean;
   criado_em: string;
+  contatado?: boolean;
+  contato_em?: string | null;
   proximo_agendamento?: string | null;
   pacientes?: { nome: string; telefone: string; cpf?: string };
   funcionarios?: { nome: string; cor: string };
@@ -221,6 +223,16 @@ export default function LaserPage() {
     color: "var(--text-primary)",
   } as const;
 
+  const hojeISO = new Date().toISOString().slice(0, 10);
+  async function patchContato(id: string, campos: Record<string, unknown>) {
+    await fetch(`/api/laser/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(campos),
+    });
+    buscar();
+  }
+
   const semAgendaCount = pacotes.filter(semAgendamentoFuturo).length;
   const pacotesExibidos = filtroSemAgenda ? pacotes.filter(semAgendamentoFuturo) : pacotes;
 
@@ -268,9 +280,14 @@ export default function LaserPage() {
             { label: "Avulsos",    valor: resumo.totalAvulsos,   icon: "⚡", cor: "#a89bcc" },
             { label: "Boleto",     valor: resumo.totalBoleto,    icon: "🔴", cor: "#e87a7a" },
           ].map((c, i) => (
-            <div key={i} className="rounded-2xl p-4"
-              onClick={() => c.label === "Boleto" && router.push("/admin/laser/boletos")}
-              style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)", cursor: c.label === "Boleto" ? "pointer" : "default" }}>
+            <div key={i} className="rounded-2xl p-4 transition hover:opacity-80"
+              onClick={() => {
+                if (c.label === "Boleto") router.push("/admin/laser/boletos");
+                else if (c.label === "Gratuitos") setFiltroCategoria("Gratuito");
+                else if (c.label === "Avulsos") setFiltroCategoria("Avulso");
+                else if (c.label === "Pacotes") setFiltroCategoria("Pacote");
+              }}
+              style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)", cursor: ["Boleto", "Gratuitos", "Avulsos", "Pacotes"].includes(c.label) ? "pointer" : "default" }}>
               <div className="text-lg mb-1">{c.icon}</div>
               <p className="text-lg font-bold" style={{ color: c.cor }}>{c.valor}</p>
               <p className="text-[10px] uppercase tracking-widest" style={{ color: "var(--text-muted)" }}>{c.label}</p>
@@ -352,7 +369,7 @@ export default function LaserPage() {
             <table className="w-full">
               <thead>
                 <tr style={{ borderBottom: "1px solid var(--border-subtle)" }}>
-                  {["Paciente", "Áreas", "Categoria", "Forma Pag.", "Status Pag.", "Acerto", "Contrato", "Sessões", "Status", "Profissional", ""].map(h => (
+                  {["Paciente", "Áreas", "Categoria", "Forma Pag.", "Status Pag.", "Acerto", "Contrato", "Contato", "Sessões", "Status", "Profissional", ""].map(h => (
                     <th key={h} className="text-left px-4 py-4 text-xs uppercase tracking-widest" style={{ color: "var(--text-muted)" }}>{h}</th>
                   ))}
                 </tr>
@@ -450,6 +467,37 @@ export default function LaserPage() {
                           style={{ background: p.assinou_contrato ? "rgba(122,232,160,0.1)" : "rgba(232,122,122,0.1)", color: p.assinou_contrato ? "#7ae8a0" : "#e87a7a" }}>
                           {p.assinou_contrato ? "Sim" : "Não"}
                         </span>
+                      </td>
+
+                      {/* ✅ Contato (só para gratuitos) */}
+                      <td className="px-4 py-4" onClick={e => e.stopPropagation()}>
+                        {p.categoria !== "Gratuito" ? (
+                          <span className="text-xs" style={{ color: "var(--text-muted)" }}>—</span>
+                        ) : !p.contatado ? (
+                          <button onClick={() => patchContato(p.id, { contatado: true, contato_em: hojeISO })}
+                            className="text-xs px-2.5 py-1 rounded-xl font-medium transition hover:opacity-70"
+                            style={{ background: "rgba(232,201,122,0.12)", color: "#e8c97a", border: "1px solid rgba(232,201,122,0.3)" }}>
+                            📞 Marcar
+                          </button>
+                        ) : (() => {
+                          const dias = p.contato_em ? Math.floor((Date.now() - new Date(p.contato_em + "T12:00:00").getTime()) / 86400000) : 0;
+                          const antigo = dias >= 60;
+                          return (
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs px-2 py-0.5 rounded-full font-medium"
+                                title={`Contatado em ${p.contato_em ? new Date(p.contato_em + "T12:00:00").toLocaleDateString("pt-BR") : "—"}`}
+                                style={{ background: antigo ? "rgba(232,122,122,0.12)" : "rgba(122,232,160,0.12)", color: antigo ? "#e87a7a" : "#7ae8a0" }}>
+                                ✓ {p.contato_em ? new Date(p.contato_em + "T12:00:00").toLocaleDateString("pt-BR") : ""} · há {dias}d
+                              </span>
+                              <button onClick={() => patchContato(p.id, { contato_em: hojeISO })}
+                                title="Registrar novo contato hoje" className="text-xs px-1.5 py-0.5 rounded-lg transition hover:opacity-70"
+                                style={{ background: "var(--gold-bg)", color: "var(--gold)" }}>↻</button>
+                              <button onClick={() => patchContato(p.id, { contatado: false, contato_em: null })}
+                                title="Desmarcar contato" className="text-xs px-1.5 py-0.5 rounded-lg transition hover:opacity-70"
+                                style={{ background: "var(--border-subtle)", color: "var(--text-muted)" }}>✕</button>
+                            </div>
+                          );
+                        })()}
                       </td>
 
                       <td className="px-4 py-4" style={{ minWidth: 120 }}>

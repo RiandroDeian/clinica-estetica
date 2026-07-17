@@ -48,6 +48,7 @@ function toggleId(ids: string[], id: string) {
 
 export default function PacotesPage() {
   const [pacotes, setPacotes] = useState<Pacote[]>([]);
+  const [busca, setBusca] = useState("");
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
   const [historicoPacote, setHistoricoPacote] = useState<any[]>([]);
   const [registrandoAtend, setRegistrandoAtend] = useState(false);
@@ -204,6 +205,14 @@ export default function PacotesPage() {
   const expirados = pacotes.filter(p => p.status === "Expirado").length;
   const receita   = pacotes.reduce((acc, p) => acc + (p.valor ?? 0), 0);
 
+  // ✅ Busca por nome do paciente ou do pacote
+  const pacotesVisiveis = pacotes.filter(p => {
+    const q = busca.trim().toLowerCase();
+    if (!q) return true;
+    return (p.pacientes?.nome ?? "").toLowerCase().includes(q)
+        || (p.nome_pacote ?? "").toLowerCase().includes(q);
+  });
+
   // ✅ Conta pacotes ativos sem agendamento futuro
   const semAgendamento = pacotes.filter(p =>
     p.status === "Ativo" && p.paciente_id && !agendadosFuturos.has(p.paciente_id)
@@ -254,6 +263,17 @@ export default function PacotesPage() {
         </div>
       )}
 
+      {/* Busca */}
+      <div className="relative mb-4">
+        <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2" stroke="currentColor" strokeWidth={1.5} style={{ color: "var(--text-muted)" }}>
+          <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" strokeLinecap="round" />
+        </svg>
+        <input type="text" placeholder="Buscar por paciente ou nome do pacote..." value={busca}
+          onChange={e => setBusca(e.target.value)}
+          className="w-full rounded-2xl pl-11 pr-5 py-3 text-sm outline-none"
+          style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
+      </div>
+
       {/* KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         {[
@@ -270,15 +290,19 @@ export default function PacotesPage() {
       </div>
 
       {/* Lista */}
-      {pacotes.length === 0 ? (
+      {pacotesVisiveis.length === 0 ? (
         <div className="text-center py-20 rounded-3xl" style={{ background: "var(--bg-card)", border: "1px solid var(--gold-bg)" }}>
           <p className="text-4xl mb-4">📦</p>
-          <p className="text-lg font-semibold mb-2" style={{ color: "var(--gold)" }}>Nenhum pacote cadastrado</p>
-          <p className="text-sm" style={{ color: "var(--text-muted)" }}>Clique em Novo Pacote para começar</p>
+          <p className="text-lg font-semibold mb-2" style={{ color: "var(--gold)" }}>
+            {busca ? "Nenhum pacote encontrado" : "Nenhum pacote cadastrado"}
+          </p>
+          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+            {busca ? "Tente outro nome" : "Clique em Novo Pacote para começar"}
+          </p>
         </div>
       ) : (
         <div className="grid gap-4">
-          {pacotes.map(pacote => {
+          {pacotesVisiveis.map(pacote => {
             const cc = categoriaCfg[pacote.categoria] ?? categoriaCfg.Pacote;
             const sc = statusCfg[pacote.status] ?? statusCfg.Ativo;
             const totalReal = pacote.total_sessoes + (pacote.sessoes_bonus ?? 0);
