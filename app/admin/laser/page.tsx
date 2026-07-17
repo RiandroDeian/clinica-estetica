@@ -70,7 +70,7 @@ const formaCfg: Record<string, { label: string; color: string; bg: string }> = {
 
 const AREAS = [
   "Axila","Buço","Queixo","Virilha","Meia Perna","Perna Completa","Coxa","Posterior de Coxa","Braço Completo",
-  "Antebraço","Rosto","Pescoço","Abdômen","Costas","Peitoral","Auréola","Glúteos",
+  "Antebraço","Rosto","Pescoço","Abdômen","Costas","Peitoral","Aréola","Glúteos",
   "Full Body","Virilha Completa","Dedos das Maos","Dedos dos Pes","Faixa da Barba",
 ];
 
