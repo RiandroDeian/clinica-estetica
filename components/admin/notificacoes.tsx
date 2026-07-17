@@ -48,9 +48,19 @@ function tempoRelativo(iso: string) {
   return `${Math.floor(diff / 86400)}d`;
 }
 
+type FollowUp = {
+  agendamento_id: string;
+  paciente_id: string;
+  paciente_nome: string;
+  tipo: string;
+  label: string;
+  icone: string;
+};
+
 export default function Notificacoes() {
   const { notificacoes, naoLidas, marcarLida, marcarTodasLidas, limpar } = useNotificacoes();
   const [aberto, setAberto] = useState(false);
+  const [followUps, setFollowUps] = useState<FollowUp[]>([]);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -61,6 +71,24 @@ export default function Notificacoes() {
     return () => document.removeEventListener("mousedown", fechar);
   }, []);
 
+  // ✅ Tarefas de contato pendentes (só para quem tem o alerta ligado)
+  useEffect(() => {
+    let vivo = true;
+    async function carregar() {
+      try {
+        const res = await fetch("/api/follow-ups");
+        if (!res.ok) return;
+        const d = await res.json();
+        if (vivo) setFollowUps(d.ativo ? (d.itens ?? []) : []);
+      } catch { /* silencioso */ }
+    }
+    carregar();
+    const t = setInterval(carregar, 5 * 60 * 1000); // reavalia a cada 5 min
+    return () => { vivo = false; clearInterval(t); };
+  }, []);
+
+  const totalBadge = naoLidas + followUps.length;
+
   return (
     <div className="relative" ref={ref}>
       <button
@@ -70,10 +98,10 @@ export default function Notificacoes() {
         <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5" stroke="currentColor" strokeWidth={1.5}>
           <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
-        {naoLidas > 0 && (
+        {totalBadge > 0 && (
           <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold"
             style={{ background: "#e87a7a", color: "white" }}>
-            {naoLidas > 9 ? "9+" : naoLidas}
+            {totalBadge > 9 ? "9+" : totalBadge}
           </span>
         )}
       </button>
@@ -106,7 +134,37 @@ export default function Notificacoes() {
           </div>
 
           <div className="overflow-y-auto" style={{ maxHeight: 380 }}>
-            {notificacoes.length === 0 ? (
+            {/* ✅ Follow-ups pendentes (tarefas de contato) */}
+            {followUps.length > 0 && (
+              <div style={{ borderBottom: "1px solid rgba(200,160,120,0.12)" }}>
+                <div className="px-4 py-2 flex items-center justify-between">
+                  <p className="text-[10px] uppercase tracking-widest font-semibold" style={{ color: "#c8a078" }}>
+                    Precisa mandar mensagem ({followUps.length})
+                  </p>
+                  <a href="/admin/pacientes" className="text-[10px] transition hover:opacity-70" style={{ color: "#c8a078" }}>
+                    Ver na aba Pacientes
+                  </a>
+                </div>
+                {followUps.slice(0, 5).map(f => (
+                  <a key={`${f.agendamento_id}:${f.tipo}`} href="/admin/pacientes"
+                    className="flex items-center gap-3 px-4 py-2.5 transition hover:bg-[rgba(200,160,120,0.04)]"
+                    style={{ borderTop: "1px solid rgba(200,160,120,0.05)" }}>
+                    <span className="text-sm flex-shrink-0">{f.icone}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold truncate" style={{ color: "#e8d5c0" }}>{f.paciente_nome}</p>
+                      <p className="text-[11px]" style={{ color: "#6b5a4e" }}>{f.label}</p>
+                    </div>
+                  </a>
+                ))}
+                {followUps.length > 5 && (
+                  <p className="px-4 py-2 text-[10px]" style={{ color: "#3a2e28" }}>
+                    + {followUps.length - 5} outro(s) na aba Pacientes
+                  </p>
+                )}
+              </div>
+            )}
+
+            {notificacoes.length === 0 && followUps.length === 0 ? (
               <div className="text-center py-12">
                 <p className="text-3xl mb-3">-</p>
                 <p className="text-sm" style={{ color: "#6b5a4e" }}>Nenhuma notificacao</p>

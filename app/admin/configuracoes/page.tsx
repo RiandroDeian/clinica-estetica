@@ -14,6 +14,7 @@ type Funcionario = {
   id: string; nome: string; email: string; role: string; cargo: string;
   cor: string; ativo: boolean; telefone?: string; data_admissao?: string;
   status?: string; especialidades?: string[]; permissoes?: Permissoes; criado_em?: string;
+  recebe_follow_ups?: boolean;
 };
 
 const cargos = [
@@ -394,6 +395,30 @@ export default function ConfiguracoesPage() {
                         </button>
                       );
                     })}
+                  </div>
+                </div>
+
+                {/* ✅ Alertas de follow-up (quem recebe as tarefas de contato) */}
+                <div>
+                  <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>Alertas de follow-up</label>
+                  <div className="flex items-center justify-between rounded-2xl px-4 py-3"
+                    style={{ background: "var(--bg-input)", border: "1px solid var(--border-subtle)" }}>
+                    <div className="pr-3">
+                      <p className="text-sm" style={{ color: "var(--text-primary)" }}>Recebe alertas de contato</p>
+                      <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
+                        Vê na aba Pacientes quem precisa de mensagem (24h, 48h, feedback 72h e 7 dias).
+                      </p>
+                    </div>
+                    <button onClick={() => {
+                      const novo = !s.recebe_follow_ups;
+                      salvarEdicao({ recebe_follow_ups: novo });
+                      setFuncionarioSelecionado(prev => prev ? { ...prev, recebe_follow_ups: novo } : null);
+                    }}
+                      className="relative w-11 h-6 rounded-full transition-colors flex-shrink-0"
+                      style={{ background: s.recebe_follow_ups ? "var(--gold)" : "var(--border-color)" }}>
+                      <div className="absolute top-1 w-4 h-4 rounded-full bg-white transition-all"
+                        style={{ left: s.recebe_follow_ups ? "calc(100% - 20px)" : "4px" }} />
+                    </button>
                   </div>
                 </div>
               </div>

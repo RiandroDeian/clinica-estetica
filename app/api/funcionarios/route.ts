@@ -8,7 +8,7 @@ export async function GET() {
   if (!sessao) return NextResponse.json({ erro: "Nao autorizado" }, { status: 401 });
   const { data, error } = await supabaseAdmin
     .from("funcionarios")
-    .select("id, nome, email, role, cargo, cor, ativo, criado_em, telefone, data_admissao, status, especialidades, permissoes")
+    .select("id, nome, email, role, cargo, cor, ativo, criado_em, telefone, data_admissao, status, especialidades, permissoes, recebe_follow_ups")
     .order("nome");
   if (error) return NextResponse.json({ erro: error.message }, { status: 500 });
   return NextResponse.json(data ?? []);
@@ -52,7 +52,7 @@ export async function PUT(request: NextRequest) {
     .from("funcionarios")
     .update(campos)
     .eq("id", id)
-    .select("id, nome, email, role, cargo, cor, ativo, telefone, data_admissao, status, especialidades, permissoes")
+    .select("id, nome, email, role, cargo, cor, ativo, telefone, data_admissao, status, especialidades, permissoes, recebe_follow_ups")
     .single();
   if (error) return NextResponse.json({ erro: error.message }, { status: 500 });
   return NextResponse.json(data);

@@ -24,6 +24,16 @@ type Paciente = {
   contato_emergencia_parentesco?: string;
 };
 
+type FollowUp = {
+  agendamento_id: string;
+  paciente_id: string;
+  tipo: string;
+  label: string;
+  icone: string;
+  procedimento?: string | null;
+  atendido_em: string;
+};
+
 const filtrosOpcoes = [
   { key: "todos", label: "Todos" },
   { key: "sem_termo", label: "Sem Termo" },
@@ -40,6 +50,40 @@ export default function PacientesPage() {
   const [excluindo, setExcluindo] = useState(false);
   const [editando, setEditando] = useState<Paciente | null>(null);
   const [painelPaciente, setPainelPaciente] = useState<Paciente | null>(null);
+
+  // ✅ Follow-ups pendentes (só para quem tem o alerta ligado)
+  const [followUps, setFollowUps] = useState<Record<string, FollowUp>>({});
+  const [followUpsAtivo, setFollowUpsAtivo] = useState(false);
+
+  const buscarFollowUps = useCallback(async () => {
+    const res = await fetch("/api/follow-ups");
+    if (!res.ok) return;
+    const d = await res.json();
+    setFollowUpsAtivo(!!d.ativo);
+    const mapa: Record<string, FollowUp> = {};
+    // A API já vem do atendimento mais recente para o mais antigo:
+    // guardamos só a tarefa mais recente de cada paciente.
+    for (const item of (d.itens ?? []) as FollowUp[]) {
+      if (!mapa[item.paciente_id]) mapa[item.paciente_id] = item;
+    }
+    setFollowUps(mapa);
+  }, []);
+
+  useEffect(() => { buscarFollowUps(); }, [buscarFollowUps]);
+
+  async function marcarFollowUpFeito(fu: FollowUp) {
+    setFollowUps(prev => {
+      const novo = { ...prev };
+      delete novo[fu.paciente_id];
+      return novo;
+    });
+    await fetch("/api/follow-ups", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ agendamento_id: fu.agendamento_id, tipo: fu.tipo, paciente_id: fu.paciente_id }),
+    });
+    buscarFollowUps();
+  }
 
   const [form, setForm] = useState({
     nome: "", telefone: "", email: "", cpf: "", sexo: "",
@@ -82,8 +126,14 @@ export default function PacientesPage() {
   const pacientesFiltrados = pacientes.filter(p => {
     if (filtro === "sem_termo") return !p.assinou_termo;
     if (filtro === "aniversario") return ehAniversario(p.data_nascimento);
+    if (filtro === "precisa_contato") return !!followUps[p.id];
     return true;
   });
+
+  const totalFollowUps = Object.keys(followUps).length;
+  const opcoesFiltro = followUpsAtivo
+    ? [...filtrosOpcoes, { key: "precisa_contato", label: `📞 Precisa contato (${totalFollowUps})` }]
+    : filtrosOpcoes;
 
   // KPIs
   const total = pacientes.length;
@@ -184,7 +234,7 @@ export default function PacientesPage() {
               style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
           </div>
           <div className="flex gap-2 flex-wrap">
-            {filtrosOpcoes.map(f => (
+            {opcoesFiltro.map(f => (
               <button key={f.key} onClick={() => setFiltro(f.key)}
                 className="px-4 py-1.5 rounded-full text-xs transition"
                 style={{ background: filtro === f.key ? "var(--border-color)" : "transparent", color: filtro === f.key ? "var(--gold)" : "var(--text-muted)", border: `1px solid ${filtro === f.key ? "rgba(200,160,120,0.3)" : "var(--gold-bg)"}` }}>
@@ -219,6 +269,7 @@ export default function PacientesPage() {
                   {pacientesFiltrados.map((p, i) => {
                     const idade = calcularIdade(p.data_nascimento);
                     const aniv = ehAniversario(p.data_nascimento);
+                    const fu = followUps[p.id];
                     return (
                       <tr key={p.id}
                         className="transition hover:bg-[var(--bg-hover)] cursor-pointer"
@@ -235,6 +286,21 @@ export default function PacientesPage() {
                                 <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>{p.nome}</span>
                                 {aniv && <span className="text-xs">🎂</span>}
                                 {!p.assinou_termo && <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "rgba(232,122,122,0.1)", color: "#e87a7a" }}>⚠ Termo</span>}
+                                {fu && (
+                                  <>
+                                    <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold"
+                                      title={`Atendido em ${new Date(fu.atendido_em).toLocaleDateString("pt-BR")}${fu.procedimento ? " · " + fu.procedimento : ""}`}
+                                      style={{ background: "rgba(232,201,122,0.15)", color: "#e8c97a" }}>
+                                      {fu.icone} {fu.label}
+                                    </span>
+                                    <button onClick={(e) => { e.stopPropagation(); marcarFollowUpFeito(fu); }}
+                                      title="Marcar como contatado"
+                                      className="text-[10px] px-1.5 py-0.5 rounded transition hover:opacity-70"
+                                      style={{ background: "rgba(122,232,160,0.12)", color: "#7ae8a0", border: "1px solid rgba(122,232,160,0.3)" }}>
+                                      ✓ feito
+                                    </button>
+                                  </>
+                                )}
                               </div>
                               {p.email && <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>{p.email}</p>}
                             </div>

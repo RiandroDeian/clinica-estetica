@@ -71,9 +71,12 @@ export async function PUT(
       .update({ quantidade: novaQtd })
       .eq("id", id);
 
-    // Registra movimentação no histórico
-    await supabaseAdmin
-      .from("estoque_historico")
+    // Registra movimentação no histórico.
+    // ⚠️ A tabela é "estoque_movimentacoes" (é dela que o histórico lê).
+    // Antes gravava em "estoque_historico", que não existe — e sem checar o
+    // erro, a movimentação sumia silenciosamente do histórico.
+    const { error: erroHist } = await supabaseAdmin
+      .from("estoque_movimentacoes")
       .insert({
         estoque_id:        id,
         tipo,
@@ -84,6 +87,13 @@ export async function PUT(
         ambiente:          ambiente || "geral",
         funcionario_id:    sessao.id,
       });
+
+    if (erroHist) {
+      return NextResponse.json(
+        { erro: "Quantidade atualizada, mas falhou ao registrar no histórico: " + erroHist.message },
+        { status: 500 },
+      );
+    }
 
     return NextResponse.json({ ok: true, quantidade: novaQtd });
   } catch {
