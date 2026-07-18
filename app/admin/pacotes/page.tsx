@@ -49,6 +49,8 @@ function toggleId(ids: string[], id: string) {
 export default function PacotesPage() {
   const [pacotes, setPacotes] = useState<Pacote[]>([]);
   const [busca, setBusca] = useState("");
+  const [filtroCategoria, setFiltroCategoria] = useState("");
+  const [filtroStatus, setFiltroStatus] = useState("");
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
   const [historicoPacote, setHistoricoPacote] = useState<any[]>([]);
   const [registrandoAtend, setRegistrandoAtend] = useState(false);
@@ -205,12 +207,13 @@ export default function PacotesPage() {
   const expirados = pacotes.filter(p => p.status === "Expirado").length;
   const receita   = pacotes.reduce((acc, p) => acc + (p.valor ?? 0), 0);
 
-  // ✅ Busca por nome do paciente ou do pacote
+  // ✅ Busca (paciente ou nome do pacote) + filtros de categoria/status
   const pacotesVisiveis = pacotes.filter(p => {
     const q = busca.trim().toLowerCase();
-    if (!q) return true;
-    return (p.pacientes?.nome ?? "").toLowerCase().includes(q)
-        || (p.nome_pacote ?? "").toLowerCase().includes(q);
+    if (q && !((p.pacientes?.nome ?? "").toLowerCase().includes(q) || (p.nome_pacote ?? "").toLowerCase().includes(q))) return false;
+    if (filtroCategoria && p.categoria !== filtroCategoria) return false;
+    if (filtroStatus && p.status !== filtroStatus) return false;
+    return true;
   });
 
   // ✅ Conta pacotes ativos sem agendamento futuro
@@ -263,30 +266,51 @@ export default function PacotesPage() {
         </div>
       )}
 
-      {/* Busca */}
-      <div className="relative mb-4">
-        <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2" stroke="currentColor" strokeWidth={1.5} style={{ color: "var(--text-muted)" }}>
-          <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" strokeLinecap="round" />
-        </svg>
-        <input type="text" placeholder="Buscar por paciente ou nome do pacote..." value={busca}
-          onChange={e => setBusca(e.target.value)}
-          className="w-full rounded-2xl pl-11 pr-5 py-3 text-sm outline-none"
-          style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
-      </div>
-
-      {/* KPIs */}
+      {/* KPIs (clicáveis, como no laser) */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         {[
-          { label: "Total",    valor: pacotes.length, cor: "var(--gold)" },
-          { label: "Ativos",   valor: ativos,         cor: "#7ae8a0" },
-          { label: "Expirados",valor: expirados,      cor: "#e87a7a" },
-          { label: "Receita",  valor: `R$ ${receita.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}`, cor: "#e8c97a" },
-        ].map(k => (
-          <div key={k.label} className="rounded-2xl px-5 py-4" style={{ background: "var(--bg-card)", border: "1px solid var(--gold-bg)" }}>
-            <p className="text-xl font-bold" style={{ color: k.cor }}>{k.valor}</p>
-            <p className="text-xs uppercase tracking-widest mt-1" style={{ color: "var(--text-muted)" }}>{k.label}</p>
-          </div>
-        ))}
+          { label: "Total",    valor: pacotes.length, cor: "var(--gold)", filtro: "" },
+          { label: "Ativos",   valor: ativos,         cor: "#7ae8a0",     filtro: "Ativo" },
+          { label: "Expirados",valor: expirados,      cor: "#e87a7a",     filtro: "Expirado" },
+          { label: "Receita",  valor: `R$ ${receita.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}`, cor: "#e8c97a", filtro: null },
+        ].map(k => {
+          const clicavel = k.filtro !== null;
+          const ativo = clicavel && filtroStatus === k.filtro && (k.filtro !== "" || (!filtroStatus && !filtroCategoria));
+          return (
+            <div key={k.label}
+              onClick={() => { if (clicavel) { setFiltroStatus(k.filtro as string); if (k.filtro === "") setFiltroCategoria(""); } }}
+              className="rounded-2xl px-5 py-4 transition"
+              style={{ background: "var(--bg-card)", border: `1px solid ${ativo ? "var(--gold)" : "var(--gold-bg)"}`, cursor: clicavel ? "pointer" : "default" }}>
+              <p className="text-xl font-bold" style={{ color: k.cor }}>{k.valor}</p>
+              <p className="text-xs uppercase tracking-widest mt-1" style={{ color: "var(--text-muted)" }}>{k.label}</p>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Filtros (busca + categoria + status), estilo laser */}
+      <div className="flex gap-3 mb-6 flex-wrap">
+        <div className="relative flex-1 min-w-[200px]">
+          <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2" stroke="currentColor" strokeWidth={1.5} style={{ color: "var(--text-muted)" }}>
+            <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" strokeLinecap="round" />
+          </svg>
+          <input type="text" placeholder="Buscar por paciente ou nome do pacote..." value={busca}
+            onChange={e => setBusca(e.target.value)}
+            className="w-full rounded-2xl pl-11 pr-5 py-3 text-sm outline-none"
+            style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
+        </div>
+        <select value={filtroCategoria} onChange={e => setFiltroCategoria(e.target.value)}
+          className="rounded-2xl px-4 py-3 text-sm outline-none"
+          style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)", color: filtroCategoria ? "var(--text-primary)" : "var(--text-muted)" }}>
+          <option value="">Todas categorias</option>
+          {Object.keys(categoriaCfg).map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <select value={filtroStatus} onChange={e => setFiltroStatus(e.target.value)}
+          className="rounded-2xl px-4 py-3 text-sm outline-none"
+          style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)", color: filtroStatus ? "var(--text-primary)" : "var(--text-muted)" }}>
+          <option value="">Todos os status</option>
+          {Object.keys(statusCfg).map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
       </div>
 
       {/* Lista */}
@@ -301,103 +325,108 @@ export default function PacotesPage() {
           </p>
         </div>
       ) : (
-        <div className="grid gap-4">
-          {pacotesVisiveis.map(pacote => {
-            const cc = categoriaCfg[pacote.categoria] ?? categoriaCfg.Pacote;
-            const sc = statusCfg[pacote.status] ?? statusCfg.Ativo;
-            const totalReal = pacote.total_sessoes + (pacote.sessoes_bonus ?? 0);
-            const pct = totalReal > 0 ? Math.round((pacote.sessoes_usadas / totalReal) * 100) : 0;
-            const restantes = totalReal - pacote.sessoes_usadas;
-            const procs = pacote.procedimentos ?? [];
+        <div className="rounded-3xl overflow-hidden" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr style={{ borderBottom: "1px solid var(--border-subtle)" }}>
+                  {["Paciente", "Pacote", "Procedimentos", "Categoria", "Sessões", "Status", "Valor", ""].map(h => (
+                    <th key={h} className="text-left px-4 py-4 text-xs uppercase tracking-widest" style={{ color: "var(--text-muted)" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {pacotesVisiveis.map((pacote, i) => {
+                  const cc = categoriaCfg[pacote.categoria] ?? categoriaCfg.Pacote;
+                  const sc = statusCfg[pacote.status] ?? statusCfg.Ativo;
+                  const totalReal = pacote.total_sessoes + (pacote.sessoes_bonus ?? 0);
+                  const pct = totalReal > 0 ? Math.round((pacote.sessoes_usadas / totalReal) * 100) : 0;
+                  const restantes = totalReal - pacote.sessoes_usadas;
+                  const procs = pacote.procedimentos ?? [];
+                  const semAg = pacote.status === "Ativo" && pacote.paciente_id && !agendadosFuturos.has(pacote.paciente_id);
+                  return (
+                    <tr key={pacote.id}
+                      className="transition cursor-pointer hover:bg-[var(--bg-hover)]"
+                      style={{ borderBottom: i < pacotesVisiveis.length - 1 ? "1px solid var(--border-subtle)" : "none" }}
+                      onClick={() => { setModalGestao(pacote); setAbaGestao("resumo"); }}>
 
-            // ✅ Verifica se paciente está sem agendamento futuro
-            const semAg = pacote.status === "Ativo" && pacote.paciente_id && !agendadosFuturos.has(pacote.paciente_id);
+                      <td className="px-4 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+                            style={{ background: "var(--gold-bg)", color: "var(--gold)" }}>
+                            {(pacote.pacientes?.nome ?? "?").charAt(0).toUpperCase()}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>{pacote.pacientes?.nome ?? "—"}</p>
+                              {semAg && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded-full" title="Paciente ativo sem agendamento futuro"
+                                  style={{ background: "rgba(232,201,122,0.12)", color: "#e8c97a" }}>📅 Sem agendamento</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
 
-            return (
-              <div key={pacote.id}
-                className="rounded-3xl p-6 transition hover:scale-[1.005]"
-                style={{
-                  background: "var(--bg-card)",
-                  border: semAg ? "1px solid rgba(232,201,122,0.4)" : "1px solid var(--border-color)",
-                  cursor: "pointer",
-                }}
-                onClick={() => { setModalGestao(pacote); setAbaGestao("resumo"); }}>
+                      <td className="px-4 py-4 text-sm" style={{ color: "var(--text-secondary)" }}>{pacote.nome_pacote}</td>
 
-                <div className="flex items-start justify-between gap-4 mb-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap mb-1">
-                      <h2 className="font-bold text-lg" style={{ color: "var(--text-primary)" }}>{pacote.nome_pacote}</h2>
-                      <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ color: cc.color, background: cc.bg }}>{pacote.categoria}</span>
-                      <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ color: sc.color, background: sc.bg }}>{pacote.status}</span>
-                      {/* ✅ Badge de alerta */}
-                      {semAg && (
-                        <span className="text-xs px-2 py-0.5 rounded-full font-medium flex items-center gap-1"
-                          style={{ background: "rgba(232,201,122,0.12)", color: "#e8c97a", border: "1px solid rgba(232,201,122,0.3)" }}>
-                          📅 Sem agendamento
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-                      Paciente: <span style={{ color: "var(--text-secondary)" }}>{pacote.pacientes?.nome ?? "—"}</span>
-                    </p>
-                  </div>
-                  <div className="flex gap-2 flex-shrink-0" onClick={e => e.stopPropagation()}>
-                    <button onClick={() => abrirEdicao(pacote)} className="p-2 rounded-xl transition hover:opacity-70"
-                      style={{ background: "var(--gold-bg)" }}>
-                      <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4" stroke="var(--gold)" strokeWidth={1.5}>
-                        <path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    </button>
-                    <button onClick={() => excluir(pacote.id)} className="p-2 rounded-xl transition hover:opacity-70"
-                      style={{ background: "rgba(232,122,122,0.1)" }}>
-                      <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4" stroke="#e87a7a" strokeWidth={1.5}>
-                        <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    </button>
-                  </div>
-                </div>
+                      <td className="px-4 py-4">
+                        <div className="flex flex-wrap gap-1 max-w-[220px]">
+                          {procs.length === 0
+                            ? <span className="text-xs" style={{ color: "var(--text-muted)" }}>—</span>
+                            : procs.map((p, k) => (
+                                <span key={k} className="text-xs px-2 py-0.5 rounded-full"
+                                  style={{ background: "var(--border-subtle)", color: "var(--text-muted)" }}>{p.nome}</span>
+                              ))}
+                        </div>
+                      </td>
 
-                {procs.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mb-3">
-                    {procs.map((p, i) => (
-                      <span key={i} className="text-xs px-2.5 py-1 rounded-full"
-                        style={{ background: "var(--border-subtle)", color: "var(--text-secondary)", border: "1px solid var(--border-color)" }}>
-                        {p.nome}
-                      </span>
-                    ))}
-                  </div>
-                )}
+                      <td className="px-4 py-4">
+                        <span className="text-xs px-2 py-1 rounded-full font-medium" style={{ color: cc.color, background: cc.bg }}>{pacote.categoria}</span>
+                      </td>
 
-                <div className="space-y-1.5 mb-3">
-                  <div className="flex justify-between text-xs" style={{ color: "var(--text-muted)" }}>
-                    <span>
-                      {pacote.sessoes_usadas}/{totalReal} sessões
-                      {(pacote.sessoes_bonus ?? 0) > 0 && <span style={{ color: "#7ae8a0" }}> (+{pacote.sessoes_bonus} bônus)</span>}
-                    </span>
-                    <span style={{ color: restantes <= 2 ? "#e87a7a" : "var(--text-muted)" }}>{restantes} restantes</span>
-                  </div>
-                  <div className="h-2 rounded-full" style={{ background: "var(--gold-bg)" }}>
-                    <div className="h-2 rounded-full transition-all" style={{ width: `${pct}%`, background: pct >= 80 ? "#e87a7a" : "var(--gold)" }} />
-                  </div>
-                </div>
+                      <td className="px-4 py-4" style={{ minWidth: 140 }}>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 h-2 rounded-full" style={{ background: "var(--gold-bg)" }}>
+                            <div className="h-2 rounded-full" style={{ width: `${pct}%`, background: pct >= 80 ? "#e87a7a" : "var(--gold)" }} />
+                          </div>
+                          <span className="text-xs flex-shrink-0" style={{ color: restantes <= 2 ? "#e87a7a" : "var(--text-muted)" }}>{pacote.sessoes_usadas}/{totalReal}</span>
+                        </div>
+                        {(pacote.sessoes_bonus ?? 0) > 0 && (
+                          <span className="text-[10px]" style={{ color: "#7ae8a0" }}>+{pacote.sessoes_bonus} bônus</span>
+                        )}
+                      </td>
 
-                <div className="flex items-center justify-between">
-                  {pacote.valor ? (
-                    <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-                      Valor: <span style={{ color: "var(--gold)", fontWeight: 600 }}>R$ {Number(pacote.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
-                    </p>
-                  ) : <div />}
-                  {pacote.validade && (
-                    <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                      Validade: <span style={{ color: new Date(pacote.validade) < new Date() ? "#e87a7a" : "var(--text-secondary)" }}>
-                        {new Date(pacote.validade).toLocaleDateString("pt-BR")}
-                      </span>
-                    </p>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+                      <td className="px-4 py-4">
+                        <span className="text-xs px-2 py-1 rounded-full font-medium" style={{ color: sc.color, background: sc.bg }}>{pacote.status}</span>
+                      </td>
+
+                      <td className="px-4 py-4 text-sm" style={{ color: "var(--gold)", fontWeight: 600 }}>
+                        {pacote.valor ? `R$ ${Number(pacote.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—"}
+                      </td>
+
+                      <td className="px-4 py-4">
+                        <div className="flex gap-1" onClick={e => e.stopPropagation()}>
+                          <button onClick={() => abrirEdicao(pacote)} className="p-1.5 rounded-lg transition hover:opacity-70"
+                            style={{ background: "var(--gold-bg)" }} title="Editar">
+                            <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4" stroke="var(--gold)" strokeWidth={1.5}>
+                              <path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          </button>
+                          <button onClick={() => excluir(pacote.id)} className="p-1.5 rounded-lg transition hover:opacity-70"
+                            style={{ background: "rgba(232,122,122,0.1)" }} title="Excluir">
+                            <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4" stroke="#e87a7a" strokeWidth={1.5}>
+                              <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
