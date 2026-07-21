@@ -12,11 +12,20 @@ type Procedimento = {
   desconto_maximo?: number;
   ativo: boolean;
   retornos_meses?: number[] | null;
+  alertas_contato?: string[] | null;
 };
+
+const ALERTAS_CONTATO_OPCOES = [
+  { key: "24h",          label: "24h" },
+  { key: "48h",          label: "48h" },
+  { key: "72h_feedback", label: "Feedback 72h" },
+  { key: "7d",           label: "7 dias" },
+];
+const CONTATO_PADRAO = ALERTAS_CONTATO_OPCOES.map(o => o.key);
 
 const CORES = ["#c8a078","#b08060","#a07050","#d0a080","#c09070","#7ae8a0","#7ab8e8","#e87a7a","#e8c97a","#c87ae8","#78c8e8","#e8a07a","#a0c878","#e87ac8","#8a6f5a"];
 
-const formInicial = { nome: "", cor: "#c8a078", duracao_minutos: 60, preco: "", desconto_maximo: "0", retornos_meses: "" };
+const formInicial = { nome: "", cor: "#c8a078", duracao_minutos: 60, preco: "", desconto_maximo: "0", retornos_meses: "", alertas_contato: [...CONTATO_PADRAO] as string[] };
 
 // "3, 6" -> [3, 6]  (vazio -> null, para não gerar alerta nenhum)
 function parseRetornos(texto: string): number[] | null {
@@ -56,13 +65,13 @@ export default function ProcedimentosPage() {
 
   function abrirEditar(p: Procedimento) {
     setEditando(p);
-    setForm({ nome: p.nome, cor: p.cor, duracao_minutos: p.duracao_minutos, preco: p.preco?.toString() ?? "", desconto_maximo: p.desconto_maximo?.toString() ?? "0", retornos_meses: (p.retornos_meses ?? []).join(", ") });
+    setForm({ nome: p.nome, cor: p.cor, duracao_minutos: p.duracao_minutos, preco: p.preco?.toString() ?? "", desconto_maximo: p.desconto_maximo?.toString() ?? "0", retornos_meses: (p.retornos_meses ?? []).join(", "), alertas_contato: p.alertas_contato ?? [...CONTATO_PADRAO] });
     setModalAberto(true);
   }
 
   async function salvar() {
     setSalvando(true);
-    const body = { ...form, preco: form.preco ? parseFloat(form.preco) : null, desconto_maximo: parseFloat(form.desconto_maximo) || 0, duracao_minutos: Number(form.duracao_minutos), retornos_meses: parseRetornos(form.retornos_meses) };
+    const body = { ...form, preco: form.preco ? parseFloat(form.preco) : null, desconto_maximo: parseFloat(form.desconto_maximo) || 0, duracao_minutos: Number(form.duracao_minutos), retornos_meses: parseRetornos(form.retornos_meses), alertas_contato: form.alertas_contato };
     const url = editando ? `/api/procedimentos/${editando.id}` : "/api/procedimentos";
     const method = editando ? "PUT" : "POST";
     const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -268,6 +277,25 @@ export default function ProcedimentosPage() {
                   className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
                   style={{ background: "var(--bg-input)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
                 <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>Limite de desconto que a recepcionista pode conceder</p>
+              </div>
+              <div>
+                <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>Alertas de contato (pós-atendimento)</label>
+                <div className="flex gap-2 flex-wrap">
+                  {ALERTAS_CONTATO_OPCOES.map(op => {
+                    const on = form.alertas_contato.includes(op.key);
+                    return (
+                      <button key={op.key} type="button"
+                        onClick={() => setForm(f => ({ ...f, alertas_contato: on ? f.alertas_contato.filter(k => k !== op.key) : [...f.alertas_contato, op.key] }))}
+                        className="px-3 py-1.5 rounded-xl text-xs transition"
+                        style={{ background: on ? "var(--gold-bg)" : "var(--bg-input)", color: on ? "var(--gold)" : "var(--text-muted)", border: `1px solid ${on ? "rgba(200,160,120,0.3)" : "var(--border-subtle)"}` }}>
+                        {on ? "✓ " : ""}{op.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+                  Alerta na aba Pacientes / sininho após o atendimento. <strong>Desmarque todos</strong> para não gerar alerta (ex.: Depilação a Laser). Zera a cada novo atendimento do paciente.
+                </p>
               </div>
               <div>
                 <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>Lembrar retorno em (meses)</label>

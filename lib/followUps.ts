@@ -24,10 +24,33 @@ export const REGRAS_FOLLOW_UP: RegraFollowUp[] = [
   { tipo: "7d",           label: "Mensagem 7 dias", icone: "📞", horas: 7 * D,  ateHoras: 14 * D },
 ];
 
-/** Retorna a regra devida agora para um atendimento (ou null se nenhuma). */
-export function regraDevida(atendidoEm: Date, agora: Date = new Date()): RegraFollowUp | null {
+/** Todos os tipos de alerta de contato (usado como padrão quando não há config). */
+export const TODOS_CONTATO = REGRAS_FOLLOW_UP.map(r => r.tipo);
+
+/**
+ * Alertas de contato habilitados para um procedimento.
+ * - null/undefined  → padrão (todos), para compatibilidade com dados antigos
+ * - array (mesmo []) → exatamente o configurado ([] = nenhum, ex.: depilação a laser)
+ */
+export function alertasContatoDe(alertas_contato: unknown): string[] {
+  if (alertas_contato == null) return TODOS_CONTATO;
+  if (Array.isArray(alertas_contato)) return alertas_contato.map(String);
+  return TODOS_CONTATO;
+}
+
+/**
+ * Retorna a regra devida agora para um atendimento (ou null se nenhuma).
+ * `habilitados` limita quais tipos de alerta valem para o procedimento.
+ */
+export function regraDevida(
+  atendidoEm: Date,
+  agora: Date = new Date(),
+  habilitados?: string[],
+): RegraFollowUp | null {
   const horas = (agora.getTime() - atendidoEm.getTime()) / (1000 * 60 * 60);
-  return REGRAS_FOLLOW_UP.find(r => horas >= r.horas && horas < r.ateHoras) ?? null;
+  return REGRAS_FOLLOW_UP.find(r =>
+    (!habilitados || habilitados.includes(r.tipo)) && horas >= r.horas && horas < r.ateHoras,
+  ) ?? null;
 }
 
 // ── Retornos por procedimento ────────────────────────────────────────────────
