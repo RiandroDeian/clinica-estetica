@@ -25,17 +25,9 @@ const CONTATO_PADRAO = ALERTAS_CONTATO_OPCOES.map(o => o.key);
 
 const CORES = ["#c8a078","#b08060","#a07050","#d0a080","#c09070","#7ae8a0","#7ab8e8","#e87a7a","#e8c97a","#c87ae8","#78c8e8","#e8a07a","#a0c878","#e87ac8","#8a6f5a"];
 
-const formInicial = { nome: "", cor: "#c8a078", duracao_minutos: 60, preco: "", desconto_maximo: "0", retornos_meses: "", alertas_contato: [...CONTATO_PADRAO] as string[] };
+const MESES_PRESET = [3, 6, 12];
 
-// "3, 6" -> [3, 6]  (vazio -> null, para não gerar alerta nenhum)
-function parseRetornos(texto: string): number[] | null {
-  const lista = texto
-    .split(",")
-    .map(v => Number(v.trim()))
-    .filter(n => Number.isFinite(n) && n > 0 && n <= 24)
-    .sort((a, b) => a - b);
-  return lista.length ? Array.from(new Set(lista)) : null;
-}
+const formInicial = { nome: "", cor: "#c8a078", duracao_minutos: 60, preco: "", desconto_maximo: "0", retornos_meses: [] as number[], alertas_contato: [...CONTATO_PADRAO] as string[] };
 
 export default function ProcedimentosPage() {
   const [procedimentos, setProcedimentos] = useState<Procedimento[]>([]);
@@ -46,6 +38,20 @@ export default function ProcedimentosPage() {
   const [busca, setBusca] = useState("");
   const [filtroAtivo, setFiltroAtivo] = useState<"todos"|"ativos"|"inativos">("ativos");
   const [form, setForm] = useState(formInicial);
+  const [novoMes, setNovoMes] = useState("");
+
+  function toggleContato(key: string) {
+    setForm(f => ({ ...f, alertas_contato: f.alertas_contato.includes(key) ? f.alertas_contato.filter(k => k !== key) : [...f.alertas_contato, key] }));
+  }
+  function toggleMes(m: number) {
+    setForm(f => ({ ...f, retornos_meses: f.retornos_meses.includes(m) ? f.retornos_meses.filter(x => x !== m) : [...f.retornos_meses, m] }));
+  }
+  function adicionarMes() {
+    const m = Math.trunc(Number(novoMes));
+    if (!Number.isFinite(m) || m <= 0 || m > 24) return;
+    setForm(f => ({ ...f, retornos_meses: f.retornos_meses.includes(m) ? f.retornos_meses : [...f.retornos_meses, m] }));
+    setNovoMes("");
+  }
 
   async function buscar() {
     setCarregando(true);
@@ -65,13 +71,14 @@ export default function ProcedimentosPage() {
 
   function abrirEditar(p: Procedimento) {
     setEditando(p);
-    setForm({ nome: p.nome, cor: p.cor, duracao_minutos: p.duracao_minutos, preco: p.preco?.toString() ?? "", desconto_maximo: p.desconto_maximo?.toString() ?? "0", retornos_meses: (p.retornos_meses ?? []).join(", "), alertas_contato: p.alertas_contato ?? [...CONTATO_PADRAO] });
+    setForm({ nome: p.nome, cor: p.cor, duracao_minutos: p.duracao_minutos, preco: p.preco?.toString() ?? "", desconto_maximo: p.desconto_maximo?.toString() ?? "0", retornos_meses: [...(p.retornos_meses ?? [])], alertas_contato: p.alertas_contato ?? [...CONTATO_PADRAO] });
     setModalAberto(true);
   }
 
   async function salvar() {
     setSalvando(true);
-    const body = { ...form, preco: form.preco ? parseFloat(form.preco) : null, desconto_maximo: parseFloat(form.desconto_maximo) || 0, duracao_minutos: Number(form.duracao_minutos), retornos_meses: parseRetornos(form.retornos_meses), alertas_contato: form.alertas_contato };
+    const meses = Array.from(new Set(form.retornos_meses)).sort((a, b) => a - b);
+    const body = { ...form, preco: form.preco ? parseFloat(form.preco) : null, desconto_maximo: parseFloat(form.desconto_maximo) || 0, duracao_minutos: Number(form.duracao_minutos), retornos_meses: meses.length ? meses : null, alertas_contato: form.alertas_contato };
     const url = editando ? `/api/procedimentos/${editando.id}` : "/api/procedimentos";
     const method = editando ? "PUT" : "POST";
     const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -279,33 +286,50 @@ export default function ProcedimentosPage() {
                 <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>Limite de desconto que a recepcionista pode conceder</p>
               </div>
               <div>
-                <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>Alertas de contato (pós-atendimento)</label>
-                <div className="flex gap-2 flex-wrap">
+                <label className="text-xs uppercase tracking-widest block mb-1" style={{ color: "var(--text-secondary)" }}>Alertas</label>
+                <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>
+                  Marque os alertas que este procedimento dispara na aba Pacientes / sininho. <strong>Desmarque todos</strong> = sem alerta (ex.: Depilação a Laser).
+                </p>
+
+                {/* Pós-atendimento (zeram a cada atendimento) */}
+                <p className="text-[10px] uppercase tracking-widest mb-1.5" style={{ color: "var(--text-muted)" }}>Pós-atendimento</p>
+                <div className="flex gap-2 flex-wrap mb-3">
                   {ALERTAS_CONTATO_OPCOES.map(op => {
                     const on = form.alertas_contato.includes(op.key);
                     return (
-                      <button key={op.key} type="button"
-                        onClick={() => setForm(f => ({ ...f, alertas_contato: on ? f.alertas_contato.filter(k => k !== op.key) : [...f.alertas_contato, op.key] }))}
+                      <button key={op.key} type="button" onClick={() => toggleContato(op.key)}
                         className="px-3 py-1.5 rounded-xl text-xs transition"
                         style={{ background: on ? "var(--gold-bg)" : "var(--bg-input)", color: on ? "var(--gold)" : "var(--text-muted)", border: `1px solid ${on ? "rgba(200,160,120,0.3)" : "var(--border-subtle)"}` }}>
-                        {on ? "✓ " : ""}{op.label}
+                        {on ? "✓ " : ""}📞 {op.label}
                       </button>
                     );
                   })}
                 </div>
-                <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
-                  Alerta na aba Pacientes / sininho após o atendimento. <strong>Desmarque todos</strong> para não gerar alerta (ex.: Depilação a Laser). Zera a cada novo atendimento do paciente.
-                </p>
-              </div>
-              <div>
-                <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>Lembrar retorno em (meses)</label>
-                <input type="text" value={form.retornos_meses} onChange={e => setForm(f => ({ ...f, retornos_meses: e.target.value }))}
-                  placeholder="Ex: 3, 6"
-                  className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
-                  style={{ background: "var(--bg-input)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
-                <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
-                  Gera alerta na aba Pacientes para entrar em contato. Separe por vírgula — ex.: botox <strong>3, 6</strong>; remodelação <strong>12</strong>. Deixe vazio para não lembrar.
-                </p>
+
+                {/* Retornos (por meses) */}
+                <p className="text-[10px] uppercase tracking-widest mb-1.5" style={{ color: "var(--text-muted)" }}>Retornos (meses)</p>
+                <div className="flex gap-2 flex-wrap items-center">
+                  {Array.from(new Set([...MESES_PRESET, ...form.retornos_meses])).sort((a, b) => a - b).map(m => {
+                    const on = form.retornos_meses.includes(m);
+                    return (
+                      <button key={m} type="button" onClick={() => toggleMes(m)}
+                        className="px-3 py-1.5 rounded-xl text-xs transition"
+                        style={{ background: on ? "rgba(200,122,232,0.15)" : "var(--bg-input)", color: on ? "#c87ae8" : "var(--text-muted)", border: `1px solid ${on ? "rgba(200,122,232,0.35)" : "var(--border-subtle)"}` }}>
+                        {on ? "✓ " : ""}💉 {m} {m === 1 ? "mês" : "meses"}
+                      </button>
+                    );
+                  })}
+                  <div className="flex items-center gap-1">
+                    <input type="number" value={novoMes} onChange={e => setNovoMes(e.target.value)}
+                      onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); adicionarMes(); } }}
+                      placeholder="+ meses" min={1} max={24}
+                      className="w-24 rounded-xl px-3 py-1.5 text-xs outline-none"
+                      style={{ background: "var(--bg-input)", border: "1px solid var(--border-subtle)", color: "var(--text-primary)" }} />
+                    <button type="button" onClick={adicionarMes}
+                      className="px-2.5 py-1.5 rounded-xl text-xs transition hover:opacity-70"
+                      style={{ background: "var(--gold-bg)", color: "var(--gold)" }}>Adicionar</button>
+                  </div>
+                </div>
               </div>
               <div>
                 <label className="text-xs uppercase tracking-widest block mb-3" style={{ color: "var(--text-secondary)" }}>Cor no calendário</label>
