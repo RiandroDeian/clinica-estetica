@@ -74,11 +74,16 @@ export async function GET(request: NextRequest) {
     const porForma: Record<string, number> = {};
 
     pagos.forEach((r) => {
-      const forma = r.forma_pagamento || "outro";
-
-      porForma[forma] =
-        (porForma[forma] || 0) +
-        Number(r.valor_final || 0);
+      // Se tem split, distribui por forma; senão, usa a forma única
+      if (Array.isArray(r.formas_pagamento) && r.formas_pagamento.length) {
+        r.formas_pagamento.forEach((f: any) => {
+          const k = f.forma || "outro";
+          porForma[k] = (porForma[k] || 0) + Number(f.valor || 0);
+        });
+      } else {
+        const forma = r.forma_pagamento || "outro";
+        porForma[forma] = (porForma[forma] || 0) + Number(r.valor_final || 0);
+      }
     });
 
     const procMap: Record<string, number> = {};
@@ -131,10 +136,18 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
 
-    const valor = Number(body.valor || 0);
-    const desconto = Number(body.desconto || 0);
+    // Formas de pagamento (split): [{ forma, valor }] — o total é a soma.
+    const formas = Array.isArray(body.formas_pagamento)
+      ? body.formas_pagamento
+          .map((f: any) => ({ forma: String(f.forma), valor: Number(f.valor) }))
+          .filter((f: any) => f.forma && Number.isFinite(f.valor) && f.valor > 0)
+      : [];
 
-    const valorFinal = valor - desconto;
+    const totalFormas = formas.reduce((s: number, f: any) => s + f.valor, 0);
+    const valor = totalFormas > 0 ? totalFormas : Number(body.valor || 0);
+    const valorFinal = valor;
+    const forma_pagamento =
+      formas.length > 1 ? "multiplas" : formas.length === 1 ? formas[0].forma : (body.forma_pagamento || "pix");
 
     const { data, error } = await supabaseAdmin
       .from("faturamentos")
@@ -145,11 +158,12 @@ export async function POST(request: NextRequest) {
         funcionario_id: body.funcionario_id || null,
 
         valor,
-        desconto,
+        desconto: 0,
         valor_final: valorFinal,
 
-        forma_pagamento: body.forma_pagamento,
-        status_pagamento: body.status_pagamento,
+        forma_pagamento,
+        formas_pagamento: formas.length ? formas : null,
+        status_pagamento: body.status_pagamento || "pendente",
 
         observacoes: body.observacoes || null,
       })

@@ -8,6 +8,7 @@ type Registro = {
   desconto: number;
   valor_final: number;
   forma_pagamento: string;
+  formas_pagamento?: { forma: string; valor: number }[] | null;
   status_pagamento: string;
   observacoes?: string;
   criado_em: string;
@@ -76,10 +77,12 @@ function getPeriodo(key: string) {
   return null;
 }
 
+type FormaLinha = { forma: string; valor: string };
+
 const formInicial = {
   agendamento_id: "", paciente_id: "", procedimento_id: "",
-  funcionario_id: "", valor: "", desconto: "0",
-  forma_pagamento: "pix", status_pagamento: "pago", observacoes: "",
+  funcionario_id: "", status_pagamento: "pendente", observacoes: "",
+  formas_pagamento: [{ forma: "pix", valor: "" }] as FormaLinha[],
 };
 
 export default function FaturamentoPage() {
@@ -93,6 +96,8 @@ export default function FaturamentoPage() {
   const [editando, setEditando] = useState<Registro | null>(null);
   const [agendamentos, setAgendamentos] = useState<Agendamento[]>([]);
   const [funcionarios, setFuncionarios] = useState<Funcionario[]>([]);
+  const [pacientes, setPacientes] = useState<{ id: string; nome: string }[]>([]);
+  const [procedimentos, setProcedimentos] = useState<{ id: string; nome: string; preco?: number }[]>([]);
   const [salvando, setSalvando] = useState(false);
   const [excluindo, setExcluindo] = useState<string | null>(null);
   const [buscaAgendamento, setBuscaAgendamento] = useState("");
@@ -122,7 +127,20 @@ export default function FaturamentoPage() {
     const p = getPeriodo("mes");
     fetch(`/api/agendamentos?inicio=${p?.inicio}&fim=${p?.fim}`).then(r => r.json()).then(d => setAgendamentos(Array.isArray(d) ? d : []));
     fetch("/api/funcionarios").then(r => r.json()).then(d => setFuncionarios(Array.isArray(d) ? d : []));
+    fetch("/api/pacientes").then(r => r.json()).then(d => setPacientes(Array.isArray(d) ? d : []));
+    fetch("/api/procedimentos").then(r => r.json()).then(d => setProcedimentos(Array.isArray(d) ? d : []));
   }, []);
+
+  // Helpers das formas de pagamento (split)
+  function setFormaLinha(i: number, campo: "forma" | "valor", v: string) {
+    setForm(f => ({ ...f, formas_pagamento: f.formas_pagamento.map((l, idx) => idx === i ? { ...l, [campo]: v } : l) }));
+  }
+  function addForma() {
+    setForm(f => ({ ...f, formas_pagamento: [...f.formas_pagamento, { forma: "pix", valor: "" }] }));
+  }
+  function removeForma(i: number) {
+    setForm(f => ({ ...f, formas_pagamento: f.formas_pagamento.length > 1 ? f.formas_pagamento.filter((_, idx) => idx !== i) : f.formas_pagamento }));
+  }
 
   function abrirNovo() {
     setEditando(null);
@@ -135,11 +153,12 @@ export default function FaturamentoPage() {
     setEditando(r);
     setForm({
       agendamento_id: "", paciente_id: "", procedimento_id: "",
-      funcionario_id: "", valor: String(r.valor),
-      desconto: String(r.desconto ?? 0),
-      forma_pagamento: r.forma_pagamento,
+      funcionario_id: "",
       status_pagamento: r.status_pagamento,
       observacoes: r.observacoes ?? "",
+      formas_pagamento: (r.formas_pagamento && r.formas_pagamento.length)
+        ? r.formas_pagamento.map(f => ({ forma: f.forma, valor: String(f.valor) }))
+        : [{ forma: r.forma_pagamento || "pix", valor: String(r.valor ?? "") }],
     });
     setModalAberto(true);
   }
@@ -147,18 +166,49 @@ export default function FaturamentoPage() {
   function selecionarAgendamento(id: string) {
     const ag = agendamentos.find(a => a.id === id);
     if (!ag) return;
-    setForm(f => ({ ...f, agendamento_id: id, valor: ag.procedimentos?.preco?.toString() ?? "" }));
+    const preco = ag.procedimentos?.preco;
+    setForm(f => ({
+      ...f,
+      agendamento_id: id,
+      paciente_id: (ag as any).paciente_id ?? f.paciente_id,
+      procedimento_id: (ag as any).procedimento_id ?? f.procedimento_id,
+      formas_pagamento: preco ? [{ forma: f.formas_pagamento[0]?.forma ?? "pix", valor: String(preco) }] : f.formas_pagamento,
+    }));
   }
 
   async function salvar() {
     setSalvando(true);
     try {
+      const formasNum = form.formas_pagamento
+        .filter(l => l.forma && Number(l.valor) > 0)
+        .map(l => ({ forma: l.forma, valor: Number(l.valor) }));
+      const total = formasNum.reduce((s, f) => s + f.valor, 0);
+      const forma_pagamento = formasNum.length > 1 ? "multiplas" : formasNum.length === 1 ? formasNum[0].forma : "pix";
+
+      const payload: Record<string, unknown> = {
+        funcionario_id: form.funcionario_id || null,
+        status_pagamento: form.status_pagamento,
+        observacoes: form.observacoes,
+        formas_pagamento: formasNum,
+        forma_pagamento,
+        valor: total,
+        desconto: 0,
+      };
+      if (!editando) {
+        payload.paciente_id = form.paciente_id || null;
+        payload.procedimento_id = form.procedimento_id || null;
+        payload.agendamento_id = form.agendamento_id || null;
+      } else {
+        if (form.paciente_id) payload.paciente_id = form.paciente_id;
+        if (form.procedimento_id) payload.procedimento_id = form.procedimento_id;
+      }
+
       const method = editando ? "PUT" : "POST";
       const url = editando ? `/api/faturamento/${editando.id}` : "/api/faturamento";
       await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       });
       setModalAberto(false);
       setEditando(null);
@@ -169,6 +219,15 @@ export default function FaturamentoPage() {
     }
   }
 
+  async function confirmarPagamento(r: Registro) {
+    await fetch(`/api/faturamento/${r.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status_pagamento: "pago" }),
+    });
+    buscar();
+  }
+
   async function excluir(id: string) {
     if (!confirm("Excluir este registro financeiro?")) return;
     setExcluindo(id);
@@ -177,7 +236,7 @@ export default function FaturamentoPage() {
     buscar();
   }
 
-  const valorFinal = useMemo(() => Number(form.valor || 0) - Number(form.desconto || 0), [form.valor, form.desconto]);
+  const valorFinal = useMemo(() => form.formas_pagamento.reduce((s, l) => s + Number(l.valor || 0), 0), [form.formas_pagamento]);
 
   const agendamentosFiltrados = agendamentos.filter(ag => {
     const txt = buscaAgendamento.toLowerCase();
@@ -355,7 +414,16 @@ export default function FaturamentoPage() {
                       <td className="px-5 py-4 text-sm" style={{ color: "var(--text-muted)" }}>
                         {r.desconto > 0 ? `- R$ ${Number(r.desconto).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—"}
                       </td>
-                      <td className="px-5 py-4 text-sm" style={{ color: "var(--text-muted)" }}>{forma?.icon} {forma?.label}</td>
+                      <td className="px-5 py-4 text-xs" style={{ color: "var(--text-muted)" }}>
+                        {r.formas_pagamento && r.formas_pagamento.length ? (
+                          <div className="flex flex-col gap-0.5">
+                            {r.formas_pagamento.map((f, k) => {
+                              const fc = formas.find(x => x.key === f.forma);
+                              return <span key={k}>{fc?.icon ?? "•"} {fc?.label ?? f.forma}: R$ {Number(f.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>;
+                            })}
+                          </div>
+                        ) : (<span>{forma?.icon} {forma?.label}</span>)}
+                      </td>
                       <td className="px-5 py-4">
                         <span className="px-2 py-1 rounded-full text-xs font-medium" style={{ color: status?.color, background: status?.bg }}>
                           {status?.label}
@@ -365,7 +433,14 @@ export default function FaturamentoPage() {
                         {new Date(r.criado_em).toLocaleDateString("pt-BR")}
                       </td>
                       <td className="px-5 py-4">
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 items-center">
+                          {r.status_pagamento === "pendente" && (
+                            <button onClick={() => confirmarPagamento(r)} title="Confirmar pagamento"
+                              className="px-2.5 py-1.5 rounded-lg text-xs font-medium transition hover:opacity-70 flex-shrink-0"
+                              style={{ background: "rgba(122,232,160,0.12)", color: "#7ae8a0", border: "1px solid rgba(122,232,160,0.3)" }}>
+                              ✓ Confirmar
+                            </button>
+                          )}
                           <button onClick={() => abrirEdicao(r)}
                             className="p-1.5 rounded-lg transition hover:opacity-70"
                             style={{ background: "var(--gold-bg)" }}>
@@ -444,6 +519,36 @@ export default function FaturamentoPage() {
                 </div>
               )}
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>Paciente</label>
+                  <select value={form.paciente_id} onChange={e => setForm(f => ({ ...f, paciente_id: e.target.value }))}
+                    className={inp} style={{ ...inpStyle, color: form.paciente_id ? "var(--text-primary)" : "var(--text-muted)" }}>
+                    <option value="">{editando ? "Manter atual" : "Selecionar paciente"}</option>
+                    {pacientes.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>Procedimento</label>
+                  <select value={form.procedimento_id}
+                    onChange={e => {
+                      const pid = e.target.value;
+                      const proc = procedimentos.find(p => p.id === pid);
+                      setForm(f => ({
+                        ...f,
+                        procedimento_id: pid,
+                        formas_pagamento: proc?.preco && f.formas_pagamento.length === 1 && !f.formas_pagamento[0].valor
+                          ? [{ forma: f.formas_pagamento[0].forma, valor: String(proc.preco) }]
+                          : f.formas_pagamento,
+                      }));
+                    }}
+                    className={inp} style={{ ...inpStyle, color: form.procedimento_id ? "var(--text-primary)" : "var(--text-muted)" }}>
+                    <option value="">{editando ? "Manter atual" : "Selecionar procedimento"}</option>
+                    {procedimentos.map(p => <option key={p.id} value={p.id}>{p.nome}{p.preco ? ` — R$ ${p.preco}` : ""}</option>)}
+                  </select>
+                </div>
+              </div>
+
               <div>
                 <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>Profissional</label>
                 <select value={form.funcionario_id} onChange={e => setForm(f => ({ ...f, funcionario_id: e.target.value }))}
@@ -453,40 +558,37 @@ export default function FaturamentoPage() {
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>Valor (R$)</label>
-                  <input type="number" value={form.valor} onChange={e => setForm(f => ({ ...f, valor: e.target.value }))}
-                    className={inp} style={inpStyle} placeholder="0,00" />
+              {/* Formas de pagamento (uma ou várias — Pix + Cartão + Dinheiro...) */}
+              <div>
+                <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>Formas de pagamento</label>
+                <div className="flex flex-col gap-2">
+                  {form.formas_pagamento.map((linha, i) => (
+                    <div key={i} className="flex gap-2 items-center">
+                      <select value={linha.forma} onChange={e => setFormaLinha(i, "forma", e.target.value)}
+                        className="rounded-2xl px-3 py-3 text-sm outline-none" style={{ ...inpStyle, width: 170, flexShrink: 0, color: "var(--text-primary)" }}>
+                        {formas.map(f => <option key={f.key} value={f.key}>{f.icon} {f.label}</option>)}
+                      </select>
+                      <input type="number" value={linha.valor} onChange={e => setFormaLinha(i, "valor", e.target.value)}
+                        placeholder="0,00" className={inp} style={inpStyle} />
+                      {form.formas_pagamento.length > 1 && (
+                        <button onClick={() => removeForma(i)} title="Remover forma"
+                          className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition hover:opacity-70"
+                          style={{ background: "rgba(232,122,122,0.1)", color: "#e87a7a" }}>✕</button>
+                      )}
+                    </div>
+                  ))}
                 </div>
-                <div>
-                  <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>Desconto (R$)</label>
-                  <input type="number" value={form.desconto} onChange={e => setForm(f => ({ ...f, desconto: e.target.value }))}
-                    className={inp} style={inpStyle} placeholder="0,00" />
-                </div>
+                <button onClick={addForma}
+                  className="mt-2 text-xs px-3 py-1.5 rounded-xl transition hover:opacity-70"
+                  style={{ background: "var(--gold-bg)", color: "var(--gold)", border: "1px solid var(--border-subtle)" }}>
+                  + Adicionar forma de pagamento
+                </button>
               </div>
 
               <div className="rounded-2xl px-4 py-3 flex items-center justify-between"
                 style={{ background: "var(--gold-bg)", border: "1px solid var(--border-color)" }}>
-                <span className="text-sm" style={{ color: "var(--text-secondary)" }}>Total Final</span>
+                <span className="text-sm" style={{ color: "var(--text-secondary)" }}>Total</span>
                 <span className="text-xl font-bold" style={{ color: "var(--gold)" }}>R$ {valorFinal.toFixed(2)}</span>
-              </div>
-
-              <div>
-                <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>Forma de Pagamento</label>
-                <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-                  {formas.map(f => (
-                    <button key={f.key} onClick={() => setForm(fm => ({ ...fm, forma_pagamento: f.key }))}
-                      className="py-2.5 rounded-2xl text-xs transition"
-                      style={{
-                        background: form.forma_pagamento === f.key ? "var(--gold-bg)" : "var(--bg-input)",
-                        color: form.forma_pagamento === f.key ? "var(--gold)" : "var(--text-muted)",
-                        border: `1px solid ${form.forma_pagamento === f.key ? "var(--border-color)" : "var(--border-subtle)"}`,
-                      }}>
-                      {f.icon} {f.label}
-                    </button>
-                  ))}
-                </div>
               </div>
 
               <div>
@@ -520,9 +622,9 @@ export default function FaturamentoPage() {
                   style={{ border: "1px solid var(--border-color)", color: "var(--text-muted)" }}>
                   Cancelar
                 </button>
-                <button onClick={salvar} disabled={salvando || !form.valor}
+                <button onClick={salvar} disabled={salvando || valorFinal <= 0}
                   className="flex-1 py-3 rounded-2xl text-sm font-semibold transition hover:scale-105"
-                  style={{ background: "var(--gold)", color: "#0a0707", opacity: salvando ? 0.7 : 1 }}>
+                  style={{ background: "var(--gold)", color: "#0a0707", opacity: salvando || valorFinal <= 0 ? 0.5 : 1 }}>
                   {salvando ? "Salvando..." : editando ? "Salvar Alterações" : "Registrar Pagamento"}
                 </button>
               </div>

@@ -9,11 +9,15 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
   const { id } = await params;
   const body = await request.json();
-  const valor_final = Number(body.valor) - Number(body.desconto ?? 0);
+  const update: Record<string, unknown> = { ...body };
+  // Só recalcula o total quando o valor é enviado (ex.: "Confirmar" manda só o status)
+  if (body.valor !== undefined) {
+    update.valor_final = Number(body.valor) - Number(body.desconto ?? 0);
+  }
 
   const { data, error } = await supabaseAdmin
     .from("faturamentos")
-    .update({ ...body, valor_final })
+    .update(update)
     .eq("id", id)
     .select()
     .single();
