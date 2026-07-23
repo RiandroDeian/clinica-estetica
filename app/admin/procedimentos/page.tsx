@@ -13,6 +13,8 @@ type Procedimento = {
   ativo: boolean;
   retornos_meses?: number[] | null;
   alertas_contato?: string[] | null;
+  mostrar_no_site?: boolean;
+  zerar_por_agendamento?: boolean;
 };
 
 const ALERTAS_CONTATO_OPCOES = [
@@ -27,7 +29,7 @@ const CORES = ["#c8a078","#b08060","#a07050","#d0a080","#c09070","#7ae8a0","#7ab
 
 const MESES_PRESET = [3, 6, 12];
 
-const formInicial = { nome: "", cor: "#c8a078", duracao_minutos: 60, preco: "", desconto_maximo: "0", retornos_meses: [] as number[], alertas_contato: [...CONTATO_PADRAO] as string[] };
+const formInicial = { nome: "", cor: "#c8a078", duracao_minutos: 60, preco: "", desconto_maximo: "0", retornos_meses: [] as number[], alertas_contato: [...CONTATO_PADRAO] as string[], mostrar_no_site: true, zerar_por_agendamento: true };
 
 export default function ProcedimentosPage() {
   const [procedimentos, setProcedimentos] = useState<Procedimento[]>([]);
@@ -71,7 +73,7 @@ export default function ProcedimentosPage() {
 
   function abrirEditar(p: Procedimento) {
     setEditando(p);
-    setForm({ nome: p.nome, cor: p.cor, duracao_minutos: p.duracao_minutos, preco: p.preco?.toString() ?? "", desconto_maximo: p.desconto_maximo?.toString() ?? "0", retornos_meses: [...(p.retornos_meses ?? [])], alertas_contato: p.alertas_contato ?? [...CONTATO_PADRAO] });
+    setForm({ nome: p.nome, cor: p.cor, duracao_minutos: p.duracao_minutos, preco: p.preco?.toString() ?? "", desconto_maximo: p.desconto_maximo?.toString() ?? "0", retornos_meses: [...(p.retornos_meses ?? [])], alertas_contato: p.alertas_contato ?? [...CONTATO_PADRAO], mostrar_no_site: p.mostrar_no_site ?? true, zerar_por_agendamento: p.zerar_por_agendamento ?? true });
     setModalAberto(true);
   }
 
@@ -330,6 +332,36 @@ export default function ProcedimentosPage() {
                       style={{ background: "var(--gold-bg)", color: "var(--gold)" }}>Adicionar</button>
                   </div>
                 </div>
+
+                {/* Zerar alertas a cada novo agendamento (deste procedimento) */}
+                <div className="flex items-center justify-between mt-3 rounded-2xl px-3 py-2.5" style={{ background: "var(--bg-input)", border: "1px solid var(--border-subtle)" }}>
+                  <div className="pr-3">
+                    <p className="text-sm" style={{ color: "var(--text-primary)" }}>Zerar alertas a cada novo agendamento</p>
+                    <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>
+                      Ligado (ex.: capilar): um novo agendamento apaga o alerta antigo deste procedimento. Desligado (ex.: botox): mantém.
+                    </p>
+                  </div>
+                  <button type="button" onClick={() => setForm(f => ({ ...f, zerar_por_agendamento: !f.zerar_por_agendamento }))}
+                    className="relative w-11 h-6 rounded-full transition-colors flex-shrink-0"
+                    style={{ background: form.zerar_por_agendamento ? "var(--gold)" : "var(--border-color)" }}>
+                    <div className="absolute top-1 w-4 h-4 rounded-full bg-white transition-all" style={{ left: form.zerar_por_agendamento ? "calc(100% - 20px)" : "4px" }} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Mostrar no site público */}
+              <div className="flex items-center justify-between rounded-2xl px-3 py-2.5" style={{ background: "var(--bg-input)", border: "1px solid var(--border-subtle)" }}>
+                <div className="pr-3">
+                  <p className="text-sm" style={{ color: "var(--text-primary)" }}>Mostrar no site</p>
+                  <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>
+                    Se ligado, aparece na lista de procedimentos do site de agendamento público.
+                  </p>
+                </div>
+                <button type="button" onClick={() => setForm(f => ({ ...f, mostrar_no_site: !f.mostrar_no_site }))}
+                  className="relative w-11 h-6 rounded-full transition-colors flex-shrink-0"
+                  style={{ background: form.mostrar_no_site ? "#7ae8a0" : "var(--border-color)" }}>
+                  <div className="absolute top-1 w-4 h-4 rounded-full bg-white transition-all" style={{ left: form.mostrar_no_site ? "calc(100% - 20px)" : "4px" }} />
+                </button>
               </div>
               <div>
                 <label className="text-xs uppercase tracking-widest block mb-3" style={{ color: "var(--text-secondary)" }}>Cor no calendário</label>

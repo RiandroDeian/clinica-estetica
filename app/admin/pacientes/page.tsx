@@ -14,6 +14,7 @@ type Paciente = {
   contraindicacoes?: string;
   observacoes?: string;
   assinou_termo: boolean;
+  termos_observacao?: string;
   criado_em: string;
   endereco?: string;
   bairro?: string;
@@ -91,7 +92,7 @@ export default function PacientesPage() {
   const [form, setForm] = useState({
     nome: "", telefone: "", email: "", cpf: "", sexo: "",
     data_nascimento: "", alergias: "", contraindicacoes: "",
-    observacoes: "", assinou_termo: false,
+    observacoes: "", assinou_termo: false, termos_observacao: "",
     endereco: "", bairro: "", cidade: "", cep: "",
     contato_emergencia_nome: "", contato_emergencia_telefone: "", contato_emergencia_parentesco: "",
   });
@@ -145,7 +146,7 @@ export default function PacientesPage() {
 
   function abrirNovo() {
     setEditando(null);
-    setForm({ nome:"", telefone:"", email:"", cpf:"", sexo:"", data_nascimento:"", alergias:"", contraindicacoes:"", observacoes:"", assinou_termo: false, endereco:"", bairro:"", cidade:"", cep:"", contato_emergencia_nome:"", contato_emergencia_telefone:"", contato_emergencia_parentesco:"" });
+    setForm({ nome:"", telefone:"", email:"", cpf:"", sexo:"", data_nascimento:"", alergias:"", contraindicacoes:"", observacoes:"", assinou_termo: false, termos_observacao: "", endereco:"", bairro:"", cidade:"", cep:"", contato_emergencia_nome:"", contato_emergencia_telefone:"", contato_emergencia_parentesco:"" });
     setModalAberto(true);
   }
 
@@ -157,6 +158,7 @@ export default function PacientesPage() {
       cpf: p.cpf ?? "", sexo: p.sexo ?? "", data_nascimento: p.data_nascimento ?? "",
       alergias: p.alergias ?? "", contraindicacoes: p.contraindicacoes ?? "",
       observacoes: p.observacoes ?? "", assinou_termo: p.assinou_termo,
+      termos_observacao: p.termos_observacao ?? "",
       endereco: (p as any).endereco ?? "", bairro: (p as any).bairro ?? "",
       cidade: (p as any).cidade ?? "", cep: (p as any).cep ?? "",
       contato_emergencia_nome: (p as any).contato_emergencia_nome ?? "",
@@ -437,6 +439,11 @@ export default function PacientesPage() {
                 {painelPaciente.assinou_termo ? "✓ Assinado" : "Pendente"}
               </span>
             </div>
+            {painelPaciente.termos_observacao && (
+              <p className="text-xs mt-2 px-1" style={{ color: "var(--text-muted)" }}>
+                📄 {painelPaciente.termos_observacao}
+              </p>
+            )}
           </div>
 
           {/* Ações */}
@@ -546,6 +553,13 @@ export default function PacientesPage() {
                   {form.assinou_termo && <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4" stroke="#0f0b0b" strokeWidth={2.5}><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                 </button>
                 <span className="text-sm" style={{ color: "var(--text-secondary)" }}>Assinou o termo de consentimento</span>
+              </div>
+              <div className="sm:col-span-2">
+                <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-muted)" }}>Observação dos termos <span style={{ textTransform: "none" }}>(opcional)</span></label>
+                <textarea value={form.termos_observacao} onChange={e => setForm(f => ({ ...f, termos_observacao: e.target.value }))}
+                  rows={2} placeholder="Ex.: assinou consentimento e imagem; falta o de anestésico"
+                  className="w-full rounded-2xl px-4 py-3 text-sm outline-none resize-none"
+                  style={{ background: "var(--bg-input)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
               </div>
             </div>
             <div className="flex gap-3 mt-6">

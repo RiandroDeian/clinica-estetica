@@ -94,7 +94,7 @@ export async function GET() {
 
   const { data: ags, error } = await supabaseAdmin
     .from("agendamentos")
-    .select("id, inicio, status, paciente_id, pacientes(nome, telefone), procedimentos(nome, alertas_contato)")
+    .select("id, inicio, status, paciente_id, procedimento_id, pacientes(nome, telefone), procedimentos(nome, alertas_contato, zerar_por_agendamento)")
     .gte("inicio", desde.toISOString())
     .lt("inicio", agora.toISOString())
     .order("inicio", { ascending: false });
@@ -106,31 +106,39 @@ export async function GET() {
     (a: any) => a.status !== "cancelado" && a.paciente_id,
   );
 
-  // ✅ Só o ATENDIMENTO MAIS RECENTE de cada paciente conta para o contato
-  // (zera o ciclo a cada atendimento). `ags` já vem do mais novo para o mais antigo.
-  const ultimoPorPaciente = new Map<string, any>();
+  // ✅ Agrupa por (paciente, procedimento). `ags` já vem do mais novo para o mais antigo.
+  // Procedimento com "zerar" ligado → só o atendimento mais recente daquele
+  // procedimento conta (recomeça o ciclo). Assim o alerta do botox NÃO some
+  // quando o paciente vem fazer outra coisa (capilar), pois são grupos diferentes.
+  const grupos = new Map<string, any[]>();
   for (const a of atendidos) {
-    if (!ultimoPorPaciente.has(a.paciente_id)) ultimoPorPaciente.set(a.paciente_id, a);
+    const key = `${a.paciente_id}:${a.procedimento_id ?? "sem"}`;
+    const arr = grupos.get(key);
+    if (arr) arr.push(a); else grupos.set(key, [a]);
   }
 
-  // Follow-ups pós-atendimento (24h / 48h / feedback 72h / 7 dias), respeitando
-  // os alertas configurados no procedimento (depilação a laser fica sem nenhum).
   const posAtendimento: Item[] = [];
-  for (const a of ultimoPorPaciente.values()) {
-    const habilitados = alertasContatoDe(a.procedimentos?.alertas_contato);
-    const regra = regraDevida(new Date(a.inicio), agora, habilitados);
-    if (!regra) continue;
-    posAtendimento.push({
-      agendamento_id: a.id,
-      paciente_id:    a.paciente_id,
-      paciente_nome:  a.pacientes?.nome ?? "",
-      telefone:       a.pacientes?.telefone ?? "",
-      procedimento:   a.procedimentos?.nome ?? null,
-      atendido_em:    a.inicio,
-      tipo:           regra.tipo,
-      label:          regra.label,
-      icone:          regra.icone,
-    });
+  for (const lista of grupos.values()) {
+    const proc = lista[0].procedimentos;
+    const habilitados = alertasContatoDe(proc?.alertas_contato);
+    const zera = proc?.zerar_por_agendamento ?? true;
+    const considerados = zera ? [lista[0]] : lista;   // lista[0] = mais recente
+    for (const a of considerados) {
+      const regra = regraDevida(new Date(a.inicio), agora, habilitados);
+      if (!regra) continue;
+      const nomeProc = a.procedimentos?.nome ?? null;
+      posAtendimento.push({
+        agendamento_id: a.id,
+        paciente_id:    a.paciente_id,
+        paciente_nome:  a.pacientes?.nome ?? "",
+        telefone:       a.pacientes?.telefone ?? "",
+        procedimento:   nomeProc,
+        atendido_em:    a.inicio,
+        tipo:           regra.tipo,
+        label:          regra.label + (nomeProc ? ` · ${nomeProc}` : ""),
+        icone:          regra.icone,
+      });
+    }
   }
 
   // Retornos configurados por procedimento (botox 3/6 meses, etc.)

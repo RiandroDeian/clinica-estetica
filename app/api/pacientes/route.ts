@@ -32,6 +32,7 @@ export async function POST(request: NextRequest) {
       contraindicacoes: body.contraindicacoes || null,
       observacoes: body.observacoes || null,
       assinou_termo: body.assinou_termo ?? false,
+      termos_observacao: body.termos_observacao || null,
       endereco: body.endereco || null,
       bairro: body.bairro || null,
       cidade: body.cidade || null,
