@@ -4,7 +4,16 @@ import { useState, useEffect } from "react";
 
 type Procedimento = { id: string; nome: string; duracao_minutos: number; preco?: number };
 
-const HORARIOS = ["08:00","09:00","10:00","11:00","13:00","14:00","15:00","16:00","17:00","18:00","19:00"];
+const HORARIOS = ["09:00","10:00","11:00","13:00","14:00","15:00","16:00","17:00","18:00"];
+
+// Horário já passou (só relevante para agendamentos no dia de hoje)
+function horarioPassou(data: string, h: string) {
+  const agora = new Date();
+  if (new Date(data + "T00:00:00").toDateString() !== agora.toDateString()) return false;
+  const [hh, mm] = h.split(":").map(Number);
+  const slot = new Date(); slot.setHours(hh, mm, 0, 0);
+  return slot <= agora;
+}
 
 function formatarTelefone(v: string) {
   const n = v.replace(/\D/g, "").slice(0, 11);
@@ -191,7 +200,7 @@ export default function AgendarPage() {
               <option value="" style={{ color: "#4a3a32" }}>Escolha um procedimento</option>
               {procedimentos.map(p => (
                 <option key={p.id} value={p.nome} style={{ color: "white", background: "#120d0d" }}>
-                  {p.nome}{p.duracao_minutos ? ` (${p.duracao_minutos} min)` : ""}{p.preco ? ` — R$ ${p.preco.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : ""}
+                  {p.nome}{p.preco ? ` — R$ ${p.preco.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : ""}
                 </option>
               ))}
             </select>
@@ -215,8 +224,11 @@ export default function AgendarPage() {
           {form.data && !isDomingo(form.data) && (
             <div>
               <label className="block text-xs uppercase tracking-widest mb-3" style={{ color: "#6b5a4e" }}>Horário</label>
+              {HORARIOS.filter(h => !horarioPassou(form.data, h)).length === 0 ? (
+                <p className="text-sm" style={{ color: "#e87a7a" }}>Não há mais horários disponíveis hoje. Escolha outro dia.</p>
+              ) : (
               <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-                {HORARIOS.map(h => {
+                {HORARIOS.filter(h => !horarioPassou(form.data, h)).map(h => {
                   const ocupado = horariosOcupados.includes(h);
                   return (
                     <button key={h} type="button" disabled={ocupado} onClick={() => setForm(f => ({ ...f, horario: h }))}
@@ -231,6 +243,7 @@ export default function AgendarPage() {
                   );
                 })}
               </div>
+              )}
             </div>
           )}
 
