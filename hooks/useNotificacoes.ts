@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 
 export type Notificacao = {
@@ -15,6 +15,16 @@ export type Notificacao = {
 export function useNotificacoes() {
   const [notificacoes, setNotificacoes] = useState<Notificacao[]>([]);
   const [naoLidas, setNaoLidas] = useState(0);
+  // Para o alerta "paciente liberado": id do usuário logado + dedupe
+  const meuIdRef = useRef<string | null>(null);
+  const liberadosNotificados = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { meuIdRef.current = d?.id ?? null; })
+      .catch(() => {});
+  }, []);
 
   const adicionar = useCallback((nova: Omit<Notificacao, "id" | "lida" | "criado_em">) => {
     const notif: Notificacao = {
@@ -65,6 +75,15 @@ export function useNotificacoes() {
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "agendamentos" },
         (payload: any) => {
           const novo = payload.new;
+          // #6 — paciente liberado pela recepção: avisa só o profissional agendado
+          if (novo.liberado && novo.funcionario_id && novo.funcionario_id === meuIdRef.current) {
+            if (!liberadosNotificados.current.has(novo.id)) {
+              liberadosNotificados.current.add(novo.id);
+              adicionar({ tipo: "recepcao", titulo: "🔔 Paciente liberado", mensagem: "Um paciente foi liberado para você chamar ao consultório." });
+            }
+          } else if (!novo.liberado) {
+            liberadosNotificados.current.delete(novo.id);
+          }
           if (novo.status === "confirmado") {
             adicionar({ tipo: "recepcao", titulo: "Paciente em Atendimento", mensagem: "Um paciente iniciou o atendimento." });
           } else if (novo.status === "finalizado") {

@@ -27,10 +27,12 @@ export async function GET() {
 export async function PUT(request: NextRequest) {
   const sessao = await getSessao();
   if (!sessao) return NextResponse.json({ erro: "Nao autorizado" }, { status: 401 });
-  const { id, status, chegou_em, consultorio } = await request.json();
+  const { id, ...campos } = await request.json();
+  if (!id) return NextResponse.json({ erro: "id obrigatorio" }, { status: 400 });
+  // Atualiza apenas os campos enviados (status, chegou_em, consultorio, liberado, liberado_em)
   const { data, error } = await supabaseAdmin
     .from("agendamentos")
-    .update({ status, chegou_em, consultorio })
+    .update(campos)
     .eq("id", id)
     .select()
     .single();

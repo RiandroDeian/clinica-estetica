@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { ModalCadastrarPaciente } from "@/components/agenda/AgendamentoRapidoComponents";
 
 type Paciente = {
   id: string;
@@ -19,8 +20,12 @@ type Agendamento = {
   status: string;
   chegou_em?: string;
   consultorio?: string;
+  liberado?: boolean;
+  liberado_em?: string;
   nome?: string | null;
   nome_temporario?: string | null;
+  telefone_temporario?: string | null;
+  funcionario_id?: string | null;
   procedimento?: string | null;
   sem_cadastro?: boolean;
   paciente_id?: string | null;
@@ -74,6 +79,7 @@ export default function RecepcaoPage() {
   const [carregandoPaciente, setCarregandoPaciente] = useState(false);
   const [abaAtiva, setAbaAtiva] = useState<"fila"|"fila_espera"|"confirmacoes"|"faltantes"|"atrasos">("fila");
   const [abaPainel, setAbaPainel] = useState<"detalhes"|"historico">("detalhes");
+  const [modalCadastro, setModalCadastro] = useState<Agendamento | null>(null);
 
   const buscar = useCallback(async () => {
     const res = await fetch("/api/recepcao");
@@ -214,7 +220,16 @@ export default function RecepcaoPage() {
             </p>
           </div>
         </div>
-        <div className="mt-4 flex gap-2 flex-wrap" onClick={e => e.stopPropagation()}>
+        <div className="mt-4 flex gap-2 flex-wrap items-center" onClick={e => e.stopPropagation()}>
+          {/* #4 — cadastrar quem veio sem cadastro */}
+          {semCadastro && (
+            <button onClick={() => setModalCadastro(ag)}
+              className="px-3 py-1.5 rounded-xl text-xs font-medium transition hover:scale-105"
+              style={{ background: "rgba(251,191,36,0.12)", color: "#fbbf24", border: "1px solid rgba(251,191,36,0.3)" }}>
+              📝 Cadastrar
+            </button>
+          )}
+
           {ag.status === "pendente" && !ag.chegou_em && (
             <>
               <button onClick={() => atualizarStatus(ag.id, "pendente", { chegou_em: new Date().toISOString() })}
@@ -229,15 +244,38 @@ export default function RecepcaoPage() {
               </button>
             </>
           )}
-          {ag.status === "pendente" && ag.chegou_em && (
-            consultorios.map(c => (
-              <button key={c} onClick={() => atualizarStatus(ag.id, "confirmado", { consultorio: c })}
-                className="px-3 py-1.5 rounded-xl text-xs transition hover:scale-105"
-                style={{ background: "rgba(122,232,160,0.1)", color: "#7ae8a0", border: "1px solid rgba(122,232,160,0.3)" }}>
-                {c.replace("Consultório ", "S")}
+
+          {/* #5/#6 — depois de chegar, recepção libera o paciente para o profissional chamar */}
+          {ag.status === "pendente" && ag.chegou_em && !ag.liberado && (
+            <>
+              <button onClick={() => atualizarStatus(ag.id, "pendente", { liberado: true, liberado_em: new Date().toISOString() })}
+                className="px-3 py-1.5 rounded-xl text-xs font-semibold transition hover:scale-105"
+                style={{ background: "rgba(122,184,232,0.15)", color: "#7ab8e8", border: "1px solid rgba(122,184,232,0.35)" }}>
+                🔔 Liberar (chamar)
               </button>
-            ))
+              <button onClick={() => atualizarStatus(ag.id, "cancelado")}
+                className="px-3 py-1.5 rounded-xl text-xs transition hover:opacity-70"
+                style={{ background: "rgba(232,122,122,0.08)", color: "var(--danger)", border: "1px solid rgba(232,122,122,0.2)" }}>
+                Cancelar
+              </button>
+            </>
           )}
+
+          {/* Liberado: profissional escolhe o consultório (vira Em Atendimento) */}
+          {ag.status === "pendente" && ag.chegou_em && ag.liberado && (
+            <>
+              <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold" style={{ background: "rgba(122,184,232,0.15)", color: "#7ab8e8" }}>🔔 Liberado</span>
+              <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>Consultório:</span>
+              {consultorios.map(c => (
+                <button key={c} onClick={() => atualizarStatus(ag.id, "confirmado", { consultorio: c })}
+                  className="px-3 py-1.5 rounded-xl text-xs transition hover:scale-105"
+                  style={{ background: "rgba(122,232,160,0.1)", color: "#7ae8a0", border: "1px solid rgba(122,232,160,0.3)" }}>
+                  {c.replace("Consultório ", "S")}
+                </button>
+              ))}
+            </>
+          )}
+
           {ag.status === "confirmado" && (
             <button onClick={() => atualizarStatus(ag.id, "finalizado")}
               className="px-4 py-1.5 rounded-xl text-xs font-semibold transition hover:scale-105"
@@ -681,6 +719,15 @@ export default function RecepcaoPage() {
             )}
           </div>
         </div>
+      )}
+
+      {/* #4 — Cadastrar paciente que veio sem cadastro */}
+      {modalCadastro && (
+        <ModalCadastrarPaciente
+          agendamento={{ id: modalCadastro.id, nome_temporario: modalCadastro.nome_temporario ?? modalCadastro.nome, telefone_temporario: modalCadastro.telefone_temporario }}
+          onClose={() => setModalCadastro(null)}
+          onSuccess={() => { setModalCadastro(null); buscar(); }}
+        />
       )}
     </div>
   );

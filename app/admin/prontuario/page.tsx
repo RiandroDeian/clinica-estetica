@@ -393,6 +393,14 @@ export default function ProntuarioPage() {
         </div>
       </div>
 
+      {/* #6 — paciente liberado pela recepção */}
+      {agendamentos.some((a: any) => a.liberado && a.status !== "finalizado" && a.status !== "cancelado" && new Date(a.inicio).toDateString() === new Date().toDateString()) && (
+        <div className="mb-5 rounded-2xl px-4 py-3 flex items-center gap-2 text-sm font-semibold"
+          style={{ background: "rgba(122,184,232,0.12)", color: "#7ab8e8", border: "1px solid rgba(122,184,232,0.35)" }}>
+          🔔 Paciente liberado para atendimento — pode chamar ao consultório.
+        </div>
+      )}
+
       <div className="flex gap-1 mb-5 p-1 rounded-2xl overflow-x-auto"
         style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
         {abas.map(aba => (
