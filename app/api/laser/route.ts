@@ -55,6 +55,21 @@ export async function GET(request: NextRequest) {
     lista = lista.map((p: any) => ({ ...p, proximo_agendamento: proximo[p.paciente_id] ?? null }));
   }
 
+  // ✅ Anexa a data da ÚLTIMA SESSÃO realizada de cada pacote (atualiza sozinho ao registrar sessão)
+  const pacoteIds = lista.map((p: any) => p.id).filter(Boolean);
+  if (pacoteIds.length) {
+    const { data: sessoes } = await supabaseAdmin
+      .from("laser_sessoes")
+      .select("pacote_id, realizada_em")
+      .in("pacote_id", pacoteIds as string[])
+      .order("realizada_em", { ascending: false });
+    const ultima: Record<string, string> = {};
+    for (const s of sessoes ?? []) {
+      if (s.realizada_em && !ultima[s.pacote_id]) ultima[s.pacote_id] = s.realizada_em;
+    }
+    lista = lista.map((p: any) => ({ ...p, ultima_sessao: ultima[p.id] ?? null }));
+  }
+
   const totalPacientes = lista.length;
   const pacotesAtivos  = lista.filter((p: any) => p.status === "em_tratamento").length;
   const sessoesMes     = lista.reduce((s: number, p: any) => s + (p.sessoes_feitas ?? 0), 0);

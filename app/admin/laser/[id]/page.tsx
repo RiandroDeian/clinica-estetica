@@ -214,6 +214,13 @@ export default function LaserDetalhePage() {
 
   const pc = pagCfg[pacote.status_pagamento] ?? pagCfg.pendente;
   const fc = formaCfg[pacote.forma_pagamento ?? ""] ?? null;
+
+  // Data da última sessão realizada (a mais recente entre as sessões)
+  const ultimaSessaoData = sessoes
+    .map(s => s.realizada_em)
+    .filter(Boolean)
+    .sort()
+    .pop();
   const eBoleto = pacote.forma_pagamento === "boleto";
 
   const fotosAntes = fotos.filter(f => f.tipo === "antes");
@@ -346,6 +353,7 @@ export default function LaserDetalhePage() {
               { label: "Início do Pagamento", valor: pacote.data_inicio ? new Date(pacote.data_inicio + "T12:00:00").toLocaleDateString("pt-BR") : "—", color: "#e87a7a" },
               { label: "Último Pagamento",    valor: pacote.data_acerto ? new Date(pacote.data_acerto + "T12:00:00").toLocaleDateString("pt-BR") : "—", color: "#e87a7a" },
             ] : []),
+            { label: "Última sessão",   valor: ultimaSessaoData ? new Date(ultimaSessaoData).toLocaleDateString("pt-BR") : "—" },
             { label: "Cadastrado em",   valor: new Date(pacote.criado_em).toLocaleDateString("pt-BR") },
           ].map(item => (
             <div key={item.label} className="rounded-2xl px-4 py-3"

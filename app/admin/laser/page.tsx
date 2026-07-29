@@ -25,6 +25,7 @@ type Pacote = {
   contatado?: boolean;
   contato_em?: string | null;
   proximo_agendamento?: string | null;
+  ultima_sessao?: string | null;
   pacientes?: { nome: string; telefone: string; cpf?: string };
   funcionarios?: { nome: string; cor: string };
 };
@@ -369,7 +370,7 @@ export default function LaserPage() {
             <table className="w-full">
               <thead>
                 <tr style={{ borderBottom: "1px solid var(--border-subtle)" }}>
-                  {["Paciente", "Áreas", "Categoria", "Forma Pag.", "Status Pag.", "Acerto", "Contrato", "Contato", "Sessões", "Status", "Profissional", ""].map(h => (
+                  {["Paciente", "Áreas", "Categoria", "Forma Pag.", "Status Pag.", "Acerto", "Contrato", "Contato", "Última sessão", "Sessões", "Status", "Profissional", ""].map(h => (
                     <th key={h} className="text-left px-4 py-4 text-xs uppercase tracking-widest" style={{ color: "var(--text-muted)" }}>{h}</th>
                   ))}
                 </tr>
@@ -498,6 +499,13 @@ export default function LaserPage() {
                             </div>
                           );
                         })()}
+                      </td>
+
+                      {/* ✅ Última sessão realizada */}
+                      <td className="px-4 py-4 text-xs" style={{ color: "var(--text-muted)" }}>
+                        {p.ultima_sessao
+                          ? new Date(p.ultima_sessao).toLocaleDateString("pt-BR")
+                          : <span style={{ color: "var(--text-muted)" }}>—</span>}
                       </td>
 
                       <td className="px-4 py-4" style={{ minWidth: 120 }}>
