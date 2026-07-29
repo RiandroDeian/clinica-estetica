@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getSessao } from "@/lib/auth";
+import { repasseECusto } from "@/lib/financeiro";
 
 export async function GET(request: NextRequest) {
   try {
@@ -149,6 +150,9 @@ export async function POST(request: NextRequest) {
     const forma_pagamento =
       formas.length > 1 ? "multiplas" : formas.length === 1 ? formas[0].forma : (body.forma_pagamento || "pix");
 
+    // Repasse ao profissional e custo de material (retrato do procedimento)
+    const { repasse_valor, custo_total } = await repasseECusto(body.procedimento_id, valorFinal);
+
     const { data, error } = await supabaseAdmin
       .from("faturamentos")
       .insert({
@@ -160,6 +164,8 @@ export async function POST(request: NextRequest) {
         valor,
         desconto: 0,
         valor_final: valorFinal,
+        repasse_valor,
+        custo_total,
 
         forma_pagamento,
         formas_pagamento: formas.length ? formas : null,

@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
+import { toast } from "sonner";
 
 type Registro = {
   id: string;
@@ -12,6 +13,9 @@ type Registro = {
   status_pagamento: string;
   observacoes?: string;
   criado_em: string;
+  funcionario_id?: string | null;
+  repasse_valor?: number;
+  custo_total?: number;
   pacientes?: { nome: string };
   procedimentos?: { nome: string; cor: string };
   funcionarios?: { nome: string };
@@ -102,6 +106,9 @@ export default function FaturamentoPage() {
   const [excluindo, setExcluindo] = useState<string | null>(null);
   const [buscaAgendamento, setBuscaAgendamento] = useState("");
   const [form, setForm] = useState(formInicial);
+  const [abaFin, setAbaFin] = useState<"recepcao" | "consultorio">("recepcao");
+  const [meuId, setMeuId] = useState<string | null>(null);
+  const [consForm, setConsForm] = useState({ paciente_id: "", procedimento_id: "" });
 
   const buscar = useCallback(async () => {
     setCarregando(true);
@@ -129,7 +136,30 @@ export default function FaturamentoPage() {
     fetch("/api/funcionarios").then(r => r.json()).then(d => setFuncionarios(Array.isArray(d) ? d : []));
     fetch("/api/pacientes").then(r => r.json()).then(d => setPacientes(Array.isArray(d) ? d : []));
     fetch("/api/procedimentos").then(r => r.json()).then(d => setProcedimentos(Array.isArray(d) ? d : []));
+    fetch("/api/auth/me").then(r => r.ok ? r.json() : null).then(d => setMeuId(d?.id ?? null)).catch(() => {});
   }, []);
+
+  // Meu consultório: o profissional lança o atendimento (fica pendente para a recepção finalizar)
+  async function lancarConsultorio() {
+    const proc = procedimentos.find(p => p.id === consForm.procedimento_id);
+    if (!consForm.paciente_id || !consForm.procedimento_id) return;
+    setSalvando(true);
+    await fetch("/api/faturamento", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        paciente_id: consForm.paciente_id,
+        procedimento_id: consForm.procedimento_id,
+        funcionario_id: meuId,
+        valor: proc?.preco ?? 0,
+        status_pagamento: "pendente",
+      }),
+    });
+    setConsForm({ paciente_id: "", procedimento_id: "" });
+    buscar();
+    setSalvando(false);
+    toast.success("Atendimento lançado — a recepção vai finalizar o pagamento.");
+  }
 
   // Helpers das formas de pagamento (split)
   function setFormaLinha(i: number, campo: "forma" | "valor", v: string) {
@@ -255,13 +285,34 @@ export default function FaturamentoPage() {
           <h1 className="text-3xl font-bold" style={{ color: "var(--text-primary)" }}>Faturamento</h1>
           <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>Controle total de pagamentos da clínica</p>
         </div>
-        <button onClick={abrirNovo}
-          className="px-6 py-3 rounded-2xl text-sm font-semibold uppercase tracking-widest transition hover:scale-105"
-          style={{ background: "var(--gold)", color: "#0a0707" }}>
-          + Registrar Pagamento
-        </button>
+        {abaFin === "recepcao" && (
+          <button onClick={abrirNovo}
+            className="px-6 py-3 rounded-2xl text-sm font-semibold uppercase tracking-widest transition hover:scale-105"
+            style={{ background: "var(--gold)", color: "#0a0707" }}>
+            + Registrar Pagamento
+          </button>
+        )}
       </div>
 
+      {/* Abas do Financeiro */}
+      <div className="flex gap-2 mb-6 flex-wrap">
+        {([
+          { key: "recepcao",   label: "🏥 Recepção" },
+          { key: "consultorio",label: "👩‍⚕️ Meu consultório" },
+        ] as const).map(a => (
+          <button key={a.key} onClick={() => setAbaFin(a.key)}
+            className="px-4 py-2 rounded-2xl text-sm font-medium transition"
+            style={{
+              background: abaFin === a.key ? "var(--gold-bg)" : "var(--bg-card)",
+              color: abaFin === a.key ? "var(--gold)" : "var(--text-muted)",
+              border: `1px solid ${abaFin === a.key ? "var(--border-color)" : "var(--border-subtle)"}`,
+            }}>
+            {a.label}
+          </button>
+        ))}
+      </div>
+
+      {abaFin === "recepcao" && (<>
       {/* Filtro período */}
       <div className="flex gap-2 flex-wrap mb-4">
         {periodos.map(p => (
@@ -468,6 +519,75 @@ export default function FaturamentoPage() {
           </div>
         )}
       </div>
+      </>)}
+
+      {/* Aba: Meu consultório — profissional lança o atendimento */}
+      {abaFin === "consultorio" && (
+        <div className="max-w-xl">
+          <div className="rounded-3xl p-6 mb-6" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+            <p className="text-sm font-semibold mb-1" style={{ color: "var(--text-primary)" }}>Lançar atendimento</p>
+            <p className="text-xs mb-4" style={{ color: "var(--text-muted)" }}>
+              Registre o que foi feito no consultório. Vai para a recepção como <strong>pendente</strong>, e lá ela define a forma de pagamento e finaliza.
+            </p>
+            <div className="flex flex-col gap-4">
+              <div>
+                <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>Paciente</label>
+                <select value={consForm.paciente_id} onChange={e => setConsForm(f => ({ ...f, paciente_id: e.target.value }))}
+                  className={inp} style={{ ...inpStyle, color: consForm.paciente_id ? "var(--text-primary)" : "var(--text-muted)" }}>
+                  <option value="">Selecionar paciente</option>
+                  {pacientes.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>Procedimento</label>
+                <select value={consForm.procedimento_id} onChange={e => setConsForm(f => ({ ...f, procedimento_id: e.target.value }))}
+                  className={inp} style={{ ...inpStyle, color: consForm.procedimento_id ? "var(--text-primary)" : "var(--text-muted)" }}>
+                  <option value="">Selecionar procedimento</option>
+                  {procedimentos.map(p => <option key={p.id} value={p.id}>{p.nome}{p.preco ? ` — R$ ${p.preco}` : ""}</option>)}
+                </select>
+              </div>
+              {(() => {
+                const proc = procedimentos.find(p => p.id === consForm.procedimento_id);
+                if (!proc) return null;
+                const preco = Number(proc.preco) || 0;
+                const repasse = preco * (Number((proc as any).repasse_percentual) || 0) / 100;
+                return (
+                  <div className="rounded-2xl px-4 py-3 flex items-center justify-between" style={{ background: "var(--gold-bg)", border: "1px solid var(--border-color)" }}>
+                    <span className="text-sm" style={{ color: "var(--text-secondary)" }}>Valor · seu repasse</span>
+                    <span className="text-sm font-semibold" style={{ color: "var(--gold)" }}>
+                      R$ {preco.toFixed(2)} · <span style={{ color: "#c87ae8" }}>R$ {repasse.toFixed(2)}</span>
+                    </span>
+                  </div>
+                );
+              })()}
+              <button onClick={lancarConsultorio} disabled={salvando || !consForm.paciente_id || !consForm.procedimento_id}
+                className="w-full py-3 rounded-2xl text-sm font-semibold transition hover:scale-105"
+                style={{ background: "var(--gold)", color: "#0a0707", opacity: salvando || !consForm.paciente_id || !consForm.procedimento_id ? 0.5 : 1 }}>
+                {salvando ? "Lançando..." : "Lançar atendimento"}
+              </button>
+            </div>
+          </div>
+
+          {/* Meus lançamentos recentes */}
+          <p className="text-xs uppercase tracking-widest mb-3" style={{ color: "var(--gold)" }}>Meus lançamentos ({registros.filter(r => r.funcionario_id === meuId).length})</p>
+          <div className="flex flex-col gap-2">
+            {registros.filter(r => r.funcionario_id === meuId).length === 0 ? (
+              <p className="text-sm" style={{ color: "var(--text-muted)" }}>Nenhum lançamento seu no período.</p>
+            ) : registros.filter(r => r.funcionario_id === meuId).map(r => {
+              const st = statusPag.find(s => s.key === r.status_pagamento);
+              return (
+                <div key={r.id} className="rounded-2xl px-4 py-3 flex items-center justify-between" style={{ background: "var(--bg-card)", border: "1px solid var(--border-subtle)" }}>
+                  <div>
+                    <p className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>{r.pacientes?.nome ?? "—"} · {r.procedimentos?.nome ?? "—"}</p>
+                    <p className="text-xs" style={{ color: "var(--text-muted)" }}>{new Date(r.criado_em).toLocaleDateString("pt-BR")} · repasse R$ {Number(r.repasse_valor ?? 0).toFixed(2)}</p>
+                  </div>
+                  <span className="text-xs px-2 py-1 rounded-full font-medium" style={{ color: st?.color, background: st?.bg }}>{st?.label}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* MODAL */}
       {modalAberto && (

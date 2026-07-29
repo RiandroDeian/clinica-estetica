@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getSessao } from "@/lib/auth";
+import { repasseECusto } from "@/lib/financeiro";
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const sessao = await getSessao();
@@ -12,7 +13,17 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   const update: Record<string, unknown> = { ...body };
   // Só recalcula o total quando o valor é enviado (ex.: "Confirmar" manda só o status)
   if (body.valor !== undefined) {
-    update.valor_final = Number(body.valor) - Number(body.desconto ?? 0);
+    const valorFinal = Number(body.valor) - Number(body.desconto ?? 0);
+    update.valor_final = valorFinal;
+    // Recalcula o repasse/custo com o novo valor (usa o procedimento do body ou o já gravado)
+    let procId = body.procedimento_id;
+    if (!procId) {
+      const { data: atual } = await supabaseAdmin.from("faturamentos").select("procedimento_id").eq("id", id).single();
+      procId = atual?.procedimento_id ?? null;
+    }
+    const { repasse_valor, custo_total } = await repasseECusto(procId, valorFinal);
+    update.repasse_valor = repasse_valor;
+    update.custo_total = custo_total;
   }
 
   const { data, error } = await supabaseAdmin
