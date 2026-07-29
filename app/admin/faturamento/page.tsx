@@ -17,7 +17,18 @@ type Registro = {
   repasse_valor?: number;
   custo_total?: number;
   pacientes?: { nome: string };
-  procedimentos?: { nome: string; cor: string };
+  procedimentos?: { nome: string; cor: string; custo_materiais?: { material: string; quantidade: number; valor: number }[] | null };
+  funcionarios?: { nome: string };
+};
+
+type Custo = {
+  id: string;
+  descricao: string;
+  categoria?: string;
+  valor: number;
+  data: string;
+  observacoes?: string;
+  criado_em: string;
   funcionarios?: { nome: string };
 };
 
@@ -106,27 +117,52 @@ export default function FaturamentoPage() {
   const [excluindo, setExcluindo] = useState<string | null>(null);
   const [buscaAgendamento, setBuscaAgendamento] = useState("");
   const [form, setForm] = useState(formInicial);
-  const [abaFin, setAbaFin] = useState<"recepcao" | "consultorio">("recepcao");
+  const [abaFin, setAbaFin] = useState<"recepcao" | "consultorio" | "custos" | "extrato">("recepcao");
   const [meuId, setMeuId] = useState<string | null>(null);
   const [consForm, setConsForm] = useState({ paciente_id: "", procedimento_id: "" });
+  const [custos, setCustos] = useState<Custo[]>([]);
+  const [custoForm, setCustoForm] = useState({ descricao: "", categoria: "Material", valor: "", data: new Date().toISOString().slice(0, 10) });
+  const [extDetalhado, setExtDetalhado] = useState(false);
+  const [extFiltro, setExtFiltro] = useState<"tudo" | "entradas" | "custos" | "repasses">("tudo");
 
   const buscar = useCallback(async () => {
     setCarregando(true);
-    let url = "/api/faturamento?";
+    let qs = "";
     if (periodo !== "custom") {
       const p = getPeriodo(periodo);
-      if (p) url += `inicio=${p.inicio}&fim=${p.fim}`;
-    } else {
-      if (customInicio && customFim) {
-        url += `inicio=${new Date(customInicio).toISOString()}&fim=${new Date(customFim + "T23:59:59").toISOString()}`;
-      }
+      if (p) qs = `inicio=${p.inicio}&fim=${p.fim}`;
+    } else if (customInicio && customFim) {
+      qs = `inicio=${new Date(customInicio).toISOString()}&fim=${new Date(customFim + "T23:59:59").toISOString()}`;
     }
-    const res = await fetch(url);
-    const data = await res.json();
+    const [rF, rC] = await Promise.all([
+      fetch(`/api/faturamento?${qs}`),
+      fetch(`/api/custos?${qs}`),
+    ]);
+    const data = await rF.json();
+    const dc = await rC.json();
     setRegistros(data.registros ?? []);
     setResumo(data.resumo ?? null);
+    setCustos(Array.isArray(dc) ? dc : []);
     setCarregando(false);
   }, [periodo, customInicio, customFim]);
+
+  async function lancarCusto() {
+    if (!custoForm.descricao.trim() || !(Number(custoForm.valor) > 0)) return;
+    setSalvando(true);
+    await fetch("/api/custos", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(custoForm),
+    });
+    setCustoForm({ descricao: "", categoria: "Material", valor: "", data: new Date().toISOString().slice(0, 10) });
+    buscar();
+    setSalvando(false);
+    toast.success("Custo lançado.");
+  }
+  async function excluirCusto(id: string) {
+    await fetch(`/api/custos?id=${id}`, { method: "DELETE" });
+    buscar();
+  }
 
   useEffect(() => { buscar(); }, [buscar]);
 
@@ -268,6 +304,39 @@ export default function FaturamentoPage() {
 
   const valorFinal = useMemo(() => form.formas_pagamento.reduce((s, l) => s + Number(l.valor || 0), 0), [form.formas_pagamento]);
 
+  const fmt = (v: number) => "R$ " + Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 });
+
+  // Extrato: junta entradas (pagamentos pagos) e saídas (material, repasse, custos avulsos)
+  const extrato = useMemo(() => {
+    const pagos = registros.filter(r => r.status_pagamento === "pago");
+    const totalEntrou = pagos.reduce((s, r) => s + Number(r.valor_final || 0), 0);
+    const totalCustoMaterial = pagos.reduce((s, r) => s + Number(r.custo_total || 0), 0);
+    const totalRepasse = pagos.reduce((s, r) => s + Number(r.repasse_valor || 0), 0);
+    const totalCustoAvulso = custos.reduce((s, c) => s + Number(c.valor || 0), 0);
+    const custosTotais = totalCustoMaterial + totalCustoAvulso;
+    const fatMenosCustos = totalEntrou - custosTotais;
+    const lucroReal = fatMenosCustos - totalRepasse;
+
+    const movimentos: any[] = [];
+    for (const r of pagos) {
+      const ref = `${r.pacientes?.nome ?? "—"} · ${r.procedimentos?.nome ?? "—"}`;
+      movimentos.push({ id: `${r.id}-e`, data: r.criado_em, tipo: "entrada", titulo: ref, valor: Number(r.valor_final || 0) });
+      if (Number(r.custo_total || 0) > 0) movimentos.push({ id: `${r.id}-c`, data: r.criado_em, tipo: "custo", titulo: `Material · ${ref}`, valor: -Number(r.custo_total || 0), materiais: r.procedimentos?.custo_materiais ?? null });
+      if (Number(r.repasse_valor || 0) > 0) movimentos.push({ id: `${r.id}-r`, data: r.criado_em, tipo: "repasse", titulo: `Repasse · ${r.funcionarios?.nome ?? "profissional"}`, valor: -Number(r.repasse_valor || 0) });
+    }
+    for (const c of custos) {
+      movimentos.push({ id: `avulso-${c.id}`, data: c.data, tipo: "custo", titulo: `${c.descricao}${c.categoria ? ` · ${c.categoria}` : ""}`, valor: -Number(c.valor || 0) });
+    }
+    movimentos.sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
+    return { totalEntrou, totalCustoMaterial, totalRepasse, totalCustoAvulso, custosTotais, fatMenosCustos, lucroReal, movimentos };
+  }, [registros, custos]);
+
+  const movimentosFiltrados = extrato.movimentos.filter(m =>
+    extFiltro === "tudo" ? true :
+    extFiltro === "entradas" ? m.tipo === "entrada" :
+    extFiltro === "repasses" ? m.tipo === "repasse" :
+    m.tipo === "custo");
+
   const agendamentosFiltrados = agendamentos.filter(ag => {
     const txt = buscaAgendamento.toLowerCase();
     return ag.pacientes?.nome?.toLowerCase().includes(txt) || ag.procedimentos?.nome?.toLowerCase().includes(txt);
@@ -299,6 +368,8 @@ export default function FaturamentoPage() {
         {([
           { key: "recepcao",   label: "🏥 Recepção" },
           { key: "consultorio",label: "👩‍⚕️ Meu consultório" },
+          { key: "custos",     label: "💸 Custos" },
+          { key: "extrato",    label: "📄 Extrato" },
         ] as const).map(a => (
           <button key={a.key} onClick={() => setAbaFin(a.key)}
             className="px-4 py-2 rounded-2xl text-sm font-medium transition"
@@ -312,8 +383,8 @@ export default function FaturamentoPage() {
         ))}
       </div>
 
-      {abaFin === "recepcao" && (<>
-      {/* Filtro período */}
+      {/* Filtro período — compartilhado (Recepção, Custos, Extrato) */}
+      {abaFin !== "consultorio" && (<>
       <div className="flex gap-2 flex-wrap mb-4">
         {periodos.map(p => (
           <button key={p.key} onClick={() => setPeriodo(p.key)}
@@ -343,7 +414,9 @@ export default function FaturamentoPage() {
           </div>
         </div>
       )}
+      </>)}
 
+      {abaFin === "recepcao" && (<>
       {/* KPIs */}
       {resumo && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -582,6 +655,127 @@ export default function FaturamentoPage() {
                     <p className="text-xs" style={{ color: "var(--text-muted)" }}>{new Date(r.criado_em).toLocaleDateString("pt-BR")} · repasse R$ {Number(r.repasse_valor ?? 0).toFixed(2)}</p>
                   </div>
                   <span className="text-xs px-2 py-1 rounded-full font-medium" style={{ color: st?.color, background: st?.bg }}>{st?.label}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Aba: Custos avulsos */}
+      {abaFin === "custos" && (
+        <div className="max-w-xl">
+          <div className="rounded-3xl p-6 mb-6" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+            <p className="text-sm font-semibold mb-1" style={{ color: "var(--text-primary)" }}>Lançar custo (saída)</p>
+            <p className="text-xs mb-4" style={{ color: "var(--text-muted)" }}>Ex.: aluguel, conta de luz, compra de material geral.</p>
+            <div className="flex flex-col gap-3">
+              <input type="text" value={custoForm.descricao} onChange={e => setCustoForm(f => ({ ...f, descricao: e.target.value }))}
+                placeholder="Descrição" className={inp} style={inpStyle} />
+              <div className="grid grid-cols-2 gap-3">
+                <select value={custoForm.categoria} onChange={e => setCustoForm(f => ({ ...f, categoria: e.target.value }))}
+                  className={inp} style={{ ...inpStyle, color: "var(--text-primary)" }}>
+                  {["Material","Aluguel","Conta","Salário","Marketing","Equipamento","Imposto","Outro"].map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+                <input type="date" value={custoForm.data} onChange={e => setCustoForm(f => ({ ...f, data: e.target.value }))}
+                  className={inp} style={{ ...inpStyle, colorScheme: "dark" }} />
+              </div>
+              <input type="number" value={custoForm.valor} onChange={e => setCustoForm(f => ({ ...f, valor: e.target.value }))}
+                placeholder="Valor (R$)" className={inp} style={inpStyle} />
+              <button onClick={lancarCusto} disabled={salvando || !custoForm.descricao.trim() || !(Number(custoForm.valor) > 0)}
+                className="w-full py-3 rounded-2xl text-sm font-semibold transition hover:scale-105"
+                style={{ background: "#e87a7a", color: "#0a0707", opacity: salvando || !custoForm.descricao.trim() || !(Number(custoForm.valor) > 0) ? 0.5 : 1 }}>
+                {salvando ? "Lançando..." : "Lançar custo"}
+              </button>
+            </div>
+          </div>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs uppercase tracking-widest" style={{ color: "var(--gold)" }}>Custos do período ({custos.length})</p>
+            <p className="text-sm font-semibold" style={{ color: "#e87a7a" }}>Total: {fmt(extrato.totalCustoAvulso)}</p>
+          </div>
+          <div className="flex flex-col gap-2">
+            {custos.length === 0 ? (
+              <p className="text-sm" style={{ color: "var(--text-muted)" }}>Nenhum custo no período.</p>
+            ) : custos.map(c => (
+              <div key={c.id} className="rounded-2xl px-4 py-3 flex items-center justify-between" style={{ background: "var(--bg-card)", border: "1px solid var(--border-subtle)" }}>
+                <div>
+                  <p className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>{c.descricao}</p>
+                  <p className="text-xs" style={{ color: "var(--text-muted)" }}>{c.categoria ?? "—"} · {new Date(c.data + "T12:00:00").toLocaleDateString("pt-BR")}{c.funcionarios?.nome ? ` · ${c.funcionarios.nome}` : ""}</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-semibold" style={{ color: "#e87a7a" }}>− {fmt(c.valor)}</span>
+                  <button onClick={() => excluirCusto(c.id)} title="Excluir" className="w-8 h-8 rounded-lg flex items-center justify-center transition hover:opacity-70" style={{ background: "rgba(232,122,122,0.1)", color: "#e87a7a" }}>✕</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Aba: Extrato */}
+      {abaFin === "extrato" && (
+        <div>
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-5">
+            {[
+              { label: "Entrou", valor: fmt(extrato.totalEntrou), cor: "#7ae8a0" },
+              { label: "Custos (material + avulsos)", valor: fmt(extrato.custosTotais), cor: "#e87a7a" },
+              { label: "Repasses profissionais", valor: fmt(extrato.totalRepasse), cor: "#c87ae8" },
+              { label: "Faturamento − custos", valor: fmt(extrato.fatMenosCustos), cor: "var(--text-primary)" },
+              { label: "Lucro real", valor: fmt(extrato.lucroReal), cor: "var(--gold)", forte: true },
+            ].map(c => (
+              <div key={c.label} className="rounded-2xl p-4" style={{ background: "var(--bg-card)", border: `1px solid ${(c as any).forte ? "var(--gold)" : "var(--border-color)"}` }}>
+                <p className="text-lg font-bold" style={{ color: c.cor }}>{c.valor}</p>
+                <p className="text-[10px] uppercase tracking-widest mt-1" style={{ color: "var(--text-muted)" }}>{c.label}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-3">
+            <div className="flex gap-2 flex-wrap">
+              {([
+                { key: "tudo", label: "Tudo" },
+                { key: "entradas", label: "Entradas" },
+                { key: "custos", label: "Custos" },
+                { key: "repasses", label: "Repasses" },
+              ] as const).map(f => (
+                <button key={f.key} onClick={() => setExtFiltro(f.key)}
+                  className="px-3 py-1.5 rounded-xl text-xs transition"
+                  style={{ background: extFiltro === f.key ? "var(--gold-bg)" : "var(--bg-card)", color: extFiltro === f.key ? "var(--gold)" : "var(--text-muted)", border: `1px solid ${extFiltro === f.key ? "var(--border-color)" : "var(--border-subtle)"}` }}>
+                  {f.label}
+                </button>
+              ))}
+            </div>
+            <button onClick={() => setExtDetalhado(v => !v)}
+              className="px-3 py-1.5 rounded-xl text-xs transition"
+              style={{ background: extDetalhado ? "var(--gold-bg)" : "var(--bg-card)", color: extDetalhado ? "var(--gold)" : "var(--text-muted)", border: "1px solid var(--border-subtle)" }}>
+              {extDetalhado ? "🔎 Detalhado" : "Detalhar"}
+            </button>
+          </div>
+
+          <div className="rounded-3xl overflow-hidden" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+            {movimentosFiltrados.length === 0 ? (
+              <div className="py-14 text-center"><p className="text-3xl mb-2">📄</p><p className="text-sm" style={{ color: "var(--text-muted)" }}>Nada no período/filtro.</p></div>
+            ) : movimentosFiltrados.map((m, i) => {
+              const cor = m.tipo === "entrada" ? "#7ae8a0" : m.tipo === "repasse" ? "#c87ae8" : "#e87a7a";
+              return (
+                <div key={m.id} className="flex items-start justify-between gap-4 px-5 py-3.5" style={{ borderBottom: i < movimentosFiltrados.length - 1 ? "1px solid var(--border-subtle)" : "none" }}>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>{m.titulo}</p>
+                    <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                      {new Date(m.data).toLocaleDateString("pt-BR")} · {m.tipo === "entrada" ? "Entrada" : m.tipo === "repasse" ? "Repasse" : "Custo"}
+                    </p>
+                    {extDetalhado && Array.isArray(m.materiais) && m.materiais.length > 0 && (
+                      <div className="mt-1.5 flex flex-col gap-0.5">
+                        {m.materiais.map((mat: any, k: number) => (
+                          <p key={k} className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+                            • {mat.material}: {mat.quantidade} × {fmt(mat.valor)} = {fmt((Number(mat.quantidade) || 0) * (Number(mat.valor) || 0))}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <span className="text-sm font-bold flex-shrink-0" style={{ color: cor }}>
+                    {m.valor >= 0 ? "+" : "−"} {fmt(Math.abs(m.valor))}
+                  </span>
                 </div>
               );
             })}

@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
       .select(`
         *,
         pacientes(nome),
-        procedimentos(nome, cor),
+        procedimentos(nome, cor, custo_materiais),
         funcionarios(nome)
       `)
       .order("criado_em", { ascending: false });
@@ -176,7 +176,7 @@ export async function POST(request: NextRequest) {
       .select(`
         *,
         pacientes(nome),
-        procedimentos(nome, cor),
+        procedimentos(nome, cor, custo_materiais),
         funcionarios(nome)
       `)
       .single();
