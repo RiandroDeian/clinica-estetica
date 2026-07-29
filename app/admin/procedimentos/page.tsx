@@ -15,7 +15,11 @@ type Procedimento = {
   alertas_contato?: string[] | null;
   mostrar_no_site?: boolean;
   zerar_por_agendamento?: boolean;
+  custo_materiais?: { material: string; quantidade: number; valor: number }[] | null;
+  repasse_percentual?: number;
 };
+
+type MaterialLinha = { material: string; quantidade: string; valor: string };
 
 const ALERTAS_CONTATO_OPCOES = [
   { key: "24h",          label: "24h" },
@@ -29,7 +33,10 @@ const CORES = ["#c8a078","#b08060","#a07050","#d0a080","#c09070","#7ae8a0","#7ab
 
 const MESES_PRESET = [3, 6, 12];
 
-const formInicial = { nome: "", cor: "#c8a078", duracao_minutos: 60, preco: "", desconto_maximo: "0", retornos_meses: [] as number[], alertas_contato: [...CONTATO_PADRAO] as string[], mostrar_no_site: true, zerar_por_agendamento: true };
+const formInicial = { nome: "", cor: "#c8a078", duracao_minutos: 60, preco: "", desconto_maximo: "0", retornos_meses: [] as number[], alertas_contato: [...CONTATO_PADRAO] as string[], mostrar_no_site: true, zerar_por_agendamento: true, custo_materiais: [] as MaterialLinha[], repasse_percentual: "25" };
+
+function custoDoMaterial(l: MaterialLinha) { return (Number(l.quantidade) || 0) * (Number(l.valor) || 0); }
+function custoTotalMateriais(lista: MaterialLinha[]) { return lista.reduce((s, l) => s + custoDoMaterial(l), 0); }
 
 export default function ProcedimentosPage() {
   const [procedimentos, setProcedimentos] = useState<Procedimento[]>([]);
@@ -55,6 +62,17 @@ export default function ProcedimentosPage() {
     setNovoMes("");
   }
 
+  // Materiais / custos do procedimento
+  function setMaterial(i: number, campo: keyof MaterialLinha, v: string) {
+    setForm(f => ({ ...f, custo_materiais: f.custo_materiais.map((l, idx) => idx === i ? { ...l, [campo]: v } : l) }));
+  }
+  function addMaterial() {
+    setForm(f => ({ ...f, custo_materiais: [...f.custo_materiais, { material: "", quantidade: "1", valor: "" }] }));
+  }
+  function removeMaterial(i: number) {
+    setForm(f => ({ ...f, custo_materiais: f.custo_materiais.filter((_, idx) => idx !== i) }));
+  }
+
   async function buscar() {
     setCarregando(true);
     const res = await fetch("/api/procedimentos");
@@ -73,14 +91,17 @@ export default function ProcedimentosPage() {
 
   function abrirEditar(p: Procedimento) {
     setEditando(p);
-    setForm({ nome: p.nome, cor: p.cor, duracao_minutos: p.duracao_minutos, preco: p.preco?.toString() ?? "", desconto_maximo: p.desconto_maximo?.toString() ?? "0", retornos_meses: [...(p.retornos_meses ?? [])], alertas_contato: p.alertas_contato ?? [...CONTATO_PADRAO], mostrar_no_site: p.mostrar_no_site ?? true, zerar_por_agendamento: p.zerar_por_agendamento ?? true });
+    setForm({ nome: p.nome, cor: p.cor, duracao_minutos: p.duracao_minutos, preco: p.preco?.toString() ?? "", desconto_maximo: p.desconto_maximo?.toString() ?? "0", retornos_meses: [...(p.retornos_meses ?? [])], alertas_contato: p.alertas_contato ?? [...CONTATO_PADRAO], mostrar_no_site: p.mostrar_no_site ?? true, zerar_por_agendamento: p.zerar_por_agendamento ?? true, custo_materiais: (p.custo_materiais ?? []).map(m => ({ material: m.material, quantidade: String(m.quantidade), valor: String(m.valor) })), repasse_percentual: String(p.repasse_percentual ?? 25) });
     setModalAberto(true);
   }
 
   async function salvar() {
     setSalvando(true);
     const meses = Array.from(new Set(form.retornos_meses)).sort((a, b) => a - b);
-    const body = { ...form, preco: form.preco ? parseFloat(form.preco) : null, desconto_maximo: parseFloat(form.desconto_maximo) || 0, duracao_minutos: Number(form.duracao_minutos), retornos_meses: meses.length ? meses : null, alertas_contato: form.alertas_contato };
+    const materiais = form.custo_materiais
+      .filter(l => l.material.trim() && (Number(l.quantidade) > 0))
+      .map(l => ({ material: l.material.trim(), quantidade: Number(l.quantidade), valor: Number(l.valor) || 0 }));
+    const body = { ...form, preco: form.preco ? parseFloat(form.preco) : null, desconto_maximo: parseFloat(form.desconto_maximo) || 0, duracao_minutos: Number(form.duracao_minutos), retornos_meses: meses.length ? meses : null, alertas_contato: form.alertas_contato, custo_materiais: materiais.length ? materiais : null, repasse_percentual: Number(form.repasse_percentual) || 0 };
     const url = editando ? `/api/procedimentos/${editando.id}` : "/api/procedimentos";
     const method = editando ? "PUT" : "POST";
     const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -287,6 +308,73 @@ export default function ProcedimentosPage() {
                   style={{ background: "var(--bg-input)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
                 <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>Limite de desconto que a recepcionista pode conceder</p>
               </div>
+
+              {/* Custos (materiais) */}
+              <div>
+                <label className="text-xs uppercase tracking-widest block mb-1" style={{ color: "var(--text-secondary)" }}>Custos (materiais)</label>
+                <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>
+                  Materiais gastos neste procedimento (ex.: luvas, gazes). O custo total é debitado automaticamente ao lançar um pagamento deste procedimento.
+                </p>
+                <div className="flex flex-col gap-2">
+                  {form.custo_materiais.length === 0 && (
+                    <p className="text-xs" style={{ color: "var(--text-muted)" }}>Nenhum material — clique em "Adicionar material".</p>
+                  )}
+                  {form.custo_materiais.map((l, i) => (
+                    <div key={i} className="flex gap-2 items-center">
+                      <input type="text" value={l.material} onChange={e => setMaterial(i, "material", e.target.value)}
+                        placeholder="Material (ex.: Luva)" className="rounded-xl px-3 py-2 text-sm outline-none flex-1"
+                        style={{ background: "var(--bg-input)", border: "1px solid var(--border-subtle)", color: "var(--text-primary)" }} />
+                      <input type="number" value={l.quantidade} onChange={e => setMaterial(i, "quantidade", e.target.value)}
+                        placeholder="Qtd" title="Quantidade" className="rounded-xl px-3 py-2 text-sm outline-none"
+                        style={{ background: "var(--bg-input)", border: "1px solid var(--border-subtle)", color: "var(--text-primary)", width: 70 }} />
+                      <div className="flex items-center gap-1" style={{ width: 110 }}>
+                        <span className="text-xs" style={{ color: "var(--text-muted)" }}>R$</span>
+                        <input type="number" value={l.valor} onChange={e => setMaterial(i, "valor", e.target.value)}
+                          placeholder="Unit." title="Custo unitário" className="rounded-xl px-3 py-2 text-sm outline-none w-full"
+                          style={{ background: "var(--bg-input)", border: "1px solid var(--border-subtle)", color: "var(--text-primary)" }} />
+                      </div>
+                      <span className="text-xs w-20 text-right" style={{ color: "var(--text-muted)" }}>R$ {custoDoMaterial(l).toFixed(2)}</span>
+                      <button type="button" onClick={() => removeMaterial(i)} title="Remover"
+                        className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition hover:opacity-70"
+                        style={{ background: "rgba(232,122,122,0.1)", color: "#e87a7a" }}>✕</button>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex items-center justify-between mt-3">
+                  <button type="button" onClick={addMaterial}
+                    className="text-xs px-3 py-1.5 rounded-xl transition hover:opacity-70"
+                    style={{ background: "var(--gold-bg)", color: "var(--gold)", border: "1px solid var(--border-subtle)" }}>
+                    + Adicionar material
+                  </button>
+                  <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+                    Custo total: R$ {custoTotalMateriais(form.custo_materiais).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Repasse ao profissional */}
+              <div>
+                <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>Repasse ao profissional (%)</label>
+                <input type="number" value={form.repasse_percentual} onChange={e => setForm(f => ({ ...f, repasse_percentual: e.target.value }))}
+                  placeholder="25" className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
+                  style={{ background: "var(--bg-input)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
+                {(() => {
+                  const preco = Number(form.preco) || 0;
+                  const perc = Number(form.repasse_percentual) || 0;
+                  const custo = custoTotalMateriais(form.custo_materiais);
+                  const repasse = preco * perc / 100;
+                  const lucro = preco - custo - repasse;
+                  if (preco <= 0) return <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>% que o profissional ganha sobre o valor deste procedimento.</p>;
+                  return (
+                    <p className="text-xs mt-2" style={{ color: "var(--text-muted)" }}>
+                      Sobre R$ {preco.toFixed(2)}: profissional ganha <strong style={{ color: "#c87ae8" }}>R$ {repasse.toFixed(2)}</strong>
+                      {" · "}custo <strong style={{ color: "#e87a7a" }}>R$ {custo.toFixed(2)}</strong>
+                      {" · "}lucro estimado <strong style={{ color: "#7ae8a0" }}>R$ {lucro.toFixed(2)}</strong>
+                    </p>
+                  );
+                })()}
+              </div>
+
               <div>
                 <label className="text-xs uppercase tracking-widest block mb-1" style={{ color: "var(--text-secondary)" }}>Alertas</label>
                 <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>
