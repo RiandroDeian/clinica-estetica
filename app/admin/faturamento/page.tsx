@@ -355,6 +355,60 @@ export default function FaturamentoPage() {
     extFiltro === "repasses" ? m.tipo === "repasse" :
     m.tipo === "custo");
 
+  function imprimirRelatorio() {
+    const brl = (v: number) => "R$ " + Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 });
+    const periodoLabel = periodo === "custom" && customInicio && customFim
+      ? `${new Date(customInicio).toLocaleDateString("pt-BR")} a ${new Date(customFim).toLocaleDateString("pt-BR")}`
+      : (periodos.find(p => p.key === periodo)?.label ?? "");
+
+    const totais = [
+      ["Entrou", brl(extrato.totalEntrou)],
+      ["Custos (material + avulsos)", brl(extrato.custosTotais)],
+      ["Repasses profissionais", brl(extrato.totalRepasse)],
+      ["Faturamento − custos", brl(extrato.fatMenosCustos)],
+      ["Lucro real", brl(extrato.lucroReal)],
+    ].map(([l, v]) => `<div class="tot"><span class="tl">${l}</span><span class="tv">${v}</span></div>`).join("");
+
+    const repasseRows = repasseGrupos.map(g =>
+      `<tr><td>${g.nome}</td><td class="r">${g.count}</td><td class="r">${brl(g.pago)}</td><td class="r">${brl(g.pendente)}</td></tr>`).join("");
+
+    const movRows = movimentosFiltrados.map((m: any) => {
+      const sinal = m.valor >= 0 ? "+" : "−";
+      const tipoLabel = m.tipo === "entrada" ? "Entrada" : m.tipo === "repasse" ? "Repasse" : "Custo";
+      const extra = (extDetalhado && Array.isArray(m.materiais) && m.materiais.length)
+        ? `<div class="mat">${m.materiais.map((x: any) => `${x.material}: ${x.quantidade} × ${brl(x.valor)}`).join(" · ")}</div>` : "";
+      return `<tr><td>${new Date(m.data).toLocaleDateString("pt-BR")}</td><td>${m.titulo}${extra}</td><td>${tipoLabel}</td><td class="r">${sinal} ${brl(Math.abs(m.valor))}</td></tr>`;
+    }).join("");
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Relatório Financeiro</title><style>
+      body{font-family:Georgia,serif;max-width:900px;margin:28px auto;color:#1a1a1a;padding:0 24px;}
+      h1{font-size:22px;margin:0 0 2px;color:#9a7647;} .sub{color:#666;font-size:13px;margin:0 0 20px;}
+      .totais{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 22px;}
+      .tot{border:1px solid #ddd;border-radius:8px;padding:10px 14px;min-width:150px;}
+      .tl{display:block;font-size:9.5px;text-transform:uppercase;letter-spacing:.08em;color:#888;} .tv{font-size:16px;font-weight:bold;}
+      h2{font-size:13px;margin:22px 0 8px;color:#9a7647;text-transform:uppercase;letter-spacing:.06em;}
+      table{width:100%;border-collapse:collapse;font-size:12px;font-family:Arial,Helvetica,sans-serif;}
+      th,td{border-bottom:1px solid #eee;padding:6px 8px;text-align:left;vertical-align:top;}
+      th{background:#faf7f2;font-size:9.5px;text-transform:uppercase;color:#888;} td.r,th.r{text-align:right;}
+      .mat{font-size:10px;color:#999;margin-top:2px;}
+      @media print{@page{margin:14mm;}}
+    </style></head><body>
+      <h1>Relatório Financeiro</h1>
+      <p class="sub">Período: ${periodoLabel} · Emitido em ${new Date().toLocaleDateString("pt-BR")} ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}${extFiltro !== "tudo" ? ` · Filtro: ${extFiltro}` : ""}</p>
+      <div class="totais">${totais}</div>
+      ${repasseGrupos.length ? `<h2>Repasse por profissional</h2><table><thead><tr><th>Profissional</th><th class="r">Atend.</th><th class="r">A pagar</th><th class="r">A confirmar</th></tr></thead><tbody>${repasseRows}</tbody></table>` : ""}
+      <h2>Extrato${extDetalhado ? " (detalhado)" : ""}</h2>
+      <table><thead><tr><th>Data</th><th>Descrição</th><th>Tipo</th><th class="r">Valor</th></tr></thead><tbody>${movRows}</tbody></table>
+    </body></html>`;
+
+    const win = window.open("", "_blank");
+    if (!win) { toast.error("Permita pop-ups para imprimir o relatório."); return; }
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(() => win.print(), 300);
+  }
+
   const agendamentosFiltrados = agendamentos.filter(ag => {
     const txt = buscaAgendamento.toLowerCase();
     return ag.pacientes?.nome?.toLowerCase().includes(txt) || ag.procedimentos?.nome?.toLowerCase().includes(txt);
@@ -763,11 +817,18 @@ export default function FaturamentoPage() {
                 </button>
               ))}
             </div>
-            <button onClick={() => setExtDetalhado(v => !v)}
-              className="px-3 py-1.5 rounded-xl text-xs transition"
-              style={{ background: extDetalhado ? "var(--gold-bg)" : "var(--bg-card)", color: extDetalhado ? "var(--gold)" : "var(--text-muted)", border: "1px solid var(--border-subtle)" }}>
-              {extDetalhado ? "🔎 Detalhado" : "Detalhar"}
-            </button>
+            <div className="flex gap-2">
+              <button onClick={() => setExtDetalhado(v => !v)}
+                className="px-3 py-1.5 rounded-xl text-xs transition"
+                style={{ background: extDetalhado ? "var(--gold-bg)" : "var(--bg-card)", color: extDetalhado ? "var(--gold)" : "var(--text-muted)", border: "1px solid var(--border-subtle)" }}>
+                {extDetalhado ? "🔎 Detalhado" : "Detalhar"}
+              </button>
+              <button onClick={imprimirRelatorio}
+                className="px-3 py-1.5 rounded-xl text-xs font-medium transition hover:scale-105"
+                style={{ background: "var(--gold)", color: "#0a0707" }}>
+                🖨️ Imprimir relatório
+              </button>
+            </div>
           </div>
 
           <div className="rounded-3xl overflow-hidden" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
