@@ -117,7 +117,8 @@ export default function FaturamentoPage() {
   const [excluindo, setExcluindo] = useState<string | null>(null);
   const [buscaAgendamento, setBuscaAgendamento] = useState("");
   const [form, setForm] = useState(formInicial);
-  const [abaFin, setAbaFin] = useState<"recepcao" | "consultorio" | "custos" | "extrato">("recepcao");
+  const [abaFin, setAbaFin] = useState<"recepcao" | "consultorio" | "custos" | "extrato" | "repasse">("recepcao");
+  const [repasseExpandido, setRepasseExpandido] = useState<string | null>(null);
   const [meuId, setMeuId] = useState<string | null>(null);
   const [consForm, setConsForm] = useState({ paciente_id: "", procedimento_id: "" });
   const [custos, setCustos] = useState<Custo[]>([]);
@@ -331,6 +332,23 @@ export default function FaturamentoPage() {
     return { totalEntrou, totalCustoMaterial, totalRepasse, totalCustoAvulso, custosTotais, fatMenosCustos, lucroReal, movimentos };
   }, [registros, custos]);
 
+  // Repasse por profissional (do período)
+  const repasseGrupos = useMemo(() => {
+    const map = new Map<string, { nome: string; pago: number; pendente: number; count: number; itens: Registro[] }>();
+    for (const r of registros) {
+      if (!r.funcionario_id || r.status_pagamento === "cancelado") continue;
+      const g = map.get(r.funcionario_id) ?? { nome: r.funcionarios?.nome ?? "—", pago: 0, pendente: 0, count: 0, itens: [] as Registro[] };
+      const rep = Number(r.repasse_valor || 0);
+      if (r.status_pagamento === "pago") g.pago += rep; else g.pendente += rep;
+      g.count += 1;
+      g.itens.push(r);
+      map.set(r.funcionario_id, g);
+    }
+    return Array.from(map.entries()).map(([id, g]) => ({ id, ...g })).sort((a, b) => b.pago - a.pago);
+  }, [registros]);
+  const repasseTotalPago = repasseGrupos.reduce((s, g) => s + g.pago, 0);
+  const repasseTotalPendente = repasseGrupos.reduce((s, g) => s + g.pendente, 0);
+
   const movimentosFiltrados = extrato.movimentos.filter(m =>
     extFiltro === "tudo" ? true :
     extFiltro === "entradas" ? m.tipo === "entrada" :
@@ -369,6 +387,7 @@ export default function FaturamentoPage() {
           { key: "recepcao",   label: "🏥 Recepção" },
           { key: "consultorio",label: "👩‍⚕️ Meu consultório" },
           { key: "custos",     label: "💸 Custos" },
+          { key: "repasse",    label: "🤝 Repasse" },
           { key: "extrato",    label: "📄 Extrato" },
         ] as const).map(a => (
           <button key={a.key} onClick={() => setAbaFin(a.key)}
@@ -776,6 +795,72 @@ export default function FaturamentoPage() {
                   <span className="text-sm font-bold flex-shrink-0" style={{ color: cor }}>
                     {m.valor >= 0 ? "+" : "−"} {fmt(Math.abs(m.valor))}
                   </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Aba: Repasse por profissional */}
+      {abaFin === "repasse" && (
+        <div>
+          <div className="grid grid-cols-2 gap-3 mb-5">
+            <div className="rounded-2xl p-4" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+              <p className="text-lg font-bold" style={{ color: "#c87ae8" }}>{fmt(repasseTotalPago)}</p>
+              <p className="text-[10px] uppercase tracking-widest mt-1" style={{ color: "var(--text-muted)" }}>Repasse a pagar (pagamentos confirmados)</p>
+            </div>
+            <div className="rounded-2xl p-4" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+              <p className="text-lg font-bold" style={{ color: "var(--warning)" }}>{fmt(repasseTotalPendente)}</p>
+              <p className="text-[10px] uppercase tracking-widest mt-1" style={{ color: "var(--text-muted)" }}>A confirmar (ainda pendente)</p>
+            </div>
+          </div>
+          <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>Repasse gerado por profissional no período. Clique num profissional para ver o histórico.</p>
+          <div className="flex flex-col gap-2">
+            {repasseGrupos.length === 0 ? (
+              <p className="text-sm" style={{ color: "var(--text-muted)" }}>Nenhum atendimento com profissional no período.</p>
+            ) : repasseGrupos.map(g => {
+              const aberto = repasseExpandido === g.id;
+              return (
+                <div key={g.id} className="rounded-2xl overflow-hidden" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+                  <button onClick={() => setRepasseExpandido(aberto ? null : g.id)}
+                    className="w-full flex items-center justify-between gap-4 px-5 py-4 transition hover:bg-[var(--bg-hover)]">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: "rgba(200,122,232,0.15)", color: "#c87ae8" }}>
+                        {g.nome.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="text-left">
+                        <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>{g.nome}</p>
+                        <p className="text-xs" style={{ color: "var(--text-muted)" }}>{g.count} atendimento{g.count !== 1 ? "s" : ""}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="text-right">
+                        <p className="text-sm font-bold" style={{ color: "#c87ae8" }}>{fmt(g.pago)}</p>
+                        {g.pendente > 0 && <p className="text-[11px]" style={{ color: "var(--warning)" }}>+ {fmt(g.pendente)} a confirmar</p>}
+                      </div>
+                      <span style={{ color: "var(--text-muted)", transform: aberto ? "rotate(180deg)" : "none", transition: "transform .2s" }}>▾</span>
+                    </div>
+                  </button>
+                  {aberto && (
+                    <div className="px-5 pb-4 pl-16 flex flex-col gap-1.5">
+                      {g.itens.map(r => {
+                        const st = statusPag.find(s => s.key === r.status_pagamento);
+                        return (
+                          <div key={r.id} className="flex items-center justify-between gap-3 text-xs rounded-xl px-3 py-2" style={{ background: "var(--bg-input)", border: "1px solid var(--border-subtle)" }}>
+                            <span style={{ color: "var(--text-secondary)" }}>
+                              {new Date(r.criado_em).toLocaleDateString("pt-BR")} · {r.pacientes?.nome ?? "—"} · {r.procedimentos?.nome ?? "—"}
+                            </span>
+                            <span className="flex items-center gap-2 flex-shrink-0">
+                              <span style={{ color: "var(--text-muted)" }}>{fmt(Number(r.valor_final || 0))}</span>
+                              <span style={{ color: "#c87ae8", fontWeight: 600 }}>{fmt(Number(r.repasse_valor || 0))}</span>
+                              <span className="px-1.5 py-0.5 rounded-full font-medium" style={{ color: st?.color, background: st?.bg }}>{st?.label}</span>
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               );
             })}
