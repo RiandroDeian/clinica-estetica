@@ -117,8 +117,10 @@ export default function FaturamentoPage() {
   const [excluindo, setExcluindo] = useState<string | null>(null);
   const [buscaAgendamento, setBuscaAgendamento] = useState("");
   const [form, setForm] = useState(formInicial);
-  const [abaFin, setAbaFin] = useState<"recepcao" | "consultorio" | "custos" | "extrato" | "repasse">("recepcao");
+  const [abaFin, setAbaFin] = useState<"recepcao" | "consultorio" | "custos" | "despesas" | "extrato" | "repasse">("recepcao");
   const [repasseExpandido, setRepasseExpandido] = useState<string | null>(null);
+  const [despesasFixas, setDespesasFixas] = useState<{ id: string; nome: string; valor: number; categoria?: string }[]>([]);
+  const [formDespesa, setFormDespesa] = useState({ nome: "", valor: "", categoria: "" });
   const [meuId, setMeuId] = useState<string | null>(null);
   const [consForm, setConsForm] = useState({ paciente_id: "", procedimento_id: "" });
   const [custos, setCustos] = useState<Custo[]>([]);
@@ -174,7 +176,34 @@ export default function FaturamentoPage() {
     fetch("/api/pacientes").then(r => r.json()).then(d => setPacientes(Array.isArray(d) ? d : []));
     fetch("/api/procedimentos").then(r => r.json()).then(d => setProcedimentos(Array.isArray(d) ? d : []));
     fetch("/api/auth/me").then(r => r.ok ? r.json() : null).then(d => setMeuId(d?.id ?? null)).catch(() => {});
+    carregarDespesasFixas();
   }, []);
+
+  function carregarDespesasFixas() {
+    fetch("/api/despesas-fixas").then(r => r.json()).then(d => setDespesasFixas(Array.isArray(d) ? d : [])).catch(() => {});
+  }
+  async function addDespesaFixa() {
+    if (!formDespesa.nome.trim() || !(Number(formDespesa.valor) >= 0)) return;
+    await fetch("/api/despesas-fixas", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nome: formDespesa.nome.trim(), valor: Number(formDespesa.valor), categoria: formDespesa.categoria.trim() || null }),
+    });
+    setFormDespesa({ nome: "", valor: "", categoria: "" });
+    carregarDespesasFixas();
+  }
+  async function removeDespesaFixa(id: string) {
+    if (!confirm("Remover esta despesa fixa? (os lançamentos já feitos continuam no extrato)")) return;
+    await fetch(`/api/despesas-fixas?id=${id}`, { method: "DELETE" });
+    setDespesasFixas(prev => prev.filter(d => d.id !== id));
+  }
+  async function registrarDespesa(d: { nome: string; valor: number; categoria?: string }) {
+    await fetch("/api/custos", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ descricao: d.nome, categoria: d.categoria || "Despesa fixa", valor: d.valor }),
+    });
+    buscar();
+    toast.success(`"${d.nome}" registrada — R$ ${Number(d.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`);
+  }
 
   // Meu consultório: o profissional lança o atendimento (fica pendente para a recepção finalizar)
   async function lancarConsultorio() {
@@ -441,6 +470,7 @@ export default function FaturamentoPage() {
           { key: "recepcao",   label: "🏥 Recepção" },
           { key: "consultorio",label: "👩‍⚕️ Meu consultório" },
           { key: "custos",     label: "💸 Custos" },
+          { key: "despesas",   label: "🏢 Despesas fixas" },
           { key: "repasse",    label: "🤝 Repasse" },
           { key: "extrato",    label: "📄 Extrato" },
         ] as const).map(a => (
@@ -856,6 +886,71 @@ export default function FaturamentoPage() {
                   <span className="text-sm font-bold flex-shrink-0" style={{ color: cor }}>
                     {m.valor >= 0 ? "+" : "−"} {fmt(Math.abs(m.valor))}
                   </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Aba: Despesas fixas da clínica */}
+      {abaFin === "despesas" && (
+        <div className="max-w-2xl">
+          {/* Cadastrar nova despesa fixa */}
+          <div className="rounded-3xl p-5 mb-5" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+            <p className="text-sm font-semibold mb-1" style={{ color: "var(--text-primary)" }}>Nova despesa fixa</p>
+            <p className="text-xs mb-4" style={{ color: "var(--text-muted)" }}>
+              Cadastre despesas recorrentes com valor fixo (internet, contador, aluguel…). Depois é só clicar em <strong>Registrar</strong> quando pagar — vira uma saída no extrato/lucro.
+            </p>
+            <div className="flex gap-2 flex-wrap items-end">
+              <div className="flex-1 min-w-[160px]">
+                <label className="text-[10px] uppercase tracking-widest block mb-1" style={{ color: "var(--text-muted)" }}>Nome</label>
+                <input type="text" value={formDespesa.nome} onChange={e => setFormDespesa(f => ({ ...f, nome: e.target.value }))}
+                  placeholder="Ex.: Aluguel" className={inp} style={inpStyle} />
+              </div>
+              <div style={{ width: 100 }}>
+                <label className="text-[10px] uppercase tracking-widest block mb-1" style={{ color: "var(--text-muted)" }}>Categoria</label>
+                <input type="text" value={formDespesa.categoria} onChange={e => setFormDespesa(f => ({ ...f, categoria: e.target.value }))}
+                  placeholder="Fixa" className={inp} style={inpStyle} />
+              </div>
+              <div style={{ width: 120 }}>
+                <label className="text-[10px] uppercase tracking-widest block mb-1" style={{ color: "var(--text-muted)" }}>Valor (R$)</label>
+                <input type="number" value={formDespesa.valor} onChange={e => setFormDespesa(f => ({ ...f, valor: e.target.value }))}
+                  placeholder="0,00" className={inp} style={inpStyle} />
+              </div>
+              <button onClick={addDespesaFixa} disabled={!formDespesa.nome.trim() || !(Number(formDespesa.valor) >= 0)}
+                className="px-4 py-3 rounded-2xl text-sm font-semibold transition hover:scale-105"
+                style={{ background: "var(--gold)", color: "#0a0707", opacity: !formDespesa.nome.trim() ? 0.5 : 1 }}>
+                Adicionar
+              </button>
+            </div>
+          </div>
+
+          {/* Lista de despesas fixas */}
+          <p className="text-xs uppercase tracking-widest mb-3" style={{ color: "var(--gold)" }}>Despesas fixas ({despesasFixas.length})</p>
+          <div className="flex flex-col gap-2">
+            {despesasFixas.length === 0 ? (
+              <p className="text-sm" style={{ color: "var(--text-muted)" }}>Nenhuma despesa fixa cadastrada.</p>
+            ) : despesasFixas.map(d => {
+              const vezes = custos.filter(c => c.descricao === d.nome).length;
+              return (
+                <div key={d.id} className="rounded-2xl px-4 py-3 flex items-center gap-3 justify-between" style={{ background: "var(--bg-card)", border: "1px solid var(--border-subtle)" }}>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>{d.nome}</p>
+                    <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                      {d.categoria ? d.categoria + " · " : ""}R$ {Number(d.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                      {vezes > 0 && <span style={{ color: "#7ae8a0" }}> · ✓ registrada {vezes}× no período</span>}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <button onClick={() => registrarDespesa(d)}
+                      className="px-3 py-1.5 rounded-xl text-xs font-medium transition hover:scale-105"
+                      style={{ background: "rgba(232,122,122,0.1)", color: "#e87a7a", border: "1px solid rgba(232,122,122,0.3)" }}>
+                      💸 Registrar
+                    </button>
+                    <button onClick={() => removeDespesaFixa(d.id)} title="Remover" className="w-8 h-8 rounded-lg flex items-center justify-center transition hover:opacity-70"
+                      style={{ background: "var(--border-subtle)", color: "var(--text-muted)" }}>✕</button>
+                  </div>
                 </div>
               );
             })}
