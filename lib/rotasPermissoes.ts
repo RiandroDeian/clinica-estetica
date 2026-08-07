@@ -6,6 +6,7 @@ export const ROTAS_PERMISSOES: Record<string, string> = {
   "/admin/agenda":        "agenda",
   "/admin/pacientes":     "pacientes",
   "/admin/prontuario":    "pacientes",
+  "/admin/alertas":       "pacientes",
   "/admin/pacotes":       "pacotes",
   "/admin/laser":         "laser",
   "/admin/procedimentos": "procedimentos",

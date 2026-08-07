@@ -62,12 +62,32 @@ export default async function AlertasPage() {
   if (pacienteIds.length > 0) {
     const agora = new Date().toISOString();
 
-    const { data } = await supabaseAdmin
+    const { data, error: errorAgendamentos } = await supabaseAdmin
       .from("agendamentos")
       .select("paciente_id, inicio, status")
       .in("paciente_id", pacienteIds)
       .gte("inicio", agora)
       .order("inicio", { ascending: true });
+
+    // Sem tratar este erro, uma falha aqui marcaria TODOS os pacientes como
+    // "sem agendamento futuro" (falso positivo). Então falhamos de forma clara.
+    if (errorAgendamentos) {
+      console.error("Erro ao buscar agendamentos para alertas:", errorAgendamentos);
+
+      return (
+        <div
+          className="rounded-3xl p-6"
+          style={{
+            background: "var(--bg-card)",
+            border: "1px solid var(--border-color)",
+          }}
+        >
+          <p className="text-sm" style={{ color: "#e87a7a" }}>
+            Erro ao carregar os alertas (não foi possível consultar os agendamentos). Tente novamente.
+          </p>
+        </div>
+      );
+    }
 
     agendamentosFuturos = data ?? [];
   }

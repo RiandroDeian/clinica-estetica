@@ -28,6 +28,7 @@ function Icon({ type }: { type: string }) {
   if (type === "metas")       return <svg {...p}><path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" strokeLinecap="round" strokeLinejoin="round"/></svg>;
   if (type === "comissoes")    return <svg {...p}><path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 9v1m0-9c-1.11 0-2.08.402-2.599 1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round"/></svg>;
   if (type === "auditoria")     return <svg {...p}><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" strokeLinecap="round" strokeLinejoin="round"/></svg>;
+  if (type === "alertas")       return <svg {...p}><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" strokeLinecap="round" strokeLinejoin="round"/><path d="M12 9v4M12 17h.01" strokeLinecap="round" strokeLinejoin="round"/></svg>;
   return <svg {...p}><circle cx="12" cy="12" r="3"/></svg>;
 }
 
@@ -36,6 +37,7 @@ const todosLinks: LinkItem[] = [
   { href: "/admin/recepcao",      label: "Recepção",      icon: "recepcao"    },
   { href: "/admin/agenda",        label: "Agenda",        icon: "agenda"      },
   { href: "/admin/pacientes",     label: "Pacientes",     icon: "pacientes"   },
+  { href: "/admin/alertas",       label: "Alertas",       icon: "alertas"     },
   { href: "/admin/prontuario",    label: "Prontuário",    icon: "prontuario"  },
   { href: "/admin/laser",         label: "Laser",         icon: "laser"       },
   { href: "/admin/pacotes",       label: "Pacotes",       icon: "pacotes"     },
