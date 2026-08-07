@@ -175,7 +175,7 @@ export function AlertasClient({ itens }: { itens: ItemAlerta[] }) {
                 </div>
 
                 <Link
-                  href={`/admin/prontuario/${i.id}`}
+                  href={`/admin/prontuario?id=${i.id}`}
                   className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs transition hover:opacity-70 flex-shrink-0"
                   style={{
                     background: "var(--gold-bg)",
