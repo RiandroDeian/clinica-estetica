@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getSessao } from "@/lib/auth";
+import { montarResumo, type Parcela } from "@/lib/parcelas";
 
 export async function GET(request: NextRequest) {
   const sessao = await getSessao();
@@ -14,6 +15,7 @@ export async function GET(request: NextRequest) {
   const status_pagamento = searchParams.get("status_pagamento") ?? "";
   const categoria      = searchParams.get("categoria")      ?? "";
   const forma_pagamento = searchParams.get("forma_pagamento") ?? "";
+  const status_parcela = searchParams.get("status_parcela") ?? ""; // pagos|pendentes|vencidos
 
   let query = supabaseAdmin
     .from("laser_pacotes")
@@ -68,6 +70,31 @@ export async function GET(request: NextRequest) {
       if (s.realizada_em && !ultima[s.pacote_id]) ultima[s.pacote_id] = s.realizada_em;
     }
     lista = lista.map((p: any) => ({ ...p, ultima_sessao: ultima[p.id] ?? null }));
+  }
+
+  // ✅ Anexa o RESUMO do parcelamento (boleto) de cada pacote
+  if (pacoteIds.length) {
+    const { data: parcelas } = await supabaseAdmin
+      .from("laser_parcelas")
+      .select("*")
+      .in("pacote_id", pacoteIds as string[]);
+
+    const porPacote: Record<string, Parcela[]> = {};
+    for (const p of (parcelas ?? []) as Parcela[]) {
+      (porPacote[p.pacote_id] ??= []).push(p);
+    }
+    lista = lista.map((p: any) => ({
+      ...p,
+      parcelas_resumo: porPacote[p.id] ? montarResumo(porPacote[p.id]) : null,
+    }));
+
+    // Filtro por status da parcela (aplicado depois de montar os resumos)
+    if (status_parcela) {
+      const alvo = status_parcela === "pagos" ? "pago"
+        : status_parcela === "pendentes" ? "pendente"
+        : status_parcela === "vencidos" ? "vencido" : "";
+      if (alvo) lista = lista.filter((p: any) => p.parcelas_resumo?.status === alvo);
+    }
   }
 
   const totalPacientes = lista.length;

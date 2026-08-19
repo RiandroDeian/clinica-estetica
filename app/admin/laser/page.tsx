@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { statusParcela, parcelaCfg, montarResumo, type Parcela, type ParcelasResumo } from "@/lib/parcelas";
 
 type Pacote = {
   id: string;
@@ -26,6 +27,7 @@ type Pacote = {
   contato_em?: string | null;
   proximo_agendamento?: string | null;
   ultima_sessao?: string | null;
+  parcelas_resumo?: ParcelasResumo | null;
   pacientes?: { nome: string; telefone: string; cpf?: string };
   funcionarios?: { nome: string; cor: string };
 };
@@ -85,6 +87,8 @@ const formInicial = {
   data_inicio: "",
   data_acerto: "", dia_vencimento_boleto: "", assinou_contrato: false,
   observacoes: "", assinou_termo: false,
+  // Parcelamento (boleto): usados só na criação para gerar as parcelas.
+  parc_total: "", parc_num: "6", parc_valor: "", parc_venc1: "",
 };
 
 function toggleArea(areas: string[], area: string) {
@@ -113,6 +117,7 @@ export default function LaserPage() {
   const [filtroPag, setFiltroPag] = useState("");
   const [filtroCategoria, setFiltroCategoria] = useState("");
   const [filtroForma, setFiltroForma] = useState("");
+  const [filtroParcela, setFiltroParcela] = useState(""); // pagos|pendentes|vencidos
   const [filtroSemAgenda, setFiltroSemAgenda] = useState(false);
   const [modalAberto, setModalAberto] = useState(false);
   const [editando, setEditando] = useState<Pacote | null>(null);
@@ -120,6 +125,11 @@ export default function LaserPage() {
   const [pacientesLista, setPacientesLista] = useState<any[]>([]);
   const [funcionariosLista, setFuncionariosLista] = useState<any[]>([]);
   const [form, setForm] = useState(formInicial);
+  // Modal de parcelas (histórico + gerar + marcar como pago)
+  const [modalParcelas, setModalParcelas] = useState<Pacote | null>(null);
+  const [parcelasLista, setParcelasLista] = useState<Parcela[]>([]);
+  const [carregandoParcelas, setCarregandoParcelas] = useState(false);
+  const [genParc, setGenParc] = useState({ total: "", num: "6", valor: "", venc1: "" });
 
   const buscar = useCallback(async () => {
     setCarregando(true);
@@ -128,12 +138,13 @@ export default function LaserPage() {
     if (filtroPag)       url += `&status_pagamento=${filtroPag}`;
     if (filtroCategoria) url += `&categoria=${filtroCategoria}`;
     if (filtroForma)     url += `&forma_pagamento=${filtroForma}`;
+    if (filtroParcela)   url += `&status_parcela=${filtroParcela}`;
     const res = await fetch(url);
     const data = await res.json();
     setPacotes(data.pacotes ?? []);
     setResumo(data.resumo ?? null);
     setCarregando(false);
-  }, [busca, filtroStatus, filtroPag, filtroCategoria, filtroForma]);
+  }, [busca, filtroStatus, filtroPag, filtroCategoria, filtroForma, filtroParcela]);
 
   useEffect(() => {
     const t = setTimeout(buscar, 300);
@@ -183,6 +194,7 @@ export default function LaserPage() {
       assinou_contrato: p.assinou_contrato ?? false,
       observacoes: p.observacoes ?? "",
       assinou_termo: p.assinou_termo,
+      parc_total: "", parc_num: "6", parc_valor: "", parc_venc1: "",
     });
     setModalAberto(true);
   }
@@ -190,8 +202,10 @@ export default function LaserPage() {
   async function salvar() {
     if (!form.paciente_id || form.areas.length === 0) return;
     setSalvando(true);
+    // Campos de parcelamento não são colunas de laser_pacotes; ficam de fora do payload.
+    const { parc_total, parc_num, parc_valor, parc_venc1, ...campos } = form;
     const payload = {
-      ...form,
+      ...campos,
       procedimento: form.areas,
       total_sessoes: Number(form.total_sessoes),
       valor: form.valor ? Number(form.valor) : null,
@@ -209,13 +223,105 @@ export default function LaserPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    if (!res.ok) { const d = await res.json(); toast.error(d.erro ?? "Erro ao salvar"); }
-    else { toast.success(editando ? "Pacote atualizado!" : "Pacote criado!"); }
+    if (!res.ok) {
+      const d = await res.json();
+      toast.error(d.erro ?? "Erro ao salvar");
+      setSalvando(false);
+      return;
+    }
+    const criado = await res.json();
+    // Ao criar um boleto com parcelamento informado, gera as parcelas automaticamente.
+    if (!editando && form.forma_pagamento === "boleto" && Number(parc_num) > 0 && parc_venc1 && criado?.id) {
+      const valorParcela = parc_valor ? Number(parc_valor) : (parc_total ? Number(parc_total) / Number(parc_num) : 0);
+      await fetch("/api/laser/parcelas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pacote_id: criado.id,
+          num_parcelas: Number(parc_num),
+          valor_parcela: Math.round(valorParcela * 100) / 100,
+          primeiro_vencimento: parc_venc1,
+        }),
+      });
+      toast.success(`Pacote criado com ${parc_num}x geradas!`);
+    } else {
+      toast.success(editando ? "Pacote atualizado!" : "Pacote criado!");
+    }
     setModalAberto(false);
     setEditando(null);
     setForm(formInicial);
     buscar();
     setSalvando(false);
+  }
+
+  // ===== Parcelas (modal) =====
+  async function abrirParcelas(p: Pacote, e?: React.MouseEvent) {
+    e?.stopPropagation();
+    setModalParcelas(p);
+    setCarregandoParcelas(true);
+    const res = await fetch(`/api/laser/parcelas?pacote_id=${p.id}`);
+    const lista: Parcela[] = res.ok ? await res.json() : [];
+    setParcelasLista(lista);
+    // Semeia o gerador: se já há parcelas, mantém o formato atual; senão usa dados do pacote.
+    if (lista.length > 0) {
+      const ord = [...lista].sort((a, b) => a.numero - b.numero);
+      setGenParc({
+        total: String(Math.round(ord.reduce((s, x) => s + Number(x.valor ?? 0), 0) * 100) / 100),
+        num: String(ord.length),
+        valor: String(ord[0].valor ?? ""),
+        venc1: ord[0].vencimento,
+      });
+    } else {
+      setGenParc({
+        total: p.valor ? String(p.valor) : "",
+        num: "6",
+        valor: p.valor_mensal ? String(p.valor_mensal) : "",
+        venc1: p.data_inicio || hojeISO,
+      });
+    }
+    setCarregandoParcelas(false);
+  }
+
+  async function recarregarParcelas(pacoteId: string) {
+    const res = await fetch(`/api/laser/parcelas?pacote_id=${pacoteId}`);
+    setParcelasLista(res.ok ? await res.json() : []);
+    buscar(); // atualiza o resumo na tabela
+  }
+
+  async function gerarParcelas() {
+    if (!modalParcelas) return;
+    const num = Number(genParc.num);
+    if (!num || num < 1 || !genParc.venc1) { toast.error("Informe nº de parcelas e o 1º vencimento"); return; }
+    const valorParcela = genParc.valor ? Number(genParc.valor) : (genParc.total ? Number(genParc.total) / num : 0);
+    const res = await fetch("/api/laser/parcelas", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        pacote_id: modalParcelas.id,
+        num_parcelas: num,
+        valor_parcela: Math.round(valorParcela * 100) / 100,
+        primeiro_vencimento: genParc.venc1,
+      }),
+    });
+    if (res.ok) { await recarregarParcelas(modalParcelas.id); toast.success(`${num} parcelas geradas!`); }
+    else toast.error("Erro ao gerar parcelas");
+  }
+
+  async function patchParcela(id: string, campos: Record<string, unknown>) {
+    if (!modalParcelas) return;
+    const res = await fetch("/api/laser/parcelas", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, ...campos }),
+    });
+    if (res.ok) await recarregarParcelas(modalParcelas.id);
+    else toast.error("Erro ao atualizar parcela");
+  }
+
+  async function regenerarParcelas() {
+    if (!modalParcelas) return;
+    if (!confirm("Regenerar apaga o histórico de pagamento das parcelas atuais. Continuar?")) return;
+    await gerarParcelas();
   }
 
   const inputStyle = {
@@ -337,6 +443,16 @@ export default function LaserPage() {
           {Object.entries(pagCfg).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
         </select>
 
+        {/* ✅ Filtro: status da parcela do boleto */}
+        <select value={filtroParcela} onChange={e => setFiltroParcela(e.target.value)}
+          className="rounded-2xl px-4 py-3 text-sm outline-none"
+          style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)", color: filtroParcela ? "var(--text-primary)" : "var(--text-muted)" }}>
+          <option value="">Todas as parcelas</option>
+          <option value="pagos">🟢 Parcelas em dia</option>
+          <option value="pendentes">🟡 Parcela pendente</option>
+          <option value="vencidos">🔴 Parcela vencida</option>
+        </select>
+
         {/* ✅ Filtro: pacientes com pacote em aberto e sem agendamento futuro */}
         <button type="button" onClick={() => setFiltroSemAgenda(v => !v)}
           className="rounded-2xl px-4 py-3 text-sm outline-none transition font-medium"
@@ -370,7 +486,7 @@ export default function LaserPage() {
             <table className="w-full">
               <thead>
                 <tr style={{ borderBottom: "1px solid var(--border-subtle)" }}>
-                  {["Paciente", "Áreas", "Categoria", "Forma Pag.", "Status Pag.", "Acerto", "Contrato", "Contato", "Última sessão", "Sessões", "Status", "Profissional", ""].map(h => (
+                  {["Paciente", "Áreas", "Categoria", "Forma Pag.", "Parcelamento", "Status Pag.", "Acerto", "Contrato", "Contato", "Última sessão", "Sessões", "Status", "Profissional", ""].map(h => (
                     <th key={h} className="text-left px-4 py-4 text-xs uppercase tracking-widest" style={{ color: "var(--text-muted)" }}>{h}</th>
                   ))}
                 </tr>
@@ -451,6 +567,39 @@ export default function LaserPage() {
                         ) : (
                           <span className="text-xs" style={{ color: "var(--text-muted)" }}>—</span>
                         )}
+                      </td>
+
+                      {/* ✅ Parcelamento (boleto) */}
+                      <td className="px-4 py-4" onClick={e => e.stopPropagation()}>
+                        {(() => {
+                          const r = p.parcelas_resumo;
+                          if (r?.tem) {
+                            const cfg = parcelaCfg[r.status];
+                            return (
+                              <button onClick={() => abrirParcelas(p)}
+                                className="text-left rounded-xl px-2.5 py-1.5 transition hover:opacity-80"
+                                style={{ background: cfg.bg, border: `1px solid ${cfg.color}40` }}
+                                title="Ver parcelas">
+                                <span className="text-xs font-semibold whitespace-nowrap" style={{ color: cfg.color }}>
+                                  {r.atual}/{r.total} · R$ {r.valor_parcela.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                                </span>
+                                <span className="block text-[10px] mt-0.5" style={{ color: cfg.color }}>
+                                  {cfg.emoji} {cfg.label}
+                                </span>
+                              </button>
+                            );
+                          }
+                          if (eBoleto) {
+                            return (
+                              <button onClick={() => abrirParcelas(p)}
+                                className="text-xs px-2.5 py-1 rounded-xl font-medium transition hover:opacity-70"
+                                style={{ background: "rgba(232,122,122,0.1)", color: "#e87a7a", border: "1px solid rgba(232,122,122,0.3)" }}>
+                                + Parcelar
+                              </button>
+                            );
+                          }
+                          return <span className="text-xs" style={{ color: "var(--text-muted)" }}>—</span>;
+                        })()}
                       </td>
 
                       <td className="px-4 py-4">
@@ -719,6 +868,56 @@ export default function LaserPage() {
                       Atualiza sozinho quando você registra um pagamento na aba Boletos.
                     </p>
                   </div>
+
+                  {/* ✅ Parcelamento — gera as parcelas automaticamente (só ao criar) */}
+                  {!editando ? (
+                    <div className="rounded-2xl p-4" style={{ background: "rgba(232,122,122,0.06)", border: "1px solid rgba(232,122,122,0.25)" }}>
+                      <p className="text-xs uppercase tracking-widest mb-3 font-semibold" style={{ color: "#e87a7a" }}>
+                        🔴 Parcelamento do contrato
+                      </p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[11px] block mb-1" style={{ color: "var(--text-muted)" }}>Valor total (R$)</label>
+                          <input type="number" value={form.parc_total}
+                            onChange={e => {
+                              const total = e.target.value;
+                              setForm(f => ({ ...f, parc_total: total, parc_valor: (total && Number(f.parc_num) > 0) ? String(Math.round((Number(total) / Number(f.parc_num)) * 100) / 100) : f.parc_valor }));
+                            }}
+                            placeholder="0,00"
+                            className="w-full rounded-xl px-3 py-2 text-sm outline-none" style={inputStyle} />
+                        </div>
+                        <div>
+                          <label className="text-[11px] block mb-1" style={{ color: "var(--text-muted)" }}>Nº de parcelas</label>
+                          <input type="number" min="1" value={form.parc_num}
+                            onChange={e => {
+                              const num = e.target.value;
+                              setForm(f => ({ ...f, parc_num: num, parc_valor: (f.parc_total && Number(num) > 0) ? String(Math.round((Number(f.parc_total) / Number(num)) * 100) / 100) : f.parc_valor }));
+                            }}
+                            className="w-full rounded-xl px-3 py-2 text-sm outline-none" style={inputStyle} />
+                        </div>
+                        <div>
+                          <label className="text-[11px] block mb-1" style={{ color: "var(--text-muted)" }}>Valor da parcela (R$)</label>
+                          <input type="number" value={form.parc_valor}
+                            onChange={e => setForm(f => ({ ...f, parc_valor: e.target.value }))}
+                            placeholder="0,00"
+                            className="w-full rounded-xl px-3 py-2 text-sm outline-none" style={inputStyle} />
+                        </div>
+                        <div>
+                          <label className="text-[11px] block mb-1" style={{ color: "var(--text-muted)" }}>1º vencimento</label>
+                          <input type="date" value={form.parc_venc1}
+                            onChange={e => setForm(f => ({ ...f, parc_venc1: e.target.value }))}
+                            className="w-full rounded-xl px-3 py-2 text-sm outline-none" style={{ ...inputStyle, colorScheme: "dark" }} />
+                        </div>
+                      </div>
+                      <p className="text-[11px] mt-2" style={{ color: "var(--text-muted)" }}>
+                        Ao salvar, as {form.parc_num || "N"} parcelas são geradas com vencimento mensal a partir do 1º. Deixe em branco para não parcelar agora.
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+                      Para gerenciar as parcelas deste contrato, use o botão <strong style={{ color: "#e87a7a" }}>Parcelamento</strong> na tabela.
+                    </p>
+                  )}
                 </>
               )}
 
@@ -789,6 +988,135 @@ export default function LaserPage() {
           </div>
         </div>
       )}
+
+      {/* ✅ Modal de Parcelamento */}
+      {modalParcelas && (() => {
+        const r = montarResumo(parcelasLista, hojeISO);
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            style={{ background: "rgba(0,0,0,0.6)" }}
+            onClick={e => { if (e.target === e.currentTarget) setModalParcelas(null); }}>
+            <div className="w-full max-w-lg rounded-3xl p-6 max-h-[90vh] overflow-y-auto"
+              style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+
+              <div className="flex items-start justify-between mb-1">
+                <div>
+                  <p className="text-xs uppercase tracking-widest" style={{ color: "#e87a7a" }}>🔴 Parcelamento do boleto</p>
+                  <p className="font-bold text-lg mt-0.5" style={{ color: "var(--text-primary)" }}>{modalParcelas.pacientes?.nome}</p>
+                </div>
+                <button onClick={() => setModalParcelas(null)} style={{ color: "var(--text-muted)" }}>✕</button>
+              </div>
+
+              {/* Indicador */}
+              {r.tem && (
+                <div className="rounded-2xl px-4 py-3 mb-4 flex flex-wrap gap-x-4 gap-y-1 text-sm"
+                  style={{ background: "var(--bg-input)", border: "1px solid var(--border-subtle)" }}>
+                  <span style={{ color: "#7ae8a0" }}><strong>{r.pagas}</strong> de {r.total} pagas</span>
+                  <span style={{ color: "var(--text-muted)" }}>·</span>
+                  <span style={{ color: "var(--text-secondary)" }}><strong>{r.restantes}</strong> restantes</span>
+                  <span style={{ color: "var(--text-muted)" }}>·</span>
+                  <span style={{ color: r.em_aberto > 0 ? "#e87a7a" : "#7ae8a0" }}>
+                    R$ {r.em_aberto.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} em aberto
+                  </span>
+                </div>
+              )}
+
+              {carregandoParcelas ? (
+                <div className="py-10 text-center text-sm" style={{ color: "var(--text-muted)" }}>Carregando...</div>
+              ) : !r.tem ? (
+                /* Gerador */
+                <div>
+                  <p className="text-sm mb-3" style={{ color: "var(--text-muted)" }}>Este contrato ainda não tem parcelas. Gere agora:</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[11px] block mb-1" style={{ color: "var(--text-muted)" }}>Valor total (R$)</label>
+                      <input type="number" value={genParc.total}
+                        onChange={e => { const total = e.target.value; setGenParc(g => ({ ...g, total, valor: (total && Number(g.num) > 0) ? String(Math.round((Number(total) / Number(g.num)) * 100) / 100) : g.valor })); }}
+                        className="w-full rounded-xl px-3 py-2 text-sm outline-none" style={inputStyle} />
+                    </div>
+                    <div>
+                      <label className="text-[11px] block mb-1" style={{ color: "var(--text-muted)" }}>Nº de parcelas</label>
+                      <input type="number" min="1" value={genParc.num}
+                        onChange={e => { const num = e.target.value; setGenParc(g => ({ ...g, num, valor: (g.total && Number(num) > 0) ? String(Math.round((Number(g.total) / Number(num)) * 100) / 100) : g.valor })); }}
+                        className="w-full rounded-xl px-3 py-2 text-sm outline-none" style={inputStyle} />
+                    </div>
+                    <div>
+                      <label className="text-[11px] block mb-1" style={{ color: "var(--text-muted)" }}>Valor da parcela (R$)</label>
+                      <input type="number" value={genParc.valor}
+                        onChange={e => setGenParc(g => ({ ...g, valor: e.target.value }))}
+                        className="w-full rounded-xl px-3 py-2 text-sm outline-none" style={inputStyle} />
+                    </div>
+                    <div>
+                      <label className="text-[11px] block mb-1" style={{ color: "var(--text-muted)" }}>1º vencimento</label>
+                      <input type="date" value={genParc.venc1}
+                        onChange={e => setGenParc(g => ({ ...g, venc1: e.target.value }))}
+                        className="w-full rounded-xl px-3 py-2 text-sm outline-none" style={{ ...inputStyle, colorScheme: "dark" }} />
+                    </div>
+                  </div>
+                  <button onClick={gerarParcelas}
+                    className="w-full mt-4 py-3 rounded-2xl text-sm font-semibold uppercase tracking-widest transition hover:opacity-90"
+                    style={{ background: "#e87a7a", color: "white" }}>
+                    Gerar parcelas
+                  </button>
+                </div>
+              ) : (
+                /* Lista de parcelas */
+                <div className="space-y-2">
+                  {parcelasLista.map(pl => {
+                    const st = statusParcela(pl, hojeISO);
+                    const cfg = parcelaCfg[st];
+                    const pago = !!pl.data_pagamento;
+                    return (
+                      <div key={pl.id} className="rounded-2xl px-3 py-2.5 flex items-center gap-3"
+                        style={{ background: "var(--bg-input)", border: `1px solid ${cfg.color}30` }}>
+                        <span className="text-sm font-bold flex-shrink-0" style={{ color: "var(--text-secondary)", width: 34 }}>
+                          {pl.numero}/{pl.total_parcelas}
+                        </span>
+                        <input type="date" defaultValue={pl.vencimento}
+                          onBlur={e => { if (e.target.value && e.target.value !== pl.vencimento) patchParcela(pl.id, { vencimento: e.target.value }); }}
+                          className="rounded-lg px-2 py-1 text-xs outline-none"
+                          style={{ ...inputStyle, colorScheme: "dark", width: 120 }} />
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs" style={{ color: "var(--text-muted)" }}>R$</span>
+                          <input type="number" defaultValue={pl.valor}
+                            onBlur={e => { if (Number(e.target.value) !== Number(pl.valor)) patchParcela(pl.id, { valor: e.target.value }); }}
+                            className="rounded-lg px-2 py-1 text-xs outline-none" style={{ ...inputStyle, width: 74 }} />
+                        </div>
+                        <span className="text-[11px] px-2 py-0.5 rounded-full font-medium flex-shrink-0"
+                          style={{ color: cfg.color, background: cfg.bg }}>
+                          {cfg.emoji} {cfg.label}
+                        </span>
+                        <div className="ml-auto flex-shrink-0">
+                          {pago ? (
+                            <button onClick={() => patchParcela(pl.id, { data_pagamento: null })}
+                              title={`Pago em ${new Date(pl.data_pagamento + "T12:00:00").toLocaleDateString("pt-BR")}`}
+                              className="text-[11px] px-2 py-1 rounded-lg transition hover:opacity-70"
+                              style={{ color: "#7ae8a0" }}>
+                              ✓ {new Date(pl.data_pagamento + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
+                            </button>
+                          ) : (
+                            <button onClick={() => patchParcela(pl.id, { data_pagamento: true })}
+                              className="text-[11px] px-2.5 py-1 rounded-lg font-medium transition hover:opacity-80"
+                              style={{ background: "rgba(122,232,160,0.12)", color: "#7ae8a0", border: "1px solid rgba(122,232,160,0.3)" }}>
+                              Marcar pago
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <button onClick={regenerarParcelas}
+                    className="w-full mt-3 py-2 rounded-xl text-xs uppercase tracking-widest transition hover:opacity-70"
+                    style={{ border: "1px solid var(--border-color)", color: "var(--text-muted)" }}>
+                    ↻ Regenerar parcelas
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
       <style>{`select option { background: var(--bg-card); } input::placeholder, textarea::placeholder { color: var(--text-muted); }`}</style>
     </div>
   );
