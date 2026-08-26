@@ -133,6 +133,8 @@ export default function ProntuarioPage() {
   const [modalFoto, setModalFoto] = useState(false);
   const [modalVerAtendimento, setModalVerAtendimento] = useState<any | null>(null);
   const [formFoto, setFormFoto] = useState({ tipo: "antes", descricao: "" });
+  const [modalFaturamento, setModalFaturamento] = useState(false);
+  const [formFaturamento, setFormFaturamento] = useState({ valor: "", forma_pagamento: "pix", status_pagamento: "pago", observacoes: "" });
   const tiposAnotacao = [
     { key: "geral", label: "Geral", cor: "var(--text-muted)" },
     { key: "clinica", label: "Clinica", cor: "var(--info)" },
@@ -187,6 +189,7 @@ export default function ProntuarioPage() {
       setModalConsulta(false); setModalAnamnese(false);
       setModalPrescricao(false); setModalExame(false);
       setModalAnotacao(false); setModalSaude(false);
+      setModalFaturamento(false);
     } else toast.error("Erro ao salvar");
     setSalvando(false);
   }
@@ -651,9 +654,16 @@ export default function ProntuarioPage() {
 
       {abaAtiva === "financeiro" && (
         <div className="rounded-3xl overflow-hidden" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-          <div className="px-6 py-4 flex justify-between" style={{ borderBottom: "1px solid var(--border-subtle)" }}>
+          <div className="px-6 py-4 flex items-center justify-between gap-3" style={{ borderBottom: "1px solid var(--border-subtle)" }}>
             <h2 className="text-xs uppercase tracking-widest" style={{ color: "var(--gold)" }}>Historico Financeiro</h2>
-            <p className="text-sm font-bold" style={{ color: "var(--success)" }}>Total: R$ {totalGasto.toLocaleString("pt-BR")}</p>
+            <div className="flex items-center gap-4">
+              <p className="text-sm font-bold" style={{ color: "var(--success)" }}>Total: R$ {totalGasto.toLocaleString("pt-BR")}</p>
+              <button onClick={() => { setFormFaturamento({ valor: "", forma_pagamento: "pix", status_pagamento: "pago", observacoes: "" }); setModalFaturamento(true); }}
+                className="px-4 py-2 rounded-2xl text-sm font-semibold whitespace-nowrap"
+                style={{ background: "var(--gold)", color: "#0a0707" }}>
+                + Adicionar
+              </button>
+            </div>
           </div>
           {faturamentos.length === 0 ? (
             <div className="text-center py-16"><p className="text-4xl mb-3">💰</p><p style={{ color: "var(--text-muted)" }}>Nenhum registro</p></div>
@@ -664,6 +674,7 @@ export default function ProntuarioPage() {
                   <div>
                     <p className="text-sm font-semibold" style={{ color: "var(--gold)" }}>R$ {Number(f.valor_final).toLocaleString("pt-BR")}</p>
                     <p className="text-xs" style={{ color: "var(--text-muted)" }}>{f.forma_pagamento}</p>
+                    {f.observacoes && <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>{f.observacoes}</p>}
                   </div>
                   <div className="text-right">
                     <span className="text-xs px-2 py-0.5 rounded-full" style={{
@@ -758,6 +769,76 @@ export default function ProntuarioPage() {
             </div>
             <div className="flex gap-3 mt-5">
               <button onClick={() => setModalFoto(false)} className="flex-1 py-3 rounded-2xl text-sm" style={{ border: "1px solid var(--border-color)", color: "var(--text-muted)" }}>Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: adicionar registro financeiro */}
+      {modalFaturamento && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}>
+          <div className="w-full max-w-md rounded-3xl p-6" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-bold" style={{ color: "var(--gold)" }}>Adicionar Registro Financeiro</h2>
+              <button onClick={() => setModalFaturamento(false)} style={{ color: "var(--text-muted)" }}>✕</button>
+            </div>
+            <div className="flex flex-col gap-4">
+              <div>
+                <label className="block text-xs uppercase tracking-widest mb-2" style={{ color: "var(--text-muted)" }}>Valor (R$)</label>
+                <input type="number" inputMode="decimal" value={formFaturamento.valor}
+                  onChange={e => setFormFaturamento(f => ({ ...f, valor: e.target.value }))}
+                  className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
+                  style={{ background: "var(--bg-input)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
+                  placeholder="0,00" />
+              </div>
+              <div>
+                <label className="block text-xs uppercase tracking-widest mb-2" style={{ color: "var(--text-muted)" }}>Forma de pagamento</label>
+                <select value={formFaturamento.forma_pagamento} onChange={e => setFormFaturamento(f => ({ ...f, forma_pagamento: e.target.value }))}
+                  className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
+                  style={{ background: "var(--bg-input)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
+                  <option value="pix">PIX</option>
+                  <option value="dinheiro">Dinheiro</option>
+                  <option value="debito">Cartão Débito</option>
+                  <option value="credito">Cartão Crédito</option>
+                  <option value="transferencia">Transferência</option>
+                  <option value="boleto">Boleto</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs uppercase tracking-widest mb-2" style={{ color: "var(--text-muted)" }}>Status</label>
+                <div className="flex gap-2">
+                  {[{ k: "pago", l: "Pago" }, { k: "pendente", l: "Pendente" }].map(s => (
+                    <button key={s.k} onClick={() => setFormFaturamento(f => ({ ...f, status_pagamento: s.k }))}
+                      className="flex-1 py-2.5 rounded-xl text-sm transition"
+                      style={{
+                        background: formFaturamento.status_pagamento === s.k ? (s.k === "pago" ? "rgba(122,232,160,0.12)" : "rgba(232,201,122,0.12)") : "var(--bg-input)",
+                        color: formFaturamento.status_pagamento === s.k ? (s.k === "pago" ? "var(--success)" : "var(--warning)") : "var(--text-muted)",
+                        border: `1px solid ${formFaturamento.status_pagamento === s.k ? (s.k === "pago" ? "var(--success)" : "var(--warning)") : "var(--border-subtle)"}`,
+                      }}>
+                      {s.l}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs uppercase tracking-widest mb-2" style={{ color: "var(--text-muted)" }}>Observação <span style={{ textTransform: "none" }}>(opcional)</span></label>
+                <input value={formFaturamento.observacoes} onChange={e => setFormFaturamento(f => ({ ...f, observacoes: e.target.value }))}
+                  className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
+                  style={{ background: "var(--bg-input)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
+                  placeholder="Ex: Aplicação de botox, sessão de laser..." />
+              </div>
+            </div>
+            <div className="flex gap-3 mt-5">
+              <button onClick={() => setModalFaturamento(false)} className="flex-1 py-3 rounded-2xl text-sm" style={{ border: "1px solid var(--border-color)", color: "var(--text-muted)" }}>Cancelar</button>
+              <button onClick={() => salvarDados("faturamento", formFaturamento)}
+                disabled={salvando || !formFaturamento.valor || Number(formFaturamento.valor) <= 0}
+                className="flex-1 py-3 rounded-2xl text-sm font-semibold"
+                style={{
+                  background: !salvando && Number(formFaturamento.valor) > 0 ? "var(--gold)" : "rgba(200,160,120,0.3)",
+                  color: "#0a0707",
+                }}>
+                {salvando ? "Salvando..." : "Salvar"}
+              </button>
             </div>
           </div>
         </div>

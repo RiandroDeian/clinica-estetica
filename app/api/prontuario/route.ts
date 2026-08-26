@@ -117,6 +117,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(data);
   }
 
+  if (acao === "faturamento") {
+    const valor = Number(body.valor) || 0;
+    const { data, error } = await supabaseAdmin.from("faturamentos").insert({
+      paciente_id, funcionario_id: sessao.id,
+      valor,
+      valor_final: valor,
+      forma_pagamento: body.forma_pagamento || null,
+      status_pagamento: body.status_pagamento || "pago",
+      observacoes: body.observacoes || null,
+    }).select().single();
+    if (error) return NextResponse.json({ erro: error.message }, { status: 500 });
+    return NextResponse.json(data);
+  }
+
   if (acao === "atualizar_paciente") {
     const { data, error } = await supabaseAdmin.from("pacientes").update({
       alergias: body.alergias, contraindicacoes: body.contraindicacoes,
