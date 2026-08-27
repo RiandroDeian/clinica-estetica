@@ -190,7 +190,10 @@ export default function ProntuarioPage() {
       setModalPrescricao(false); setModalExame(false);
       setModalAnotacao(false); setModalSaude(false);
       setModalFaturamento(false);
-    } else toast.error("Erro ao salvar");
+    } else {
+      const d = await res.json().catch(() => ({}));
+      toast.error(d.erro ? `Erro ao salvar: ${d.erro}` : "Erro ao salvar");
+    }
     setSalvando(false);
   }
 
