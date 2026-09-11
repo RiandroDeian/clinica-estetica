@@ -30,14 +30,19 @@ export async function POST(request: NextRequest) {
 
   if (!pacote_id) return NextResponse.json({ erro: "pacote_id obrigatório" }, { status: 400 });
 
-  // Pega o número da próxima sessão
+  // Pega o número da próxima sessão + dados para congelar o valor reconhecido
   const { data: pacoteAtual } = await supabaseAdmin
     .from("laser_pacotes")
-    .select("sessoes_feitas")
+    .select("sessoes_feitas, valor, total_sessoes")
     .eq("id", pacote_id)
     .single();
 
   const proximaSessao = (pacoteAtual?.sessoes_feitas ?? 0) + 1;
+
+  // Valor reconhecido = valor do pacote / total de sessões, CONGELADO neste momento.
+  // Mudanças futuras no valor do pacote não afetam o que já foi executado.
+  const totalSess = Number(pacoteAtual?.total_sessoes ?? 0) || 1;
+  const valorReconhecido = Math.round((Number(pacoteAtual?.valor ?? 0) / totalSess) * 100) / 100;
 
   const { data, error } = await supabaseAdmin
     .from("laser_sessoes")
@@ -49,6 +54,7 @@ export async function POST(request: NextRequest) {
       realizada_em: data_sessao ? new Date(data_sessao).toISOString() : new Date().toISOString(),
       observacoes: observacoes || null,
       intercorrencias: intercorrencias || null,
+      valor_reconhecido: valorReconhecido,
     })
     .select("*, funcionarios(nome, cor)")
     .single();

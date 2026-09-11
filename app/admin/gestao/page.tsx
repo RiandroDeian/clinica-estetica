@@ -41,16 +41,21 @@ const INDICADORES_META = [
 const ORIGENS = ["Instagram", "Facebook", "Google", "Anúncio pago", "Indicação de paciente", "Indicação de parceiro", "Passou em frente", "Já era paciente", "Outro"];
 
 const ABAS = [
-  { key: "dashboard",     label: "Dashboard",     ativa: true },
-  { key: "financeiro",    label: "Financeiro",    ativa: true },
-  { key: "procedimentos", label: "Procedimentos", ativa: true },
-  { key: "origem",        label: "Origem",        ativa: true },
-  { key: "metas",         label: "Metas",         ativa: true },
-  { key: "historico",     label: "Histórico",     ativa: true },
-  { key: "funil",         label: "Funil",         ativa: true },
-  { key: "relatorios",    label: "Relatórios",    ativa: true },
-  { key: "config",        label: "Configurações", ativa: true },
+  { key: "dashboard",     label: "Dashboard",     ativa: true, fin: false },
+  { key: "financeiro",    label: "Financeiro",    ativa: true, fin: true },
+  { key: "funil",         label: "Funil",         ativa: true, fin: false },
+  { key: "procedimentos", label: "Procedimentos", ativa: true, fin: false },
+  { key: "profissionais", label: "Profissionais", ativa: true, fin: true },
+  { key: "origem",        label: "Origem",        ativa: true, fin: false },
+  { key: "contatar",      label: "Contatar",      ativa: true, fin: false },
+  { key: "metas",         label: "Metas",         ativa: true, fin: false },
+  { key: "historico",     label: "Histórico",     ativa: true, fin: true },
+  { key: "relatorios",    label: "Relatórios",    ativa: true, fin: true },
+  { key: "config",        label: "Configurações", ativa: true, fin: false },
 ];
+
+// Cards que são financeiros/estratégicos (escondidos de quem não tem permissão "financeiro").
+const CARDS_FIN = new Set(["valor_fechado", "valor_recebido", "valor_executado", "ticket_medio", "valor_proposto", "valor_perdido", "inadimplencia"]);
 
 export default function GestaoPage() {
   const [aba, setAba] = useState("dashboard");
@@ -83,6 +88,9 @@ export default function GestaoPage() {
   const [origem, setOrigem] = useState<any[]>([]);
   const [funil, setFunil] = useState<any>(null);
   const [perdas, setPerdas] = useState<any[]>([]);
+  const [profissionais, setProfissionais] = useState<any[]>([]);
+  const [contatar, setContatar] = useState<any>(null);
+  const [viewer, setViewer] = useState<{ financeiro: boolean } | null>(null);
   const [historico, setHistorico] = useState<any[]>([]);
   const [metas, setMetas] = useState<any[]>([]);
   const [funcionarios, setFuncionarios] = useState<any[]>([]);
@@ -91,19 +99,22 @@ export default function GestaoPage() {
   const carregar = useCallback(async () => {
     setCarregando(true);
     const per = `inicio=${ciclo.inicio.toISOString()}&fim=${ciclo.fim.toISOString()}`;
-    const [rK, rP, rO, rF, rL] = await Promise.all([
+    const [rK, rP, rO, rF, rL, rPro] = await Promise.all([
       fetch(`/api/gestao?${qs}`).then(r => r.json()),
       fetch(`/api/gestao/procedimentos?${per}`).then(r => r.json()),
       fetch(`/api/gestao/origem?${per}`).then(r => r.json()),
       fetch(`/api/gestao/funil?${per}`).then(r => r.json()),
       fetch(`/api/gestao/perdas?${per}`).then(r => r.json()),
+      fetch(`/api/gestao/profissionais?${per}`).then(r => r.json()),
     ]);
     setKpis(rK?.kpis ?? null);
     setDrill(rK?.drill ?? null);
+    setViewer(rK?.viewer ?? null);
     setProcs(Array.isArray(rP) ? rP : []);
     setOrigem(Array.isArray(rO) ? rO : []);
     setFunil(rF && !rF.erro ? rF : null);
     setPerdas(Array.isArray(rL) ? rL : []);
+    setProfissionais(Array.isArray(rPro) ? rPro : []);
     setCarregando(false);
   }, [qs, ciclo]);
 
@@ -124,9 +135,17 @@ export default function GestaoPage() {
   }, [ciclo.ref]);
   useEffect(() => { if (aba === "metas") carregarMetas(); }, [aba, carregarMetas]);
 
-  const abrirDrill = (key: string) => {
-    if (key === "pacientes_novos" && drill?.pacientes_novos) setModalDrill({ titulo: "Pacientes novos", itens: drill.pacientes_novos.map((p: any) => ({ nome: p.nome, extra: p.origem || "Sem origem", data: p.data })) });
-    if (key === "fechamentos" && drill?.fechamentos) setModalDrill({ titulo: "Fechamentos", itens: drill.fechamentos.map((f: any) => ({ nome: `${f.tipo} · ${f.nome}`, extra: fmtMoney(f.valor), data: f.data })) });
+  // Fetch de "Contatar" ao abrir a aba (não depende de ciclo)
+  useEffect(() => {
+    if (aba !== "contatar" || contatar) return;
+    fetch("/api/gestao/contatar").then(r => r.json()).then(d => setContatar(d && !d.erro ? d : { semAgenda: [], orcamentos: [], parcelas: [] }));
+  }, [aba, contatar]);
+
+  // Qual chave de drill usar para cada card (valor fechado reaproveita a lista de fechamentos)
+  const drillKey = (key: string) => (drill?.[key] ? key : key === "valor_fechado" ? "fechamentos" : null);
+  const abrirDrill = (cardKey: string, titulo: string) => {
+    const k = drillKey(cardKey);
+    if (k && drill?.[k]) setModalDrill({ titulo, itens: drill[k] });
   };
 
   return (
@@ -166,9 +185,9 @@ export default function GestaoPage() {
         </button>
       </div>
 
-      {/* Abas */}
+      {/* Abas (esconde as financeiras de quem não tem permissão "financeiro") */}
       <div className="flex gap-2 flex-wrap">
-        {ABAS.map(a => (
+        {ABAS.filter(a => !(a.fin && viewer && !viewer.financeiro)).map(a => (
           <button key={a.key} onClick={() => a.ativa && setAba(a.key)} disabled={!a.ativa}
             className="px-4 py-2 rounded-2xl text-sm font-medium transition"
             style={{
@@ -192,7 +211,10 @@ export default function GestaoPage() {
         <>
           {aba === "dashboard" && kpis && (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-              {CARDS.map(c => <CardKpi key={c.key} cfg={c} kpi={kpis[c.key]} onClick={() => abrirDrill(c.key)} />)}
+              {CARDS.filter(c => !(CARDS_FIN.has(c.key) && viewer && !viewer.financeiro)).map(c => {
+                const clicavel = !!drillKey(c.key) && !!kpis[c.key]?.tem;
+                return <CardKpi key={c.key} cfg={c} kpi={kpis[c.key]} clicavel={clicavel} onClick={() => abrirDrill(c.key, c.label)} />;
+              })}
             </div>
           )}
 
@@ -239,7 +261,20 @@ export default function GestaoPage() {
           )}
 
           {aba === "funil" && (
-            <FunilTab funil={funil} perdas={perdas} />
+            <FunilTab funil={funil} perdas={perdas} onDrill={(key, label) => { if (funil?.drill?.[key]) setModalDrill({ titulo: label, itens: funil.drill[key] }); }} />
+          )}
+
+          {aba === "profissionais" && (
+            <TabelaSimples
+              vazio="Nenhum profissional com movimento no ciclo"
+              cols={["Profissional", "Fechado", "Recebido", "Executado", "Comparec.", "Ticket"]}
+              alinhamentos={["left", "right", "right", "right", "right", "right"]}
+              linhas={profissionais.map(p => [p.nome, fmtMoney(p.fechado), fmtMoney(p.recebido), fmtMoney(p.executado), fmtInt(p.comparecimentos), p.ticket != null ? fmtMoney(p.ticket) : "—"])}
+            />
+          )}
+
+          {aba === "contatar" && (
+            <ContatarTab dados={contatar} />
           )}
 
           {aba === "relatorios" && kpis && (
@@ -283,11 +318,10 @@ export default function GestaoPage() {
 }
 
 // ===== Card de KPI =====
-function CardKpi({ cfg, kpi, onClick }: { cfg: { key: string; label: string; tipo: "money" | "int"; bomSobe: boolean }; kpi?: Kpi; onClick?: () => void }) {
+function CardKpi({ cfg, kpi, onClick, clicavel }: { cfg: { key: string; label: string; tipo: "money" | "int"; bomSobe: boolean }; kpi?: Kpi; onClick?: () => void; clicavel?: boolean }) {
   const tem = kpi?.tem && kpi.valor != null;
-  const valorTxt = tem ? (cfg.tipo === "money" ? fmtMoney(kpi!.valor as number) : fmtInt(kpi!.valor as number)) : "—";
+  const valorTxt = tem ? (cfg.tipo === "money" ? fmtMoney(kpi!.valor as number) : (cfg.key === "taxa_conversao" || cfg.key === "aproveitamento" ? `${(kpi!.valor as number).toFixed(1)}%` : fmtInt(kpi!.valor as number))) : "—";
   const v = kpi?.variacao;
-  const clicavel = !!onClick && (cfg.key === "pacientes_novos" || cfg.key === "fechamentos") && tem;
 
   let corVar = "var(--text-muted)";
   let seta = "";
@@ -485,7 +519,7 @@ function HistoricoTab({ dados }: { dados: any[] }) {
 }
 
 // ===== Aba Funil =====
-function FunilTab({ funil, perdas }: { funil: any; perdas: any[] }) {
+function FunilTab({ funil, perdas, onDrill }: { funil: any; perdas: any[]; onDrill: (key: string, label: string) => void }) {
   if (!funil) return <div className="text-center py-16 rounded-3xl" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}><p style={{ color: "var(--text-muted)" }}>Sem dados de funil no ciclo</p></div>;
   const etapas = funil.etapas ?? [];
   const maxQtd = Math.max(1, ...etapas.map((e: any) => e.qtd));
@@ -508,7 +542,7 @@ function FunilTab({ funil, perdas }: { funil: any; perdas: any[] }) {
       {/* Barras do funil */}
       <div className="rounded-3xl p-5 flex flex-col gap-2" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
         {etapas.map((e: any) => (
-          <div key={e.key} className="flex items-center gap-3">
+          <button key={e.key} onClick={() => onDrill(e.key, `${e.label} (${e.qtd})`)} className="flex items-center gap-3 text-left transition hover:opacity-80" style={{ cursor: e.qtd > 0 ? "pointer" : "default" }}>
             <span className="text-xs w-24 flex-shrink-0" style={{ color: "var(--text-secondary)" }}>{e.label}</span>
             <div className="flex-1 h-8 rounded-lg overflow-hidden" style={{ background: "var(--bg-input)" }}>
               <div className="h-full rounded-lg flex items-center px-2" style={{ width: `${Math.max(4, (e.qtd / maxQtd) * 100)}%`, background: corEtapa[e.key] ?? "var(--gold)", minWidth: 32 }}>
@@ -519,7 +553,7 @@ function FunilTab({ funil, perdas }: { funil: any; perdas: any[] }) {
               {e.valor > 0 ? fmtMoney(e.valor) : ""}
               {e.conversao != null ? `  ${e.conversao.toFixed(0)}%` : ""}
             </span>
-          </div>
+          </button>
         ))}
       </div>
 
@@ -591,6 +625,46 @@ function ConfigTab({ ciclo }: { ciclo: Ciclo }) {
         <h3 className="text-sm font-bold mb-2" style={{ color: "var(--gold)" }}>Funil de vendas</h3>
         <p className="text-sm" style={{ color: "var(--text-secondary)" }}>O funil usa os <strong>orçamentos</strong>: proposta enviada → <strong>aprovado</strong> (fechado, pela data de fechamento) ou <strong>recusado/expirado</strong> (perdido, com motivo). Registre os orçamentos na aba Orçamentos para alimentar conversão, valor proposto e motivos de perda.</p>
       </div>
+    </div>
+  );
+}
+
+// ===== Aba Contatar =====
+function ContatarTab({ dados }: { dados: any }) {
+  if (!dados) return <div className="text-center py-16 rounded-3xl" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}><p style={{ color: "var(--text-muted)" }}>Carregando...</p></div>;
+  const so = (tel: string) => (tel || "").replace(/\D/g, "");
+  const grupos = [
+    { titulo: "Sem agendamento futuro", cor: "#e87a7a", itens: dados.semAgenda ?? [] },
+    { titulo: "Orçamento enviado sem resposta", cor: "#e8c97a", itens: dados.orcamentos ?? [] },
+    { titulo: "Parcela vencida", cor: "#e87a7a", itens: dados.parcelas ?? [] },
+  ];
+  return (
+    <div className="flex flex-col gap-5">
+      {grupos.map(g => (
+        <div key={g.titulo}>
+          <h3 className="text-xs uppercase tracking-widest mb-2" style={{ color: g.cor }}>{g.titulo} ({g.itens.length})</h3>
+          {g.itens.length === 0 ? (
+            <div className="rounded-2xl px-4 py-4 text-sm" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-muted)" }}>Ninguém nesta lista 🎉</div>
+          ) : (
+            <div className="rounded-2xl overflow-hidden" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+              {g.itens.map((it: any, i: number) => (
+                <div key={i} className="flex items-center justify-between px-4 py-3" style={{ borderBottom: i < g.itens.length - 1 ? "1px solid var(--border-subtle)" : "none" }}>
+                  <div>
+                    <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>{it.nome}</p>
+                    <p className="text-xs" style={{ color: "var(--text-muted)" }}>{it.info}{it.telefone ? ` · ${it.telefone}` : ""}</p>
+                  </div>
+                  {so(it.telefone) && (
+                    <a href={`https://wa.me/55${so(it.telefone)}`} target="_blank" rel="noopener noreferrer"
+                      className="text-xs px-3 py-1.5 rounded-xl font-medium flex-shrink-0" style={{ background: "rgba(122,232,160,0.12)", color: "#7ae8a0", border: "1px solid rgba(122,232,160,0.3)" }}>
+                      WhatsApp
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
     </div>
   );
 }

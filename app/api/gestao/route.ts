@@ -33,7 +33,7 @@ async function calcular(f: Faixa) {
     supabaseAdmin.from("laser_parcelas").select("id, valor, data_pagamento").gte("data_pagamento", inicioDate).lt("data_pagamento", fimDate),
     supabaseAdmin.from("laser_pacotes").select("id, valor, total_sessoes, procedimento, criado_em").gte("criado_em", inicio).lt("criado_em", fim),
     supabaseAdmin.from("pacotes").select("id, valor, nome_pacote, comprado_em").gte("comprado_em", inicio).lt("comprado_em", fim),
-    supabaseAdmin.from("laser_sessoes").select("id, pacote_id, realizada_em").gte("realizada_em", inicio).lt("realizada_em", fim),
+    supabaseAdmin.from("laser_sessoes").select("id, pacote_id, realizada_em, valor_reconhecido").gte("realizada_em", inicio).lt("realizada_em", fim),
     // Orçamentos PROPOSTOS no ciclo (por criação) — exclui rascunho.
     supabaseAdmin.from("orcamentos").select("id, status, valor_final, criado_em").gte("criado_em", inicio).lt("criado_em", fim),
     // Orçamentos FECHADOS no ciclo (por data de fechamento) — a data manda no ciclo.
@@ -58,11 +58,15 @@ async function calcular(f: Faixa) {
   const sessoes = laserSessoes.data ?? [];
   let executado = 0;
   if (sessoes.length) {
-    const ids = Array.from(new Set(sessoes.map(s => s.pacote_id).filter(Boolean)));
-    const { data: pcsSess } = await supabaseAdmin.from("laser_pacotes").select("id, valor, total_sessoes").in("id", ids as string[]);
+    // Sessões sem valor congelado (antigas) usam o fallback valor/total_sessoes.
+    const semValor = sessoes.filter(s => s.valor_reconhecido == null).map(s => s.pacote_id).filter(Boolean);
     const mapa: Record<string, { valor: number; total: number }> = {};
-    for (const p of pcsSess ?? []) mapa[p.id] = { valor: Number(p.valor ?? 0), total: Number(p.total_sessoes ?? 0) || 1 };
+    if (semValor.length) {
+      const { data: pcsSess } = await supabaseAdmin.from("laser_pacotes").select("id, valor, total_sessoes").in("id", Array.from(new Set(semValor)) as string[]);
+      for (const p of pcsSess ?? []) mapa[p.id] = { valor: Number(p.valor ?? 0), total: Number(p.total_sessoes ?? 0) || 1 };
+    }
     executado = sessoes.reduce((s, x) => {
+      if (x.valor_reconhecido != null) return s + Number(x.valor_reconhecido);
       const p = mapa[x.pacote_id];
       return s + (p ? p.valor / p.total : 0);
     }, 0);
@@ -95,6 +99,10 @@ async function calcular(f: Faixa) {
     perdidoCount: perdidos.length,
     perdidoValor,
     fechamentosOrc: orcamentosFechados.data?.length ?? 0,
+    agendamentosLista: ags.map(a => ({ nome: a.nome || "Paciente", status: a.status, data: a.inicio })),
+    comparecimentosLista: compareceram.map(a => ({ nome: a.nome || "Paciente", status: a.status, data: a.inicio })),
+    naoCompareceuLista: naoCompareceu.map(a => ({ nome: a.nome || "Paciente", status: a.status, data: a.inicio })),
+    canceladosLista: ags.filter(a => a.status === "cancelado").map(a => ({ nome: a.nome || "Paciente", status: a.status, data: a.inicio })),
     fechamentosLista: [
       ...lps.map(x => ({ id: x.id, tipo: "Laser", nome: x.procedimento ?? "Laser", valor: Number(x.valor ?? 0), data: x.criado_em })),
       ...pcs.map(x => ({ id: x.id, tipo: "Pacote", nome: x.nome_pacote ?? "Pacote", valor: Number(x.valor ?? 0), data: x.comprado_em })),
@@ -107,7 +115,7 @@ async function acumuladoAteFim(fim: string) {
   const [lp, pc, sess] = await Promise.all([
     supabaseAdmin.from("laser_pacotes").select("valor").lt("criado_em", fim),
     supabaseAdmin.from("pacotes").select("valor").lt("comprado_em", fim),
-    supabaseAdmin.from("laser_sessoes").select("pacote_id").lt("realizada_em", fim),
+    supabaseAdmin.from("laser_sessoes").select("pacote_id, valor_reconhecido").lt("realizada_em", fim),
   ]);
   const fechadoAcum = (lp.data ?? []).reduce((s, x) => s + Number(x.valor ?? 0), 0)
     + (pc.data ?? []).reduce((s, x) => s + Number(x.valor ?? 0), 0);
@@ -115,11 +123,13 @@ async function acumuladoAteFim(fim: string) {
   let executadoAcum = 0;
   const sessoes = sess.data ?? [];
   if (sessoes.length) {
-    const ids = Array.from(new Set(sessoes.map(s => s.pacote_id).filter(Boolean)));
-    const { data: pcsSess } = await supabaseAdmin.from("laser_pacotes").select("id, valor, total_sessoes").in("id", ids as string[]);
+    const semValor = sessoes.filter(s => s.valor_reconhecido == null).map(s => s.pacote_id).filter(Boolean);
     const mapa: Record<string, number> = {};
-    for (const p of pcsSess ?? []) mapa[p.id] = (Number(p.valor ?? 0)) / ((Number(p.total_sessoes ?? 0)) || 1);
-    executadoAcum = sessoes.reduce((s, x) => s + (mapa[x.pacote_id] ?? 0), 0);
+    if (semValor.length) {
+      const { data: pcsSess } = await supabaseAdmin.from("laser_pacotes").select("id, valor, total_sessoes").in("id", Array.from(new Set(semValor)) as string[]);
+      for (const p of pcsSess ?? []) mapa[p.id] = (Number(p.valor ?? 0)) / ((Number(p.total_sessoes ?? 0)) || 1);
+    }
+    executadoAcum = sessoes.reduce((s, x) => s + (x.valor_reconhecido != null ? Number(x.valor_reconhecido) : (mapa[x.pacote_id] ?? 0)), 0);
   }
   return { fechadoAcum, executadoAcum, aExecutar: fechadoAcum - executadoAcum };
 }
@@ -185,8 +195,17 @@ export async function GET(request: NextRequest) {
       inadimplencia:    kpi(inadimplencia, null, true),
     },
     drill: {
-      pacientes_novos: atual.pacientesNovos.map(p => ({ id: p.id, nome: p.nome, origem: p.origem, data: p.criado_em })),
-      fechamentos: atual.fechamentosLista,
+      pacientes_novos: atual.pacientesNovos.map(p => ({ nome: p.nome, extra: p.origem || "Sem origem", data: p.criado_em })),
+      agendamentos:    atual.agendamentosLista.map(a => ({ nome: a.nome, extra: a.status, data: a.data })),
+      comparecimentos: atual.comparecimentosLista.map(a => ({ nome: a.nome, extra: "compareceu", data: a.data })),
+      nao_compareceu:  atual.naoCompareceuLista.map(a => ({ nome: a.nome, extra: a.status, data: a.data })),
+      cancelados:      atual.canceladosLista.map(a => ({ nome: a.nome, extra: "cancelado", data: a.data })),
+      fechamentos:     atual.fechamentosLista.map((f: any) => ({ nome: `${f.tipo} · ${f.nome}`, extra: "R$ " + Number(f.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 }), data: f.data })),
+    },
+    viewer: {
+      id: sessao.id,
+      role: (sessao as any).role ?? "",
+      financeiro: (sessao as any).role === "admin" || !!(sessao as any).permissoes?.financeiro,
     },
   });
 }

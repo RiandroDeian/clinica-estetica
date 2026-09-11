@@ -16,25 +16,42 @@ export async function GET(request: NextRequest) {
   const fimDate = fim.slice(0, 10);
 
   const [leads, agendamentos, orcs, fechados] = await Promise.all([
-    supabaseAdmin.from("crm_leads").select("id").gte("criado_em", inicio).lt("criado_em", fim),
-    supabaseAdmin.from("agendamentos").select("paciente_id, status").gte("inicio", inicio).lt("inicio", fim),
-    supabaseAdmin.from("orcamentos").select("id, status, valor_final").gte("criado_em", inicio).lt("criado_em", fim),
-    supabaseAdmin.from("orcamentos").select("id, valor_final").eq("status", "aprovado").gte("data_fechamento", inicioDate).lt("data_fechamento", fimDate),
+    supabaseAdmin.from("crm_leads").select("id, nome").gte("criado_em", inicio).lt("criado_em", fim),
+    supabaseAdmin.from("agendamentos").select("paciente_id, nome, status").gte("inicio", inicio).lt("inicio", fim),
+    supabaseAdmin.from("orcamentos").select("id, nome, status, valor_final, pacientes(nome)").gte("criado_em", inicio).lt("criado_em", fim),
+    supabaseAdmin.from("orcamentos").select("id, nome, valor_final, pacientes(nome)").eq("status", "aprovado").gte("data_fechamento", inicioDate).lt("data_fechamento", fimDate),
   ]);
 
   const ags = agendamentos.data ?? [];
-  const agendados = new Set(ags.map(a => a.paciente_id).filter(Boolean));
-  const compareceram = new Set(ags.filter(a => a.status === "finalizado").map(a => a.paciente_id).filter(Boolean));
+  // dedup por paciente, guardando um nome para o drill
+  const agMap = new Map<string, string>();
+  const compMap = new Map<string, string>();
+  for (const a of ags) {
+    if (!a.paciente_id) continue;
+    if (!agMap.has(a.paciente_id)) agMap.set(a.paciente_id, a.nome || "Paciente");
+    if (a.status === "finalizado" && !compMap.has(a.paciente_id)) compMap.set(a.paciente_id, a.nome || "Paciente");
+  }
   const propostas = (orcs.data ?? []).filter(o => o.status !== "rascunho");
   const perdidos = (orcs.data ?? []).filter(o => o.status === "recusado" || o.status === "expirado");
   const fech = fechados.data ?? [];
 
   const soma = (arr: any[]) => arr.reduce((s, x) => s + Number(x.valor_final ?? 0), 0);
+  const nomeOrc = (o: any) => (o.pacientes?.nome || o.nome || "—");
+  const money = (v: number) => "R$ " + Number(v ?? 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 });
+
+  const drill: Record<string, { nome: string; extra: string }[]> = {
+    lead:       (leads.data ?? []).map(l => ({ nome: l.nome || "Lead", extra: "" })),
+    agendado:   Array.from(agMap.values()).map(n => ({ nome: n, extra: "" })),
+    compareceu: Array.from(compMap.values()).map(n => ({ nome: n, extra: "" })),
+    orcamento:  propostas.map(o => ({ nome: nomeOrc(o), extra: money(o.valor_final) })),
+    fechado:    fech.map(o => ({ nome: nomeOrc(o), extra: money(o.valor_final) })),
+    perdido:    perdidos.map(o => ({ nome: nomeOrc(o), extra: money(o.valor_final) })),
+  };
 
   const etapas = [
     { key: "lead",       label: "Lead",       qtd: (leads.data ?? []).length, valor: 0 },
-    { key: "agendado",   label: "Agendado",   qtd: agendados.size,            valor: 0 },
-    { key: "compareceu", label: "Compareceu", qtd: compareceram.size,         valor: 0 },
+    { key: "agendado",   label: "Agendado",   qtd: agMap.size,                valor: 0 },
+    { key: "compareceu", label: "Compareceu", qtd: compMap.size,              valor: 0 },
     { key: "orcamento",  label: "Orçamento",  qtd: propostas.length,          valor: soma(propostas) },
     { key: "fechado",    label: "Fechado",    qtd: fech.length,               valor: soma(fech) },
     { key: "perdido",    label: "Perdido",    qtd: perdidos.length,           valor: soma(perdidos) },
@@ -57,5 +74,5 @@ export async function GET(request: NextRequest) {
   const conversaoTotal = topo > 0 ? (fechadoQtd / topo) * 100 : null;
   const valorMovimentado = soma(propostas);
 
-  return NextResponse.json({ etapas: comConversao, conversaoTotal, valorMovimentado });
+  return NextResponse.json({ etapas: comConversao, conversaoTotal, valorMovimentado, drill });
 }

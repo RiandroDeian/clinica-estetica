@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
       supabaseAdmin.from("pacotes").select("valor").gte("comprado_em", r.inicio).lt("comprado_em", r.fim),
       supabaseAdmin.from("faturamentos").select("valor_final, status_pagamento").gte("criado_em", r.inicio).lt("criado_em", r.fim),
       supabaseAdmin.from("laser_parcelas").select("valor").gte("data_pagamento", inicioDate).lt("data_pagamento", fimDate),
-      supabaseAdmin.from("laser_sessoes").select("pacote_id").gte("realizada_em", r.inicio).lt("realizada_em", r.fim),
+      supabaseAdmin.from("laser_sessoes").select("pacote_id, valor_reconhecido").gte("realizada_em", r.inicio).lt("realizada_em", r.fim),
     ]);
 
     const fechado = (lp.data ?? []).reduce((s, x) => s + Number(x.valor ?? 0), 0)
@@ -35,11 +35,13 @@ export async function GET(request: NextRequest) {
     let executado = 0;
     const sessoes = sess.data ?? [];
     if (sessoes.length) {
-      const ids = Array.from(new Set(sessoes.map(s => s.pacote_id).filter(Boolean)));
-      const { data: pcsSess } = await supabaseAdmin.from("laser_pacotes").select("id, valor, total_sessoes").in("id", ids as string[]);
+      const semValor = sessoes.filter(s => s.valor_reconhecido == null).map(s => s.pacote_id).filter(Boolean);
       const mapa: Record<string, number> = {};
-      for (const p of pcsSess ?? []) mapa[p.id] = Number(p.valor ?? 0) / ((Number(p.total_sessoes ?? 0)) || 1);
-      executado = sessoes.reduce((s, x) => s + (mapa[x.pacote_id] ?? 0), 0);
+      if (semValor.length) {
+        const { data: pcsSess } = await supabaseAdmin.from("laser_pacotes").select("id, valor, total_sessoes").in("id", Array.from(new Set(semValor)) as string[]);
+        for (const p of pcsSess ?? []) mapa[p.id] = Number(p.valor ?? 0) / ((Number(p.total_sessoes ?? 0)) || 1);
+      }
+      executado = sessoes.reduce((s, x) => s + (x.valor_reconhecido != null ? Number(x.valor_reconhecido) : (mapa[x.pacote_id] ?? 0)), 0);
     }
 
     return { label: r.label, fechado, recebido, executado };
