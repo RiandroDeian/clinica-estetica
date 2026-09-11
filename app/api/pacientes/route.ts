@@ -27,6 +27,7 @@ export async function POST(request: NextRequest) {
       email: body.email || null,
       cpf: body.cpf || null,
       sexo: body.sexo || null,
+      origem: body.origem || null,
       data_nascimento: body.data_nascimento || null,
       alergias: body.alergias || null,
       contraindicacoes: body.contraindicacoes || null,

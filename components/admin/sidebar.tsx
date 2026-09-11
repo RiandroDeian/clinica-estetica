@@ -29,11 +29,13 @@ function Icon({ type }: { type: string }) {
   if (type === "comissoes")    return <svg {...p}><path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 9v1m0-9c-1.11 0-2.08.402-2.599 1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round"/></svg>;
   if (type === "auditoria")     return <svg {...p}><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" strokeLinecap="round" strokeLinejoin="round"/></svg>;
   if (type === "alertas")       return <svg {...p}><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" strokeLinecap="round" strokeLinejoin="round"/><path d="M12 9v4M12 17h.01" strokeLinecap="round" strokeLinejoin="round"/></svg>;
+  if (type === "gestao")        return <svg {...p}><path d="M3 3v18h18" strokeLinecap="round" strokeLinejoin="round"/><path d="M7 15l3-4 3 2 4-6" strokeLinecap="round" strokeLinejoin="round"/></svg>;
   return <svg {...p}><circle cx="12" cy="12" r="3"/></svg>;
 }
 
 const todosLinks: LinkItem[] = [
   { href: "/admin",               label: "Dashboard",     icon: "dashboard"   },
+  { href: "/admin/gestao",        label: "Gestão e Indicadores", icon: "gestao" },
   { href: "/admin/recepcao",      label: "Recepção",      icon: "recepcao"    },
   { href: "/admin/agenda",        label: "Agenda",        icon: "agenda"      },
   { href: "/admin/pacientes",     label: "Pacientes",     icon: "pacientes"   },

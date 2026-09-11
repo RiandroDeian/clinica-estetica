@@ -90,7 +90,7 @@ export default function PacientesPage() {
   }
 
   const [form, setForm] = useState({
-    nome: "", telefone: "", email: "", cpf: "", sexo: "",
+    nome: "", telefone: "", email: "", cpf: "", sexo: "", origem: "",
     data_nascimento: "", alergias: "", contraindicacoes: "",
     observacoes: "", assinou_termo: false, termos_observacao: "",
     endereco: "", bairro: "", cidade: "", cep: "",
@@ -146,7 +146,7 @@ export default function PacientesPage() {
 
   function abrirNovo() {
     setEditando(null);
-    setForm({ nome:"", telefone:"", email:"", cpf:"", sexo:"", data_nascimento:"", alergias:"", contraindicacoes:"", observacoes:"", assinou_termo: false, termos_observacao: "", endereco:"", bairro:"", cidade:"", cep:"", contato_emergencia_nome:"", contato_emergencia_telefone:"", contato_emergencia_parentesco:"" });
+    setForm({ nome:"", telefone:"", email:"", cpf:"", sexo:"", origem:"", data_nascimento:"", alergias:"", contraindicacoes:"", observacoes:"", assinou_termo: false, termos_observacao: "", endereco:"", bairro:"", cidade:"", cep:"", contato_emergencia_nome:"", contato_emergencia_telefone:"", contato_emergencia_parentesco:"" });
     setModalAberto(true);
   }
 
@@ -155,7 +155,7 @@ export default function PacientesPage() {
     setEditando(p);
     setForm({
       nome: p.nome, telefone: p.telefone, email: p.email ?? "",
-      cpf: p.cpf ?? "", sexo: p.sexo ?? "", data_nascimento: p.data_nascimento ?? "",
+      cpf: p.cpf ?? "", sexo: p.sexo ?? "", origem: (p as any).origem ?? "", data_nascimento: p.data_nascimento ?? "",
       alergias: p.alergias ?? "", contraindicacoes: p.contraindicacoes ?? "",
       observacoes: p.observacoes ?? "", assinou_termo: p.assinou_termo,
       termos_observacao: p.termos_observacao ?? "",
@@ -545,6 +545,15 @@ export default function PacientesPage() {
                     </button>
                   ))}
                 </div>
+              </div>
+              <div className="sm:col-span-2">
+                <label className="text-xs uppercase tracking-widest block mb-2" style={{ color: "var(--text-secondary)" }}>Origem <span style={{ textTransform: "none" }}>(como conheceu a clínica)</span></label>
+                <select value={form.origem} onChange={e => setForm(f => ({ ...f, origem: e.target.value }))}
+                  className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
+                  style={{ background: "var(--bg-input)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
+                  <option value="">Selecionar origem...</option>
+                  {["Instagram","Facebook","Google","Anúncio pago","Indicação de paciente","Indicação de parceiro","Passou em frente","Já era paciente","Outro"].map(o => <option key={o} value={o}>{o}</option>)}
+                </select>
               </div>
               <div className="sm:col-span-2 flex items-center gap-3">
                 <button type="button" onClick={() => setForm(f => ({ ...f, assinou_termo: !f.assinou_termo }))}

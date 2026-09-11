@@ -3,6 +3,7 @@
 // sidebar (que esconde do menu o que o usuário não pode acessar), para que os
 // dois nunca fiquem divergentes.
 export const ROTAS_PERMISSOES: Record<string, string> = {
+  "/admin/gestao":        "gestao",
   "/admin/agenda":        "agenda",
   "/admin/pacientes":     "pacientes",
   "/admin/prontuario":    "pacientes",
