@@ -47,9 +47,9 @@ const ABAS = [
   { key: "origem",        label: "Origem",        ativa: true },
   { key: "metas",         label: "Metas",         ativa: true },
   { key: "historico",     label: "Histórico",     ativa: true },
-  { key: "funil",         label: "Funil",         ativa: false },
-  { key: "relatorios",    label: "Relatórios",    ativa: false },
-  { key: "config",        label: "Configurações", ativa: false },
+  { key: "funil",         label: "Funil",         ativa: true },
+  { key: "relatorios",    label: "Relatórios",    ativa: true },
+  { key: "config",        label: "Configurações", ativa: true },
 ];
 
 export default function GestaoPage() {
@@ -81,6 +81,8 @@ export default function GestaoPage() {
   const [carregando, setCarregando] = useState(true);
   const [procs, setProcs] = useState<any[]>([]);
   const [origem, setOrigem] = useState<any[]>([]);
+  const [funil, setFunil] = useState<any>(null);
+  const [perdas, setPerdas] = useState<any[]>([]);
   const [historico, setHistorico] = useState<any[]>([]);
   const [metas, setMetas] = useState<any[]>([]);
   const [funcionarios, setFuncionarios] = useState<any[]>([]);
@@ -88,15 +90,20 @@ export default function GestaoPage() {
 
   const carregar = useCallback(async () => {
     setCarregando(true);
-    const [rK, rP, rO] = await Promise.all([
+    const per = `inicio=${ciclo.inicio.toISOString()}&fim=${ciclo.fim.toISOString()}`;
+    const [rK, rP, rO, rF, rL] = await Promise.all([
       fetch(`/api/gestao?${qs}`).then(r => r.json()),
-      fetch(`/api/gestao/procedimentos?inicio=${ciclo.inicio.toISOString()}&fim=${ciclo.fim.toISOString()}`).then(r => r.json()),
-      fetch(`/api/gestao/origem?inicio=${ciclo.inicio.toISOString()}&fim=${ciclo.fim.toISOString()}`).then(r => r.json()),
+      fetch(`/api/gestao/procedimentos?${per}`).then(r => r.json()),
+      fetch(`/api/gestao/origem?${per}`).then(r => r.json()),
+      fetch(`/api/gestao/funil?${per}`).then(r => r.json()),
+      fetch(`/api/gestao/perdas?${per}`).then(r => r.json()),
     ]);
     setKpis(rK?.kpis ?? null);
     setDrill(rK?.drill ?? null);
     setProcs(Array.isArray(rP) ? rP : []);
     setOrigem(Array.isArray(rO) ? rO : []);
+    setFunil(rF && !rF.erro ? rF : null);
+    setPerdas(Array.isArray(rL) ? rL : []);
     setCarregando(false);
   }, [qs, ciclo]);
 
@@ -229,6 +236,18 @@ export default function GestaoPage() {
 
           {aba === "historico" && (
             <HistoricoTab dados={historico} />
+          )}
+
+          {aba === "funil" && (
+            <FunilTab funil={funil} perdas={perdas} />
+          )}
+
+          {aba === "relatorios" && kpis && (
+            <RelatoriosTab kpis={kpis} ciclo={ciclo} procs={procs} origem={origem} />
+          )}
+
+          {aba === "config" && (
+            <ConfigTab ciclo={ciclo} />
           )}
         </>
       )}
@@ -461,6 +480,117 @@ function HistoricoTab({ dados }: { dados: any[] }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ===== Aba Funil =====
+function FunilTab({ funil, perdas }: { funil: any; perdas: any[] }) {
+  if (!funil) return <div className="text-center py-16 rounded-3xl" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}><p style={{ color: "var(--text-muted)" }}>Sem dados de funil no ciclo</p></div>;
+  const etapas = funil.etapas ?? [];
+  const maxQtd = Math.max(1, ...etapas.map((e: any) => e.qtd));
+  const corEtapa: Record<string, string> = { lead: "#a89bcc", agendado: "#7ab8e8", compareceu: "#7ae8a0", orcamento: "var(--gold)", fechado: "#7ae8a0", perdido: "#e87a7a" };
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* Resumo */}
+      <div className="flex flex-wrap gap-3">
+        <div className="rounded-2xl px-4 py-3 flex-1 min-w-[160px]" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+          <p className="text-[11px] uppercase tracking-widest" style={{ color: "var(--text-muted)" }}>Conversão total</p>
+          <p className="text-lg font-bold" style={{ color: "var(--gold)" }}>{funil.conversaoTotal != null ? `${funil.conversaoTotal.toFixed(1)}%` : "—"}</p>
+        </div>
+        <div className="rounded-2xl px-4 py-3 flex-1 min-w-[160px]" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+          <p className="text-[11px] uppercase tracking-widest" style={{ color: "var(--text-muted)" }}>Valor movimentado</p>
+          <p className="text-lg font-bold" style={{ color: "var(--text-primary)" }}>{fmtMoney(funil.valorMovimentado ?? 0)}</p>
+        </div>
+      </div>
+
+      {/* Barras do funil */}
+      <div className="rounded-3xl p-5 flex flex-col gap-2" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+        {etapas.map((e: any) => (
+          <div key={e.key} className="flex items-center gap-3">
+            <span className="text-xs w-24 flex-shrink-0" style={{ color: "var(--text-secondary)" }}>{e.label}</span>
+            <div className="flex-1 h-8 rounded-lg overflow-hidden" style={{ background: "var(--bg-input)" }}>
+              <div className="h-full rounded-lg flex items-center px-2" style={{ width: `${Math.max(4, (e.qtd / maxQtd) * 100)}%`, background: corEtapa[e.key] ?? "var(--gold)", minWidth: 32 }}>
+                <span className="text-xs font-bold" style={{ color: "#0a0707" }}>{fmtInt(e.qtd)}</span>
+              </div>
+            </div>
+            <span className="text-xs w-28 text-right flex-shrink-0" style={{ color: "var(--text-muted)" }}>
+              {e.valor > 0 ? fmtMoney(e.valor) : ""}
+              {e.conversao != null ? `  ${e.conversao.toFixed(0)}%` : ""}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* Motivos de perda */}
+      <div>
+        <h3 className="text-xs uppercase tracking-widest mb-2" style={{ color: "var(--gold)" }}>Motivos de perda</h3>
+        <TabelaSimples cols={["Motivo", "Qtd", "Valor perdido"]} alinhamentos={["left", "right", "right"]} vazio="Nenhuma perda registrada no ciclo"
+          linhas={perdas.map(p => [p.motivo, fmtInt(p.qtd), fmtMoney(p.valor)])} />
+      </div>
+    </div>
+  );
+}
+
+// ===== Aba Relatórios =====
+function RelatoriosTab({ kpis, ciclo, procs, origem }: { kpis: Kpis; ciclo: Ciclo; procs: any[]; origem: any[] }) {
+  const linhas = CARDS.map(c => {
+    const k = kpis[c.key];
+    const val = k?.tem && k.valor != null ? (c.tipo === "money" ? fmtMoney(k.valor) : fmtInt(k.valor)) : "—";
+    const ant = k?.valorAnterior != null ? (c.tipo === "money" ? fmtMoney(k.valorAnterior) : fmtInt(k.valorAnterior)) : "—";
+    const varr = k?.variacao != null ? `${k.variacao > 0 ? "+" : ""}${k.variacao.toFixed(1)}%` : "—";
+    return { indicador: c.label, val, ant, varr };
+  });
+
+  function exportarCSV() {
+    const linhasCsv = [["Indicador", "Ciclo", "Ciclo anterior", "Variação"], ...linhas.map(l => [l.indicador, l.val, l.ant, l.varr])];
+    const csv = linhasCsv.map(r => r.map(c => `"${c}"`).join(",")).join("\n");
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `gestao-${ciclo.ref}.csv`;
+    a.click();
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex justify-between items-center">
+        <p className="text-sm" style={{ color: "var(--text-muted)" }}>Consolidado do ciclo <strong style={{ color: "var(--text-primary)" }}>{ciclo.label}</strong></p>
+        <button onClick={exportarCSV} className="px-4 py-2 rounded-2xl text-sm font-semibold" style={{ background: "var(--gold)", color: "#0a0707" }}>⬇ Exportar CSV</button>
+      </div>
+      <TabelaSimples cols={["Indicador", "Ciclo", "Ciclo anterior", "Variação"]} alinhamentos={["left", "right", "right", "right"]} vazio="Sem dados"
+        linhas={linhas.map(l => [l.indicador, l.val, l.ant, l.varr])} />
+      <h3 className="text-xs uppercase tracking-widest" style={{ color: "var(--gold)" }}>Procedimentos</h3>
+      <TabelaSimples cols={["Procedimento", "Qtd", "Sessões", "Valor"]} alinhamentos={["left", "right", "right", "right"]} vazio="Sem dados"
+        linhas={procs.map(p => [p.nome, fmtInt(p.qtd), fmtInt(p.sessoes), fmtMoney(p.valor)])} />
+      <h3 className="text-xs uppercase tracking-widest" style={{ color: "var(--gold)" }}>Origem</h3>
+      <TabelaSimples cols={["Origem", "Novos", "Fechamentos", "Valor"]} alinhamentos={["left", "right", "right", "right"]} vazio="Sem dados"
+        linhas={origem.map(o => [o.origem, fmtInt(o.novos), fmtInt(o.fechamentos), fmtMoney(o.valor)])} />
+    </div>
+  );
+}
+
+// ===== Aba Configurações =====
+function ConfigTab({ ciclo }: { ciclo: Ciclo }) {
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="rounded-3xl p-5" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+        <h3 className="text-sm font-bold mb-2" style={{ color: "var(--gold)" }}>Ciclo da clínica</h3>
+        <p className="text-sm" style={{ color: "var(--text-secondary)" }}>O período de análise vai do <strong>dia 15</strong> ao <strong>dia 15</strong> do mês seguinte (o dia 15 pertence ao ciclo que começa nele). Ciclo atual selecionado: <strong style={{ color: "var(--text-primary)" }}>{ciclo.label}</strong>.</p>
+        <p className="text-xs mt-2" style={{ color: "var(--text-muted)" }}>Regra central em <code>lib/ciclo.ts</code> — usada por todos os indicadores, metas e relatórios.</p>
+      </div>
+      <div className="rounded-3xl p-5" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+        <h3 className="text-sm font-bold mb-2" style={{ color: "var(--gold)" }}>Origens de paciente</h3>
+        <div className="flex flex-wrap gap-2">
+          {ORIGENS.map(o => <span key={o} className="text-xs px-3 py-1 rounded-full" style={{ background: "var(--bg-input)", color: "var(--text-secondary)", border: "1px solid var(--border-subtle)" }}>{o}</span>)}
+        </div>
+        <p className="text-xs mt-2" style={{ color: "var(--text-muted)" }}>Definidas no cadastro do paciente (aba Pacientes / Recepção).</p>
+      </div>
+      <div className="rounded-3xl p-5" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+        <h3 className="text-sm font-bold mb-2" style={{ color: "var(--gold)" }}>Funil de vendas</h3>
+        <p className="text-sm" style={{ color: "var(--text-secondary)" }}>O funil usa os <strong>orçamentos</strong>: proposta enviada → <strong>aprovado</strong> (fechado, pela data de fechamento) ou <strong>recusado/expirado</strong> (perdido, com motivo). Registre os orçamentos na aba Orçamentos para alimentar conversão, valor proposto e motivos de perda.</p>
+      </div>
     </div>
   );
 }

@@ -120,13 +120,20 @@ export default function OrcamentosPage() {
   }
 
   async function atualizarStatus(id: string, status: string) {
+    const payload: any = { status };
+    // Ao recusar, registra o motivo da perda (alimenta os relatórios de gestão).
+    if (status === "recusado") {
+      const motivo = prompt("Motivo da perda (ex.: preço, foi pensar, escolheu concorrente, sem retorno):");
+      if (motivo === null) return; // cancelou
+      payload.motivo_perda = motivo.trim() || null;
+    }
     await fetch(`/api/orcamentos/${id}`, {
       method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
+      body: JSON.stringify(payload),
     });
     toast.success(`Status atualizado para ${statusCfg[status]?.label}`);
     buscar();
-    if (detalhe?.id === id) setDetalhe(prev => prev ? { ...prev, status } : null);
+    if (detalhe?.id === id) setDetalhe(prev => prev ? { ...prev, status, ...(payload.motivo_perda !== undefined ? { motivo_perda: payload.motivo_perda } : {}) } : null);
   }
 
   async function excluir(id: string) {

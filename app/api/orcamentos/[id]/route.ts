@@ -22,14 +22,25 @@ export async function PUT(request: NextRequest, { params }: Params) {
   if (!sessao) return NextResponse.json({ erro: "Nao autorizado" }, { status: 401 });
   const { id } = await params;
   const body = await request.json();
-  const itens = body.itens ?? [];
-  const valor_total = itens.reduce((acc: number, i: any) => acc + (Number(i.preco) * Number(i.quantidade)), 0);
-  const desconto    = Number(body.desconto ?? 0);
-  const valor_final = valor_total - desconto;
+
+  const patch: any = { ...body };
+  // Só recalcula os valores quando os itens forem realmente enviados (edição do
+  // orçamento). Numa troca de status (sem itens) preserva os valores existentes.
+  if (body.itens !== undefined) {
+    const itens = body.itens ?? [];
+    patch.itens = itens;
+    patch.valor_total = itens.reduce((acc: number, i: any) => acc + (Number(i.preco) * Number(i.quantidade)), 0);
+    patch.desconto = Number(body.desconto ?? 0);
+    patch.valor_final = patch.valor_total - patch.desconto;
+  }
+  // A data de fechamento (quando aprovado) determina o ciclo da venda.
+  if (body.status === "aprovado" && !body.data_fechamento) {
+    patch.data_fechamento = new Date().toISOString().slice(0, 10);
+  }
 
   const { data, error } = await supabaseAdmin
     .from("orcamentos")
-    .update({ ...body, itens, valor_total, desconto, valor_final })
+    .update(patch)
     .eq("id", id)
     .select("*, pacientes(nome, telefone), funcionarios(nome)")
     .single();
