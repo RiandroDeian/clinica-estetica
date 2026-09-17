@@ -42,6 +42,7 @@ const ORIGENS = ["Instagram", "Facebook", "Google", "Anúncio pago", "Indicaçã
 
 const ABAS = [
   { key: "dashboard",     label: "Dashboard",     ativa: true, fin: false },
+  { key: "resumo",        label: "Resumo diário", ativa: true, fin: false },
   { key: "financeiro",    label: "Financeiro",    ativa: true, fin: true },
   { key: "funil",         label: "Funil",         ativa: true, fin: false },
   { key: "procedimentos", label: "Procedimentos", ativa: true, fin: false },
@@ -90,6 +91,7 @@ export default function GestaoPage() {
   const [perdas, setPerdas] = useState<any[]>([]);
   const [profissionais, setProfissionais] = useState<any[]>([]);
   const [contatar, setContatar] = useState<any>(null);
+  const [resumo, setResumo] = useState<any[]>([]);
   const [viewer, setViewer] = useState<{ financeiro: boolean } | null>(null);
   const [historico, setHistorico] = useState<any[]>([]);
   const [metas, setMetas] = useState<any[]>([]);
@@ -134,6 +136,12 @@ export default function GestaoPage() {
     fetch(`/api/gestao/metas?ciclo_inicio=${ciclo.ref}`).then(r => r.json()).then(d => setMetas(Array.isArray(d) ? d : []));
   }, [ciclo.ref]);
   useEffect(() => { if (aba === "metas") carregarMetas(); }, [aba, carregarMetas]);
+
+  // Resumo diário (carrega ao abrir a aba / trocar ciclo)
+  const carregarResumo = useCallback(() => {
+    fetch(`/api/gestao/resumo?inicio=${ciclo.inicio.toISOString()}&fim=${ciclo.fim.toISOString()}`).then(r => r.json()).then(d => setResumo(Array.isArray(d) ? d : []));
+  }, [ciclo]);
+  useEffect(() => { if (aba === "resumo") carregarResumo(); }, [aba, carregarResumo]);
 
   // Fetch de "Contatar" ao abrir a aba (não depende de ciclo)
   useEffect(() => {
@@ -216,6 +224,10 @@ export default function GestaoPage() {
                 return <CardKpi key={c.key} cfg={c} kpi={kpis[c.key]} clicavel={clicavel} onClick={() => abrirDrill(c.key, c.label)} />;
               })}
             </div>
+          )}
+
+          {aba === "resumo" && (
+            <ResumoTab dados={resumo} onChange={carregarResumo} />
           )}
 
           {aba === "financeiro" && kpis && (
@@ -625,6 +637,120 @@ function ConfigTab({ ciclo }: { ciclo: Ciclo }) {
         <h3 className="text-sm font-bold mb-2" style={{ color: "var(--gold)" }}>Funil de vendas</h3>
         <p className="text-sm" style={{ color: "var(--text-secondary)" }}>O funil usa os <strong>orçamentos</strong>: proposta enviada → <strong>aprovado</strong> (fechado, pela data de fechamento) ou <strong>recusado/expirado</strong> (perdido, com motivo). Registre os orçamentos na aba Orçamentos para alimentar conversão, valor proposto e motivos de perda.</p>
       </div>
+    </div>
+  );
+}
+
+// ===== Aba Resumo diário =====
+function ResumoTab({ dados, onChange }: { dados: any[]; onChange: () => void }) {
+  const hoje = new Date().toISOString().slice(0, 10);
+  const [form, setForm] = useState({ data: hoje, contatos_recebidos: "", contatos_feitos: "", avaliacoes_agendadas: "", avaliacoes_dia: "", fechamentos: "", observacao: "" });
+  const [salvando, setSalvando] = useState(false);
+
+  async function salvar() {
+    if (!form.data) { toast.error("Informe a data"); return; }
+    setSalvando(true);
+    const res = await fetch("/api/gestao/resumo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+    if (res.ok) { toast.success("Dia salvo!"); setForm({ data: hoje, contatos_recebidos: "", contatos_feitos: "", avaliacoes_agendadas: "", avaliacoes_dia: "", fechamentos: "", observacao: "" }); onChange(); }
+    else { const d = await res.json().catch(() => ({})); toast.error(d.erro ? `Erro: ${d.erro}` : "Erro ao salvar"); }
+    setSalvando(false);
+  }
+  async function excluir(id: string) {
+    if (!confirm("Excluir este dia?")) return;
+    const res = await fetch(`/api/gestao/resumo?id=${id}`, { method: "DELETE" });
+    if (res.ok) onChange(); else toast.error("Erro ao excluir");
+  }
+  function editar(d: any) {
+    setForm({ data: d.data, contatos_recebidos: String(d.contatos_recebidos), contatos_feitos: String(d.contatos_feitos), avaliacoes_agendadas: String(d.avaliacoes_agendadas), avaliacoes_dia: String(d.avaliacoes_dia), fechamentos: String(d.fechamentos), observacao: d.observacao ?? "" });
+  }
+
+  const campos = [
+    { key: "contatos_recebidos", label: "Entraram em contato" },
+    { key: "contatos_feitos", label: "Contatamos" },
+    { key: "avaliacoes_agendadas", label: "Agendaram avaliação" },
+    { key: "avaliacoes_dia", label: "Avaliações do dia" },
+    { key: "fechamentos", label: "Fecharam procedimento" },
+  ];
+
+  const tot = dados.reduce((a, d) => ({
+    contatos_recebidos: a.contatos_recebidos + d.contatos_recebidos,
+    contatos_feitos: a.contatos_feitos + d.contatos_feitos,
+    avaliacoes_agendadas: a.avaliacoes_agendadas + d.avaliacoes_agendadas,
+    avaliacoes_dia: a.avaliacoes_dia + d.avaliacoes_dia,
+    fechamentos: a.fechamentos + d.fechamentos,
+  }), { contatos_recebidos: 0, contatos_feitos: 0, avaliacoes_agendadas: 0, avaliacoes_dia: 0, fechamentos: 0 });
+  const pct = (n: number, d: number) => d > 0 ? `${Math.round((n / d) * 100)}%` : "—";
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* Formulário do dia */}
+      <div className="rounded-3xl p-4" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+          <div>
+            <label className="text-[11px] block mb-1" style={{ color: "var(--text-muted)" }}>Data</label>
+            <input type="date" value={form.data} onChange={e => setForm(f => ({ ...f, data: e.target.value }))} className="w-full rounded-xl px-3 py-2 text-sm outline-none" style={{ ...inp, colorScheme: "dark" }} />
+          </div>
+          {campos.map(c => (
+            <div key={c.key}>
+              <label className="text-[11px] block mb-1" style={{ color: "var(--text-muted)" }}>{c.label}</label>
+              <input type="number" min="0" value={(form as any)[c.key]} onChange={e => setForm(f => ({ ...f, [c.key]: e.target.value }))} placeholder="0" className="w-full rounded-xl px-3 py-2 text-sm outline-none" style={inp} />
+            </div>
+          ))}
+          <div className="flex items-end">
+            <button onClick={salvar} disabled={salvando} className="w-full py-2 rounded-xl text-sm font-semibold" style={{ background: "var(--gold)", color: "#0a0707" }}>{salvando ? "..." : "Salvar dia"}</button>
+          </div>
+        </div>
+        <div className="mt-3">
+          <input value={form.observacao} onChange={e => setForm(f => ({ ...f, observacao: e.target.value }))} placeholder="Observação do dia (opcional)" className="w-full rounded-xl px-3 py-2 text-sm outline-none" style={inp} />
+        </div>
+        <p className="text-[11px] mt-2" style={{ color: "var(--text-muted)" }}>Salvar um dia que já existe atualiza os números daquele dia.</p>
+      </div>
+
+      {/* Tabela do ciclo */}
+      {dados.length === 0 ? (
+        <div className="text-center py-12 rounded-3xl" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}><p className="text-3xl mb-2">🗒️</p><p style={{ color: "var(--text-muted)" }}>Nenhum dia registrado neste ciclo</p></div>
+      ) : (
+        <div className="rounded-3xl overflow-hidden" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead><tr style={{ borderBottom: "1px solid var(--border-subtle)" }}>
+                {["Data", "Entraram", "Contatamos", "Agendaram", "Avaliações", "Fecharam", "% Agend.", "% Fech.", ""].map((h, i) => (
+                  <th key={h} className="px-3 py-3 text-xs uppercase tracking-widest" style={{ color: "var(--text-muted)", textAlign: i === 0 || i === 8 ? "left" : "right" }}>{h}</th>
+                ))}
+              </tr></thead>
+              <tbody>
+                {dados.map(d => (
+                  <tr key={d.id} style={{ borderBottom: "1px solid var(--border-subtle)" }}>
+                    <td className="px-3 py-2.5 text-sm" style={{ color: "var(--text-primary)" }}>{new Date(d.data + "T12:00:00").toLocaleDateString("pt-BR")}{d.observacao ? <span className="block text-[11px]" style={{ color: "var(--text-muted)" }}>{d.observacao}</span> : null}</td>
+                    <td className="px-3 py-2.5 text-sm text-right" style={{ color: "var(--text-secondary)" }}>{d.contatos_recebidos}</td>
+                    <td className="px-3 py-2.5 text-sm text-right" style={{ color: "var(--text-secondary)" }}>{d.contatos_feitos}</td>
+                    <td className="px-3 py-2.5 text-sm text-right" style={{ color: "var(--text-secondary)" }}>{d.avaliacoes_agendadas}</td>
+                    <td className="px-3 py-2.5 text-sm text-right" style={{ color: "var(--text-secondary)" }}>{d.avaliacoes_dia}</td>
+                    <td className="px-3 py-2.5 text-sm text-right font-semibold" style={{ color: "var(--gold)" }}>{d.fechamentos}</td>
+                    <td className="px-3 py-2.5 text-sm text-right" style={{ color: "var(--text-muted)" }}>{pct(d.avaliacoes_agendadas, d.contatos_recebidos + d.contatos_feitos)}</td>
+                    <td className="px-3 py-2.5 text-sm text-right" style={{ color: "var(--text-muted)" }}>{pct(d.fechamentos, d.avaliacoes_dia)}</td>
+                    <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                      <button onClick={() => editar(d)} className="text-[11px] mr-2" style={{ color: "var(--info, #7ab8e8)" }}>editar</button>
+                      <button onClick={() => excluir(d.id)} className="text-[11px]" style={{ color: "#e87a7a" }}>excluir</button>
+                    </td>
+                  </tr>
+                ))}
+                <tr style={{ background: "var(--bg-input)" }}>
+                  <td className="px-3 py-3 text-sm font-bold" style={{ color: "var(--gold)" }}>Total</td>
+                  <td className="px-3 py-3 text-sm text-right font-bold" style={{ color: "var(--gold)" }}>{tot.contatos_recebidos}</td>
+                  <td className="px-3 py-3 text-sm text-right font-bold" style={{ color: "var(--gold)" }}>{tot.contatos_feitos}</td>
+                  <td className="px-3 py-3 text-sm text-right font-bold" style={{ color: "var(--gold)" }}>{tot.avaliacoes_agendadas}</td>
+                  <td className="px-3 py-3 text-sm text-right font-bold" style={{ color: "var(--gold)" }}>{tot.avaliacoes_dia}</td>
+                  <td className="px-3 py-3 text-sm text-right font-bold" style={{ color: "var(--gold)" }}>{tot.fechamentos}</td>
+                  <td className="px-3 py-3 text-sm text-right font-bold" style={{ color: "var(--gold)" }}>{pct(tot.avaliacoes_agendadas, tot.contatos_recebidos + tot.contatos_feitos)}</td>
+                  <td className="px-3 py-3 text-sm text-right font-bold" style={{ color: "var(--gold)" }}>{pct(tot.fechamentos, tot.avaliacoes_dia)}</td>
+                  <td></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

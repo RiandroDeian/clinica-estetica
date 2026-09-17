@@ -35,6 +35,7 @@ export function ModalCadastrarPaciente({ agendamento, onClose, onSuccess }: Prop
   const [alergias, setAlergias] = useState("");
   const [contraindicacoes, setContraindicacoes] = useState("");
   const [observacoes, setObservacoes] = useState("");
+  const [origem, setOrigem] = useState("");
 
   async function handleCadastrar() {
     setErro("");
@@ -58,6 +59,7 @@ export function ModalCadastrarPaciente({ agendamento, onClose, onSuccess }: Prop
         alergias: alergias.trim() || null,
         contraindicacoes: contraindicacoes.trim() || null,
         observacoes: observacoes.trim() || null,
+        origem: origem || null,
       }),
     });
 
@@ -154,6 +156,14 @@ export function ModalCadastrarPaciente({ agendamento, onClose, onSuccess }: Prop
               <input type="date" value={dataNascimento} onChange={(e) => setDataNascimento(e.target.value)}
                 className={inputClass} style={{ ...inputStyle, colorScheme: "dark" }} />
             </div>
+          </div>
+          <div>
+            <label className={labelClass} style={labelStyle}>Como conheceu a clínica?</label>
+            <select value={origem} onChange={(e) => setOrigem(e.target.value)} className={inputClass}
+              style={{ ...inputStyle, color: origem ? "#e8d5c0" : "#3a2e28" }}>
+              <option value="">Selecionar origem...</option>
+              {["Instagram","Facebook","Google","Anúncio pago","Indicação de paciente","Indicação de parceiro","Passou em frente","Já era paciente","Outro"].map(o => <option key={o} value={o}>{o}</option>)}
+            </select>
           </div>
           <div>
             <label className={labelClass} style={labelStyle}>Alergias</label>
