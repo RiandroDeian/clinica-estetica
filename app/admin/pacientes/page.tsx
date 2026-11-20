@@ -51,6 +51,21 @@ export default function PacientesPage() {
   const [excluindo, setExcluindo] = useState(false);
   const [editando, setEditando] = useState<Paciente | null>(null);
   const [painelPaciente, setPainelPaciente] = useState<Paciente | null>(null);
+  const [historico, setHistorico] = useState<any[]>([]);
+  const [carregandoHist, setCarregandoHist] = useState(false);
+
+  // Ao abrir um paciente, busca o histórico de atendimentos dele (agendamentos)
+  useEffect(() => {
+    if (!painelPaciente?.id) { setHistorico([]); return; }
+    let cancelado = false;
+    setCarregandoHist(true);
+    fetch(`/api/prontuario?paciente_id=${painelPaciente.id}`)
+      .then(r => r.json())
+      .then(d => { if (!cancelado) setHistorico(Array.isArray(d?.agendamentos) ? d.agendamentos : []); })
+      .catch(() => { if (!cancelado) setHistorico([]); })
+      .finally(() => { if (!cancelado) setCarregandoHist(false); });
+    return () => { cancelado = true; };
+  }, [painelPaciente?.id]);
 
   // ✅ Follow-ups pendentes (só para quem tem o alerta ligado)
   const [followUps, setFollowUps] = useState<Record<string, FollowUp[]>>({});
@@ -444,6 +459,41 @@ export default function PacientesPage() {
                 📄 {painelPaciente.termos_observacao}
               </p>
             )}
+
+            {/* Histórico de atendimentos */}
+            <div className="pt-3" style={{ borderTop: "1px solid var(--border-subtle)" }}>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs uppercase tracking-widest" style={{ color: "var(--gold)" }}>Histórico de atendimentos</p>
+                {historico.length > 0 && <span className="text-xs" style={{ color: "var(--text-muted)" }}>{historico.length}</span>}
+              </div>
+              {carregandoHist ? (
+                <p className="text-xs" style={{ color: "var(--text-muted)" }}>Carregando...</p>
+              ) : historico.length === 0 ? (
+                <p className="text-xs" style={{ color: "var(--text-muted)" }}>Nenhum atendimento registrado.</p>
+              ) : (
+                <div className="flex flex-col gap-1.5">
+                  {historico.map((a: any) => {
+                    const nome = a.procedimentos?.nome || a.procedimento || "Atendimento";
+                    const cor = a.procedimentos?.cor || "var(--gold)";
+                    const cancelado = a.status === "cancelado";
+                    const quando = a.inicio ?? a.data;
+                    return (
+                      <div key={a.id} className="flex items-start gap-2 py-1.5 px-2.5 rounded-xl" style={{ background: "var(--bg-input)" }}>
+                        <span className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0" style={{ background: cancelado ? "#e87a7a" : cor }} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm" style={{ color: "var(--text-primary)", textDecoration: cancelado ? "line-through" : "none" }}>{nome}</p>
+                          <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+                            {quando ? new Date(quando).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—"}
+                            {a.funcionarios?.nome ? ` · ${a.funcionarios.nome}` : ""}
+                            {cancelado ? " · cancelado" : a.status === "finalizado" ? " · realizado" : a.status ? ` · ${a.status}` : ""}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Ações */}
