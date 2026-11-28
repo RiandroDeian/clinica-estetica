@@ -38,7 +38,6 @@ const INDICADORES_META = [
   { key: "fechamentos",     label: "Fechamentos",     tipo: "int" },
 ];
 
-const ORIGENS = ["Instagram", "Facebook", "Google", "Anúncio pago", "Indicação de paciente", "Indicação de parceiro", "Passou em frente", "Já era paciente", "Outro"];
 
 const ABAS = [
   { key: "dashboard",     label: "Dashboard",     ativa: true, fin: false },
@@ -255,13 +254,7 @@ export default function GestaoPage() {
           )}
 
           {aba === "origem" && (
-            <TabelaSimples
-              vazio="Sem dados de origem no ciclo"
-              cols={["Origem", "Novos", "Agendados", "Compareceram", "Fechamentos", "Conversão", "Valor"]}
-              linhas={origem.map(o => [o.origem, fmtInt(o.novos), fmtInt(o.agendados), fmtInt(o.compareceram), fmtInt(o.fechamentos), o.conversao != null ? `${o.conversao.toFixed(0)}%` : "—", fmtMoney(o.valor)])}
-              alinhamentos={["left", "right", "right", "right", "right", "right", "right"]}
-              rodape={origem.length > 0 ? ["Total", fmtInt(origem.reduce((s, o) => s + o.novos, 0)), fmtInt(origem.reduce((s, o) => s + o.agendados, 0)), fmtInt(origem.reduce((s, o) => s + o.compareceram, 0)), fmtInt(origem.reduce((s, o) => s + o.fechamentos, 0)), "", fmtMoney(origem.reduce((s, o) => s + o.valor, 0))] : undefined}
-            />
+            <OrigemTab ciclo={ciclo} />
           )}
 
           {aba === "metas" && (
@@ -617,6 +610,113 @@ function RelatoriosTab({ kpis, ciclo, procs, origem }: { kpis: Kpis; ciclo: Cicl
   );
 }
 
+// ===== Aba Origem (com filtro de período próprio) =====
+function OrigemTab({ ciclo }: { ciclo: Ciclo }) {
+  const [periodo, setPeriodo] = useState("ciclo");
+  const [dados, setDados] = useState<any[]>([]);
+  const [carregando, setCarregando] = useState(true);
+
+  const faixa = useMemo(() => {
+    const agora = new Date();
+    const fim = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() + 1); // fim do dia de hoje
+    if (periodo === "ciclo") return { inicio: ciclo.inicio, fim: ciclo.fim, label: ciclo.label };
+    if (periodo === "semana") return { inicio: new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() - 6), fim, label: "Últimos 7 dias" };
+    if (periodo === "mes") return { inicio: new Date(agora.getFullYear(), agora.getMonth(), 1), fim, label: "Este mês" };
+    if (periodo === "3meses") return { inicio: new Date(agora.getFullYear(), agora.getMonth() - 3, agora.getDate()), fim, label: "Últimos 3 meses" };
+    if (periodo === "ano") return { inicio: new Date(agora.getFullYear(), 0, 1), fim, label: "Este ano" };
+    return { inicio: ciclo.inicio, fim: ciclo.fim, label: ciclo.label };
+  }, [periodo, ciclo]);
+
+  useEffect(() => {
+    setCarregando(true);
+    fetch(`/api/gestao/origem?inicio=${faixa.inicio.toISOString()}&fim=${faixa.fim.toISOString()}`)
+      .then(r => r.json()).then(d => setDados(Array.isArray(d) ? d : [])).finally(() => setCarregando(false));
+  }, [faixa]);
+
+  const opcoes = [
+    { k: "ciclo", l: "Ciclo atual" }, { k: "semana", l: "Semana" }, { k: "mes", l: "Mês" }, { k: "3meses", l: "3 meses" }, { k: "ano", l: "Ano" },
+  ];
+  const tot = (campo: string) => dados.reduce((s, o) => s + (o[campo] || 0), 0);
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center gap-2">
+        {opcoes.map(o => (
+          <button key={o.k} onClick={() => setPeriodo(o.k)} className="px-3 py-1.5 rounded-xl text-xs transition" style={{ background: periodo === o.k ? "var(--gold)" : "var(--bg-card)", color: periodo === o.k ? "#0a0707" : "var(--text-muted)", border: "1px solid var(--border-color)" }}>{o.l}</button>
+        ))}
+        <span className="text-xs ml-2" style={{ color: "var(--text-muted)" }}>{faixa.label}</span>
+      </div>
+      {carregando ? (
+        <div className="flex items-center justify-center h-32"><div className="w-7 h-7 rounded-full border-2 animate-spin" style={{ borderColor: "rgba(200,160,120,0.2)", borderTopColor: "var(--gold)" }} /></div>
+      ) : (
+        <TabelaSimples
+          vazio="Sem dados de origem no período"
+          cols={["Origem", "Novos", "Agendados", "Compareceram", "Fechamentos", "Conversão", "Valor"]}
+          alinhamentos={["left", "right", "right", "right", "right", "right", "right"]}
+          linhas={dados.map(o => [o.origem, fmtInt(o.novos), fmtInt(o.agendados), fmtInt(o.compareceram), fmtInt(o.fechamentos), o.conversao != null ? `${o.conversao.toFixed(0)}%` : "—", fmtMoney(o.valor)])}
+          rodape={dados.length > 0 ? ["Total", fmtInt(tot("novos")), fmtInt(tot("agendados")), fmtInt(tot("compareceram")), fmtInt(tot("fechamentos")), "", fmtMoney(tot("valor"))] : undefined}
+        />
+      )}
+    </div>
+  );
+}
+
+// ===== Gestão das origens (editável) =====
+function OrigensConfig() {
+  const [lista, setLista] = useState<any[]>([]);
+  const [nova, setNova] = useState("");
+  const [carregando, setCarregando] = useState(true);
+
+  const carregar = useCallback(() => {
+    fetch("/api/gestao/origens?todos=1").then(r => r.json()).then(d => setLista(Array.isArray(d) ? d : [])).finally(() => setCarregando(false));
+  }, []);
+  useEffect(() => { carregar(); }, [carregar]);
+
+  async function adicionar() {
+    const nome = nova.trim();
+    if (!nome) return;
+    const res = await fetch("/api/gestao/origens", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nome }) });
+    if (res.ok) { setNova(""); carregar(); } else { const d = await res.json().catch(() => ({})); toast.error(d.erro ? `Erro: ${d.erro}` : "Erro ao adicionar"); }
+  }
+  async function toggle(o: any) {
+    const res = await fetch("/api/gestao/origens", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: o.id, ativo: !o.ativo }) });
+    if (res.ok) carregar();
+  }
+  async function excluir(id: string) {
+    if (!confirm("Excluir esta origem? (os pacientes já cadastrados com ela mantêm o valor)")) return;
+    const res = await fetch(`/api/gestao/origens?id=${id}`, { method: "DELETE" });
+    if (res.ok) carregar();
+  }
+
+  return (
+    <div className="rounded-3xl p-5" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+      <h3 className="text-sm font-bold mb-1" style={{ color: "var(--gold)" }}>Origens de paciente</h3>
+      <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>Adicione canais e parceiros (ex.: "Parceira Maria"). Aparecem no cadastro do paciente (Pacientes / Recepção) e no resumo da aba Origem.</p>
+      <div className="flex gap-2 mb-3">
+        <input value={nova} onChange={e => setNova(e.target.value)} onKeyDown={e => { if (e.key === "Enter") adicionar(); }} placeholder="Nova origem ou parceiro..." className="flex-1 rounded-xl px-3 py-2 text-sm outline-none" style={inp} />
+        <button onClick={adicionar} className="px-4 py-2 rounded-xl text-sm font-semibold" style={{ background: "var(--gold)", color: "#0a0707" }}>+ Adicionar</button>
+      </div>
+      {carregando ? (
+        <p className="text-xs" style={{ color: "var(--text-muted)" }}>Carregando...</p>
+      ) : lista.length === 0 ? (
+        <p className="text-xs" style={{ color: "var(--text-muted)" }}>Nenhuma origem cadastrada — rode a migração (gestao_origens) ou adicione acima.</p>
+      ) : (
+        <div className="flex flex-col gap-1.5">
+          {lista.map(o => (
+            <div key={o.id} className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl" style={{ background: "var(--bg-input)", opacity: o.ativo ? 1 : 0.5 }}>
+              <span className="text-sm" style={{ color: "var(--text-primary)", textDecoration: o.ativo ? "none" : "line-through" }}>{o.nome}</span>
+              <div className="flex items-center gap-3 flex-shrink-0">
+                <button onClick={() => toggle(o)} className="text-[11px]" style={{ color: o.ativo ? "var(--text-muted)" : "#7ae8a0" }}>{o.ativo ? "desativar" : "ativar"}</button>
+                <button onClick={() => excluir(o.id)} className="text-[11px]" style={{ color: "#e87a7a" }}>excluir</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ===== Aba Configurações =====
 function ConfigTab({ ciclo }: { ciclo: Ciclo }) {
   return (
@@ -626,13 +726,7 @@ function ConfigTab({ ciclo }: { ciclo: Ciclo }) {
         <p className="text-sm" style={{ color: "var(--text-secondary)" }}>O período de análise vai do <strong>dia 15</strong> ao <strong>dia 15</strong> do mês seguinte (o dia 15 pertence ao ciclo que começa nele). Ciclo atual selecionado: <strong style={{ color: "var(--text-primary)" }}>{ciclo.label}</strong>.</p>
         <p className="text-xs mt-2" style={{ color: "var(--text-muted)" }}>Regra central em <code>lib/ciclo.ts</code> — usada por todos os indicadores, metas e relatórios.</p>
       </div>
-      <div className="rounded-3xl p-5" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-        <h3 className="text-sm font-bold mb-2" style={{ color: "var(--gold)" }}>Origens de paciente</h3>
-        <div className="flex flex-wrap gap-2">
-          {ORIGENS.map(o => <span key={o} className="text-xs px-3 py-1 rounded-full" style={{ background: "var(--bg-input)", color: "var(--text-secondary)", border: "1px solid var(--border-subtle)" }}>{o}</span>)}
-        </div>
-        <p className="text-xs mt-2" style={{ color: "var(--text-muted)" }}>Definidas no cadastro do paciente (aba Pacientes / Recepção).</p>
-      </div>
+      <OrigensConfig />
       <div className="rounded-3xl p-5" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
         <h3 className="text-sm font-bold mb-2" style={{ color: "var(--gold)" }}>Funil de vendas</h3>
         <p className="text-sm" style={{ color: "var(--text-secondary)" }}>O funil usa os <strong>orçamentos</strong>: proposta enviada → <strong>aprovado</strong> (fechado, pela data de fechamento) ou <strong>recusado/expirado</strong> (perdido, com motivo). Registre os orçamentos na aba Orçamentos para alimentar conversão, valor proposto e motivos de perda.</p>

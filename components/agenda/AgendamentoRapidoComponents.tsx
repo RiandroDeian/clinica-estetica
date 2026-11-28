@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export function BadgeSemCadastro() {
   return (
@@ -36,6 +36,10 @@ export function ModalCadastrarPaciente({ agendamento, onClose, onSuccess }: Prop
   const [contraindicacoes, setContraindicacoes] = useState("");
   const [observacoes, setObservacoes] = useState("");
   const [origem, setOrigem] = useState("");
+  const [origensOpcoes, setOrigensOpcoes] = useState<string[]>(["Instagram", "Facebook", "Google", "Tráfego pago", "Indicação", "Indicação de paciente", "Indicação de parceiro", "Passou em frente", "Já era paciente", "Outro"]);
+  useEffect(() => {
+    fetch("/api/gestao/origens").then(r => r.json()).then((d: any) => { if (Array.isArray(d) && d.length) setOrigensOpcoes(d.map((o: any) => o.nome)); }).catch(() => {});
+  }, []);
 
   async function handleCadastrar() {
     setErro("");
@@ -162,7 +166,7 @@ export function ModalCadastrarPaciente({ agendamento, onClose, onSuccess }: Prop
             <select value={origem} onChange={(e) => setOrigem(e.target.value)} className={inputClass}
               style={{ ...inputStyle, color: origem ? "#e8d5c0" : "#3a2e28" }}>
               <option value="">Selecionar origem...</option>
-              {["Instagram","Facebook","Google","Anúncio pago","Indicação de paciente","Indicação de parceiro","Passou em frente","Já era paciente","Outro"].map(o => <option key={o} value={o}>{o}</option>)}
+              {origensOpcoes.map(o => <option key={o} value={o}>{o}</option>)}
             </select>
           </div>
           <div>

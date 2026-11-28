@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useCallback } from "react";
 
+const ORIGENS_PADRAO = ["Instagram", "Facebook", "Google", "Tráfego pago", "Indicação", "Indicação de paciente", "Indicação de parceiro", "Passou em frente", "Já era paciente", "Outro"];
+
 type Paciente = {
   id: string;
   nome: string;
@@ -53,6 +55,14 @@ export default function PacientesPage() {
   const [painelPaciente, setPainelPaciente] = useState<Paciente | null>(null);
   const [historico, setHistorico] = useState<any[]>([]);
   const [carregandoHist, setCarregandoHist] = useState(false);
+  const [origensOpcoes, setOrigensOpcoes] = useState<string[]>(ORIGENS_PADRAO);
+
+  // Lista de origens editável (gerenciada em Gestão → Configurações); cai no padrão se vazia
+  useEffect(() => {
+    fetch("/api/gestao/origens").then(r => r.json()).then((d: any) => {
+      if (Array.isArray(d) && d.length) setOrigensOpcoes(d.map((o: any) => o.nome));
+    }).catch(() => {});
+  }, []);
 
   // Ao abrir um paciente, busca o histórico de atendimentos dele (agendamentos)
   useEffect(() => {
@@ -602,7 +612,8 @@ export default function PacientesPage() {
                   className="w-full rounded-2xl px-4 py-3 text-sm outline-none"
                   style={{ background: "var(--bg-input)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
                   <option value="">Selecionar origem...</option>
-                  {["Instagram","Facebook","Google","Anúncio pago","Indicação de paciente","Indicação de parceiro","Passou em frente","Já era paciente","Outro"].map(o => <option key={o} value={o}>{o}</option>)}
+                  {origensOpcoes.map(o => <option key={o} value={o}>{o}</option>)}
+                  {form.origem && !origensOpcoes.includes(form.origem) && <option value={form.origem}>{form.origem}</option>}
                 </select>
               </div>
               <div className="sm:col-span-2 flex items-center gap-3">

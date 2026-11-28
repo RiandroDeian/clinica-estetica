@@ -30,6 +30,7 @@ function Icon({ type }: { type: string }) {
   if (type === "auditoria")     return <svg {...p}><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" strokeLinecap="round" strokeLinejoin="round"/></svg>;
   if (type === "alertas")       return <svg {...p}><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" strokeLinecap="round" strokeLinejoin="round"/><path d="M12 9v4M12 17h.01" strokeLinecap="round" strokeLinejoin="round"/></svg>;
   if (type === "gestao")        return <svg {...p}><path d="M3 3v18h18" strokeLinecap="round" strokeLinejoin="round"/><path d="M7 15l3-4 3 2 4-6" strokeLinecap="round" strokeLinejoin="round"/></svg>;
+  if (type === "historico")     return <svg {...p}><path d="M3 3h18v4H3zM3 10h18M3 10v11h18V10M8 14h8M8 17h5" strokeLinecap="round" strokeLinejoin="round"/></svg>;
   return <svg {...p}><circle cx="12" cy="12" r="3"/></svg>;
 }
 
@@ -41,6 +42,7 @@ const todosLinks: LinkItem[] = [
   { href: "/admin/pacientes",     label: "Pacientes",     icon: "pacientes"   },
   { href: "/admin/alertas",       label: "Alertas",       icon: "alertas"     },
   { href: "/admin/prontuario",    label: "Prontuário",    icon: "prontuario"  },
+  { href: "/admin/historico",     label: "Histórico",     icon: "historico"   },
   { href: "/admin/laser",         label: "Laser",         icon: "laser"       },
   { href: "/admin/pacotes",       label: "Pacotes",       icon: "pacotes"     },
   { href: "/admin/procedimentos", label: "Procedimentos", icon: "procedimentos" },
